@@ -1,0 +1,38 @@
+holonomic_robot: false
+track_base_link: true
+estimate_pose_angle: false
+base_link_frame: 'base_link'
+Kd_ang: 0.3
+Kd_lat: 0.3
+Ki_ang: 0.0
+Ki_lat: 0.0
+Kp_ang: 1.0
+Kp_lat: 1.0
+l: 2.0
+feedback_ang: false
+feedback_lat: true
+feedforward_ang: false
+feedforward_lat: true
+controller_debug_enabled: true
+target_end_x_vel: 0.0
+target_x_acc: 2.0
+target_x_decc: 2.0
+target_x_vel: 2.0
+abs_minimum_x_vel: 0.025
+max_error_x_vel: 1.0
+max_yaw_vel: 2.0
+max_yaw_acc: 2.0
+min_turning_radius: 0.0
+
+# MPC
+use_mpc: false
+mpc_max_error_lat: 0.5
+mpc_max_fwd_iter: 200
+mpc_max_vel_optimization_iterations: 5
+mpc_min_x_vel: 0.5
+mpc_simulation_sample_time: 0.05
+
+# anti-collision:
+anti_collision: true
+obstacle_speed_reduction: true
+collision_look_ahead_resolution: 1.0  # [m]

@@ -1,0 +1,18 @@
+map_frame: 'map'
+global_frame: 'map'
+controller_frequency: 20.0
+controller_max_retries: 0
+controllers:
+  - name: 'PathTrackingPID'
+    type: 'path_tracking_pid/TrackingPidLocalPlanner'
+PathTrackingPID:
+  holonomic_robot: false
+  track_base_link: true
+  estimate_pose_angle: false
+  base_link_frame: 'base_link'
+  target_x_acc: 1.0
+  target_x_decc: 0.3
+  abs_minimum_x_vel: 0.0
+  anti_collision: true
+  use_mpc: false
+  controller_debug_enabled: true

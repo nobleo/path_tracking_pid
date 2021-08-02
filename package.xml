@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>path_tracking_pid</name>
+  <version>2.15.0</version>
+  <description>Follows a trajectory with open-loop speed and closed loop (pid) lateral control</description>
+
+  <maintainer email="cesar.lopez@nobleo.nl">Cesar Lopez</maintainer>
+
+  <author email="cesar.lopez@nobleo.nl">Cesar Lopez</author>
+  <author email="michiel.francke@nobleo.nl">Michiel Francke</author>
+
+  <license>TBD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>roslint</build_depend>
+  <build_depend>rostest</build_depend>
+  <build_export_depend>message_runtime</build_export_depend>
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>geometry_msgs</depend>
+  <depend>mbf_costmap_core</depend>
+  <depend>mbf_msgs</depend>
+  <depend>nav_core</depend>
+  <depend>nav_msgs</depend>
+  <depend>pluginlib</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+  <exec_depend>mbf_costmap_nav</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <test_depend>mobile_robot_simulator</test_depend>
+
+  <export>
+    <nav_core plugin="${prefix}/path_tracking_pid_plugin.xml"/>
+    <mbf_costmap_core plugin="${prefix}/path_tracking_pid_plugin.xml"/>
+  </export>
+</package>
