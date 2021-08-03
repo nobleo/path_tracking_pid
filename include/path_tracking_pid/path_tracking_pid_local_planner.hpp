@@ -29,6 +29,7 @@
 #include <visualization_msgs/MarkerArray.h>
 
 #define MAP_PARALLEL_THRESH 0.2
+constexpr double DT_MAX=1.5;
 
 
 BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::Point, double, cs::cartesian, x, y)
