@@ -192,6 +192,11 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
+  else if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
+  {
+    ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
+    return false;
+  }
   try
   {
     ROS_DEBUG("map_frame: %s, base_link_frame: %s", map_frame_.c_str(), base_link_frame_.c_str());
