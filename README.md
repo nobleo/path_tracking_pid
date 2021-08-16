@@ -101,6 +101,8 @@ Tracking_pid parameters are all available through (rqt_)dynamic_reconfigure. The
 
 * **`l`** (double, default: `0.5`) Following distance from robot's rotational point to trajectory.
 * **`track_base_link`** (bool, default: `false`) Whether to track the path using the base_link instead of the control point ahead. A smooth path is needed.
+* **`init_vel_method`** (enum, default: `1`) Method to choose initial velocity on new paths.
+* **`init_vel_max_diff`** (double, default: `0.5`) How much velocity difference is acceptable upon starting a new path. If internal state and new path's velocity differ more than this, the path will be rejected. Set to -1 to ignore this check.
 
 Proportional, Integral and Derivative actions for the two closed loops: Lateral and angular loops.
 

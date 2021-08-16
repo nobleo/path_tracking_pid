@@ -137,7 +137,9 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
 
   // Feasability check, but only when not resuming with odom-vel
   if (pid_controller_.getConfig().init_vel_method != Pid_Odom &&
-      std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) > 0.5)
+      pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
+      std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
+        pid_controller_.getConfig().init_vel_max_diff)
   {
     ROS_ERROR("Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
               latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
