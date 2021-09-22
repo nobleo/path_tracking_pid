@@ -74,12 +74,12 @@ class TestPathTrackingPID(unittest.TestCase):
 
             self.assertTrue(finished_in_time, msg="Action call didn't return in time")
             self.assertEqual(client.get_state(), outcome_exp, msg="Wrong action outcome")
-            self.assertTrue(endpose_error < 0.5, msg="Did not arrive on final path's pose! \
-                                                      pose: {}, {} endpoint: {}, {}".format(
-                                                            self.cur_odom.pose.pose.position.x,
-                                                            self.cur_odom.pose.pose.position.y,
-                                                            path.poses[-1].pose.position.x,
-                                                            path.poses[-1].pose.position.y))
+            self.assertTrue(endpose_error < 1.0, msg=
+                "Did not arrive on final path's pose! pose: {}, {} endpoint: {}, {}".format(
+                    self.cur_odom.pose.pose.position.x,
+                    self.cur_odom.pose.pose.position.y,
+                    path.poses[-1].pose.position.x,
+                    path.poses[-1].pose.position.y))
 
 
 if __name__ == "__main__":
