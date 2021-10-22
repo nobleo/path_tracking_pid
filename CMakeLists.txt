@@ -1,110 +1,83 @@
-cmake_minimum_required(VERSION 3.0.2)
-add_compile_options(-std=c++17)
+cmake_minimum_required(VERSION 3.8)
 project(path_tracking_pid)
 
-## Find catkin and any catkin packages
-find_package(catkin REQUIRED
-  COMPONENTS
-    actionlib
-    actionlib_msgs
-    dynamic_reconfigure
-    geometry_msgs
-    mbf_costmap_core
-    mbf_msgs
-    message_generation
-    nav_core
-    nav_msgs
-    pluginlib
-    roscpp
-    roslint
-    rospy
-    rostest
-    std_msgs
-    std_srvs
-    tf2
-    tf2_geometry_msgs
-    tf2_ros
-    visualization_msgs
-)
+find_package(ament_cmake REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(nav2_common REQUIRED)
+find_package(nav2_core REQUIRED)
+find_package(nav2_costmap_2d REQUIRED)
+find_package(nav2_util REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-add_message_files(
-  FILES
-    PidDebug.msg
-    PidFeedback.msg
-)
-
-generate_dynamic_reconfigure_options(
-  cfg/Pid.cfg
-)
-
-generate_messages(
-  DEPENDENCIES
-    actionlib_msgs
-    geometry_msgs
-    nav_msgs
-    std_msgs
-)
-
-catkin_package(
-  CATKIN_DEPENDS
-    actionlib
-    actionlib_msgs
-    dynamic_reconfigure
-    geometry_msgs
-    mbf_costmap_core
-    mbf_msgs
-    message_runtime
-    nav_msgs
-    pluginlib
-    roscpp
-    std_msgs
-    std_srvs
-    tf2_geometry_msgs
-    tf2_ros
-    visualization_msgs
-)
-
-add_library(${PROJECT_NAME} src/controller.cpp src/${PROJECT_NAME}_local_planner.cpp)
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
+nav2_package()
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
-  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
 )
 
-# Configure roslint for nodes
-
-# Roslint cpp
-set(ROSLINT_CPP_OPTS "--filter=-legal/copyright")
-roslint_cpp()
-
-install(
-  TARGETS
-    ${PROJECT_NAME}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+set(dependencies
+  builtin_interfaces
+  geometry_msgs
+  nav2_costmap_2d
+  pluginlib
+  nav_msgs
+  nav2_util
+  nav2_core
+  rclcpp
+  tf2
+  tf2_geometry_msgs
+  visualization_msgs
 )
 
-# Install files
-install(
-  FILES
-    README.md
-    ${PROJECT_NAME}_plugin.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/PidDebug.msg"
+  "msg/PidFeedback.msg"
+  DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
-# Install directories
-install(
-  DIRECTORY
-    doc
-    launch
-    param
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+set(library_name path_tracking_pid_lib)
+
+add_library(${library_name} SHARED
+        src/path_tracking_pid_nav2_controller.cpp)
+
+# # prevent pluginlib from using boost
+# target_compile_definitions(${library_name} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+
+ament_target_dependencies(${library_name}
+  ${dependencies}
 )
 
-if(CATKIN_ENABLE_TESTING)
-  add_rostest(test/test_path_tracking_pid.test ARGS rviz:=false reconfigure:=false)
+rosidl_target_interfaces(${library_name}  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+install(TARGETS ${library_name}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_include_directories(include)
+ament_export_libraries(${library_name})
+ament_export_dependencies(${dependencies})
+
+pluginlib_export_plugin_description_file(nav2_core path_tracking_pid.xml)
+
+ament_package()

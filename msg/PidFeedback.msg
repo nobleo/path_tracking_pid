@@ -1,2 +1,2 @@
-duration eda       # Estimated (optimistic) duration remaining
+builtin_interfaces/Duration eda       # Estimated (optimistic) duration remaining
 float32  progress  # Progress in distance of the path traveled

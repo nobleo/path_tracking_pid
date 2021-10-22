@@ -1,28 +1,23 @@
 #pragma once
-#include <limits>
-#include <utility>
-#include <string>
-#include <vector>
-#include <memory>
-#include <algorithm>
 
 #include <angles/angles.h>
-#include "builtin_interfaces/msg/duration.hpp"
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-#include <nav_msgs/msg/path.hpp>
-#include "nav2_util/odometry_utils.hpp"
-#include "visualization_msgs/msg/marker.hpp"
-#include <path_tracking_pid/msg/pid_debug.hpp>
-#include <path_tracking_pid/msg/pid_feedback.hpp>
-
-
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <ros/ros.h>
+#include <std_msgs/Duration.h>
+#include <string>
 #include <tf2/LinearMath/Transform.h>
-// #include <tf2/utils.h>
-#include <tf2/convert.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2/utils.h>
+#include <vector>
+#include <path_tracking_pid/PidConfig.h>
+#include <path_tracking_pid/PidDebug.h>
+#include <path_tracking_pid/PidFeedback.h>
 
-
+// Typesafe sign implementation with signum:
+// https://stackoverflow.com/a/4609795
+template <typename T> int sign(T val) {
+    return (T(0) < val) - (val < T(0));
+}
 
 namespace path_tracking_pid
 {
@@ -73,62 +68,6 @@ struct ControllerState
   std::array<double, 3> filtered_error_deriv_ang = {0.0, 0.0, 0.0};
 };
 
-// ------------- new ----------- 0
-struct PidConfig
-{
-  double l;
-  double target_x_vel;
-  double target_end_x_vel;
-  double target_x_acc;
-  double target_x_decc;
-  double abs_minimum_x_vel;
-  double max_error_x_vel;
-  double max_x_vel;
-  double max_yaw_vel;
-  double max_yaw_acc;
-  double min_turning_radius;
-  bool track_base_link;
-
-  int init_vel_method; //NOTE: look at this again
-  // init_vel_method_enum init_vel_method;
-  double init_vel_max_diff;
-
-  double Kp_lat;
-  double Ki_lat;
-  double Kd_lat;
-  double Kp_ang;
-  double Ki_ang;
-  double Kd_ang;
-
-  bool feedback_lat;
-  bool feedback_ang;
-
-  bool feedforward_lat;
-  bool feedforward_ang;
-
-  // bool controller_debug_enabled; //NOTE double decleration error
-
-  bool use_mpc;
-  double mpc_simulation_sample_time;
-  double mpc_max_error_lat;
-  int mpc_max_fwd_iterations;
-  double mpc_min_x_vel;
-  int mpc_max_vel_optimization_iterations;
-
-  double max_steering_angle;
-  double max_steering_x_vel;
-  double max_steering_x_acc;
-  double max_steering_yaw_vel;
-  double max_steering_yaw_acc;
-
-  bool anti_collision;
-  bool obstacle_speed_reduction;
-  double collision_look_ahead_length_offset;
-  double collision_look_ahead_resolution;
-};
-// ------------- new ----------- 0
-
-
 class Controller
 {
 public:
@@ -153,7 +92,7 @@ public:
    * @param tricycle_model_enabled If tricycle model should be used
    * @param estimate_pose_angle The transformation from base to steered wheel
    */
-  void setTricycleModel(bool tricycle_model_enabled, geometry_msgs::msg::Transform tf_base_to_steered_wheel);
+  void setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Transform tf_base_to_steered_wheel);
 
   /**
    * Set plan
@@ -161,8 +100,8 @@ public:
    * @param odom_twist Robot odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs::msg::Twist odom_twist,
-               const std::vector<geometry_msgs::msg::PoseStamped>& global_plan);
+  void setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+               const std::vector<geometry_msgs::PoseStamped>& global_plan);
 
   /**
    * Set plan
@@ -172,9 +111,9 @@ public:
    * @param steering_odom_twist Steered wheel odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs::msg::Twist odom_twist,
-                           geometry_msgs::msg::Transform tf_base_to_steered_wheel, geometry_msgs::msg::Twist steering_odom_twist,
-                           const std::vector<geometry_msgs::msg::PoseStamped>& global_plan);
+  void setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+                           geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist steering_odom_twist,
+                           const std::vector<geometry_msgs::PoseStamped>& global_plan);
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
@@ -182,11 +121,11 @@ public:
    * @return tf of found position on plan
    * @return index of current path-pose if requested
    */
-  tf2::Transform findPositionOnPlan(const geometry_msgs::msg::Transform current_tf,
+  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform current_tf,
                                     ControllerState* controller_state_ptr,
                                     size_t &path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
-  tf2::Transform findPositionOnPlan(const geometry_msgs::msg::Transform current_tf,
+  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform current_tf,
                                     ControllerState* controller_state_ptr)
   {
     size_t path_pose_idx;
@@ -204,14 +143,12 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::msg::Twist update(const double target_x_vel,
+  geometry_msgs::Twist update(const double target_x_vel,
                               const double target_end_x_vel,
-                              const geometry_msgs::msg::Transform current_tf,
-                              const geometry_msgs::msg::Twist odom_twist,
-                              const rclcpp::Duration dt,
-                              double* eda, double* progress
-                            //   , path_tracking_pid::PidDebug* pid_debug (NOTE: change to dynamic param config)
-                              );
+                              const geometry_msgs::Transform current_tf,
+                              const geometry_msgs::Twist odom_twist,
+                              const ros::Duration dt,
+                              double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
@@ -223,12 +160,10 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::msg::Twist update_with_limits(const geometry_msgs::msg::Transform current_tf,
-                                          const geometry_msgs::msg::Twist odom_twist,
-                                          const rclcpp::Duration dt,
-                                          double* eda, double* progress
-                                        //   path_tracking_pid::PidDebug* pid_debug (NOTE: change to dyn params ros2)
-                                          );
+  geometry_msgs::Twist update_with_limits(const geometry_msgs::Transform current_tf,
+                                          const geometry_msgs::Twist odom_twist,
+                                          const ros::Duration dt,
+                                          double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
@@ -236,8 +171,8 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(const double target_x_vel, geometry_msgs::msg::Transform current_tf,
-                           geometry_msgs::msg::Twist odom_twist);
+  double mpc_based_max_vel(const double target_x_vel, geometry_msgs::Transform current_tf,
+                           geometry_msgs::Twist odom_twist);
 
   /**
    * Select mode for the controller
@@ -249,7 +184,7 @@ public:
    * Set dynamic parameters for the PID controller
    * @param config
    */
-  void configure(PidConfig& config);
+  void configure(path_tracking_pid::PidConfig& config);
 
   /**
    * Set whether the controller is enabled
@@ -262,11 +197,11 @@ public:
    */
   void reset();
 
-    /**
+  /**
    * Gets current dynamic configuration of the controller
    * @return current controller configuration
    */
-  PidConfig getConfig(); //NOTE: not necessary because PidConfig comes from the path_tracking_pid
+  path_tracking_pid::PidConfig getConfig();
 
   // Inline get-functions for transforms
   tf2::Transform getCurrentGoal() const
@@ -299,7 +234,7 @@ public:
 
 private:
   double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w) const;
-  double distSquared(const geometry_msgs::msg::Pose& pose_v, const geometry_msgs::msg::Pose& pose_w) const;
+  double distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w) const;
   void distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,
                             tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w);
 
@@ -313,15 +248,15 @@ private:
     return result;
   }
 
-  geometry_msgs::msg::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
-  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(geometry_msgs::msg::Twist cmd_vel);
+  geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
+  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(geometry_msgs::Twist cmd_vel);
   /**
    * Output some debug information about the current parameters
    */
   void printParameters();
 
+  path_tracking_pid::PidConfig local_config_;
   ControllerState controller_state_ = ControllerState();
-  PidConfig local_config_; //NOTE: copy is not needed, change this at the end
 
   // Global Plan variables
   std::vector<tf2::Transform> global_plan_tf_;  // Global plan vector
@@ -356,7 +291,7 @@ private:
 
   // tricycle model
   bool use_tricycle_model_ = false;
-  geometry_msgs::msg::Transform tf_base_to_steered_wheel_;
+  geometry_msgs::Transform tf_base_to_steered_wheel_;
   double max_steering_angle_;
   double max_steering_x_vel_;
   double max_steering_x_acc_;

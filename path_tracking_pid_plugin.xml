@@ -10,3 +10,13 @@
         </description>
     </class>
 </library>
+
+<!-- <class_libraries>
+    <library path="nav2_contour_follower">
+        <class type="nav2_contour_follower::ContourFollower" base_class_type="nav2_core::Controller">
+            <description>
+                nav2_contour_follower
+            </description>
+        </class>
+    </library>
+</class_libraries> -->

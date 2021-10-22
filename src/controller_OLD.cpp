@@ -1,4 +1,7 @@
 #include "path_tracking_pid/controller.hpp"
+#include <algorithm>
+#include <limits>
+#include <vector>
 
 namespace path_tracking_pid
 {
@@ -77,7 +80,8 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometr
     return steering_cmd_vel;
 }
 
-void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs::msg::Twist odom_twist, const std::vector<geometry_msgs::msg::PoseStamped>& global_plan)
+void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+                         const std::vector<geometry_msgs::PoseStamped>& global_plan)
 {
   ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
   ROS_DEBUG("Plan is defined in frame '%s'", global_plan.at(0).header.frame_id.c_str());
@@ -205,9 +209,9 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
   controller_state_.end_reached = false;
 }
 
-void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs::msg::Twist odom_twist,
-                          geometry_msgs::msg::Transform tf_base_to_steered_wheel, geometry_msgs::msg::Twist steering_odom_twist,
-                          const std::vector<geometry_msgs::msg::PoseStamped>& global_plan)
+void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+                          geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist steering_odom_twist,
+                          const std::vector<geometry_msgs::PoseStamped>& global_plan)
 {
   setPlan(current_tf, odom_twist, global_plan);
   controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.rotation);
@@ -1085,7 +1089,7 @@ void Controller::printParameters()
   ROS_INFO("-----------------------------------------");
 }
 
-void Controller::configure(PidConfig& config)
+void Controller::configure(path_tracking_pid::PidConfig& config)
 {
   // Erase all queues when config changes
 
@@ -1105,6 +1109,7 @@ void Controller::configure(PidConfig& config)
   Kp_ang_ = config.Kp_ang;
   Ki_ang_ = config.Ki_ang;
   Kd_ang_ = config.Kd_ang;
+
 
   track_base_link_enabled_ = config.track_base_link;
   ROS_DEBUG("Track base_link? Then global path poses are needed! '%d'", (int)track_base_link_enabled_);
@@ -1165,7 +1170,7 @@ void Controller::configure(PidConfig& config)
   // printParameters();
 }
 
-PidConfig Controller::getConfig()
+path_tracking_pid::PidConfig Controller::getConfig()
 {
   return local_config_;
 }

@@ -1,7 +1,0 @@
-header:
-  seq: 1
-  stamp:
-    secs: 0
-    nsecs:         0
-  frame_id: '/map'
-poses: []

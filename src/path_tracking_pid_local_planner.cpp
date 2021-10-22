@@ -1,7 +1,3 @@
-//
-// Created by nobleo on 12-9-18.
-//
-
 #include "path_tracking_pid/path_tracking_pid_local_planner.hpp"
 #include <algorithm>
 #include <geometry_msgs/TransformStamped.h>
@@ -441,7 +437,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
     // Fill markers:
     geometry_msgs::Point mkStep;
-    tf2::toMsg(next_straight_step_tf.getOrigin(), mkStep);
+    mkStep = tf2::toMsg(next_straight_step_tf.getOrigin());
     mkSteps.points.push_back(mkStep);
     geometry_msgs::Point mkPointOnPath;
     tf2::toMsg(projected_step_tf.getOrigin(), mkPointOnPath);

@@ -1,0 +1,9 @@
+<class_libraries>
+    <library path="path_tracking_pid_lib">
+        <class type="path_tracking_pid::PathTrackingPid" base_class_type="nav2_core::Controller">
+            <description>
+                path_tracking_pid
+            </description>
+        </class>
+    </library>
+</class_libraries>
