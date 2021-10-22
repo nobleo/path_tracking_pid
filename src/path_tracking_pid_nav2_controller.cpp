@@ -458,8 +458,7 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
   }
 
   // Feasability check, but only when not resuming with odom-vel
-  // if (pid_controller_.getConfig().init_vel_method != Pid_Odom && //NOTE where/what is pid_odom?
-  if (pid_controller_.getConfig().init_vel_method &&
+  if (pid_controller_.getConfig().init_vel_method != Odom && //NOTE
       pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
       std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
         pid_controller_.getConfig().init_vel_max_diff)
@@ -487,19 +486,16 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::msg::Twist steering_odom_twist;
     pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, global_plan_);
-    // pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, path);
-
   }
   else
   {
     pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, global_plan_);
-    // pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, path);
 
   }
 
   pid_controller_.setEnabled(true);
   active_goal_ = true;
-  prev_time_ = node_->get_clock()->now(); //NOTE get_clock() necessary?
+  prev_time_ = node_->get_clock()->now();
 }
 
 void PathTrackingPid::curOdomCallback(const nav_msgs::msg::Odometry& odom_msg)

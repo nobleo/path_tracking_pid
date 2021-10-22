@@ -74,6 +74,12 @@ struct ControllerState
 };
 
 // ------------- new ----------- 0
+enum init_vel_method_enum {
+  Zero = 0,
+  InternaState = 1,
+  Odom = 2
+};
+
 struct PidConfig
 {
   double l;
@@ -89,8 +95,7 @@ struct PidConfig
   double min_turning_radius;
   bool track_base_link;
 
-  int init_vel_method; //NOTE: look at this again
-  // init_vel_method_enum init_vel_method;
+  init_vel_method_enum init_vel_method;
   double init_vel_max_diff;
 
   double Kp_lat;
@@ -126,6 +131,7 @@ struct PidConfig
   double collision_look_ahead_length_offset;
   double collision_look_ahead_resolution;
 };
+
 // ------------- new ----------- 0
 
 
