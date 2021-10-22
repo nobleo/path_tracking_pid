@@ -173,6 +173,8 @@ private:
 
   void curOdomCallback(const nav_msgs::msg::Odometry& odom_msg);
 
+  // void velMaxExternalCallback(const std_msgs::Float64& msg);
+
   uint8_t projectedCollisionCost();
 
 

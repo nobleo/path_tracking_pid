@@ -207,6 +207,7 @@ void PathTrackingPid::configure(
 
   //Subscribers:
   sub_odom_ = node->create_subscription<nav_msgs::msg::Odometry>("odom", 1, std::bind(&PathTrackingPid::curOdomCallback, this, _1));
+  // sub_vel_max_external_ = node->create_subscription<std_msgs::Float64>("vel_max", 1, std::bind(&TrackingPidLocalPlanner::velMaxExternalCallback, this, _1));
   // sub_vel_max_external_ = nh.subscribe("vel_max", 1, &TrackingPidLocalPlanner::velMaxExternalCallback, this); //NOTE is this available for Jax?
 
   map_frame_ = costmap_ros->getGlobalFrameID();
@@ -498,228 +499,223 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
   prev_time_ = node_->get_clock()->now();
 }
 
-void PathTrackingPid::curOdomCallback(const nav_msgs::msg::Odometry& odom_msg)
+uint8_t PathTrackingPid::projectedCollisionCost()
 {
-  latest_odom_ = odom_msg;
+  // configure rviz visualization
+  visualization_msgs::msg::Marker mkSteps;
+  mkSteps.header.frame_id = map_frame_;
+  mkSteps.header.stamp = node_->get_clock()->now();
+  mkSteps.ns = "extrapolated poses";
+  mkSteps.action = visualization_msgs::msg::Marker::ADD;
+  mkSteps.pose.orientation.w = 1.0;
+  mkSteps.id = __COUNTER__;
+  mkSteps.type = visualization_msgs::msg::Marker::POINTS;
+  mkSteps.scale.x = 0.5;
+  mkSteps.scale.y = 0.5;
+  mkSteps.color.r = 1.0;
+  mkSteps.color.g = 0.5;
+  mkSteps.color.a = 1.0;
+
+  visualization_msgs::msg::Marker mkPosesOnPath;
+  mkPosesOnPath.header.frame_id = map_frame_;
+  mkPosesOnPath.header.stamp = node_->get_clock()->now();
+  mkPosesOnPath.ns = "goal poses on path";
+  mkPosesOnPath.action = visualization_msgs::msg::Marker::ADD;
+  mkPosesOnPath.pose.orientation.w = 1.0;
+  mkPosesOnPath.id = __COUNTER__;
+  mkPosesOnPath.type = visualization_msgs::msg::Marker::POINTS;
+  mkPosesOnPath.scale.x = 0.5;
+  mkPosesOnPath.scale.y = 0.5;
+  mkPosesOnPath.color.r = 1.0;
+  mkPosesOnPath.color.g = 1.0;
+  mkPosesOnPath.color.a = 1.0;
+
+  visualization_msgs::msg::Marker mkCollisionFootprint;
+  mkCollisionFootprint.header.frame_id = map_frame_;
+  mkCollisionFootprint.header.stamp = node_->get_clock()->now();
+  mkCollisionFootprint.ns = "Collision footprint";
+  mkCollisionFootprint.action = visualization_msgs::msg::Marker::ADD;
+  mkCollisionFootprint.pose.orientation.w = 1.0;
+  mkCollisionFootprint.id = __COUNTER__;
+  mkCollisionFootprint.type = visualization_msgs::msg::Marker::LINE_LIST;
+  mkCollisionFootprint.scale.x = 0.1;
+  mkCollisionFootprint.color.b = 1.0;
+  mkCollisionFootprint.color.a = 0.3;
+
+  visualization_msgs::msg::Marker mkCollisionHull;
+  mkCollisionHull.header.frame_id = map_frame_;
+  mkCollisionHull.header.stamp = node_->get_clock()->now();
+  mkCollisionHull.ns = "Collision polygon";
+  mkCollisionHull.action = visualization_msgs::msg::Marker::ADD;
+  mkCollisionHull.pose.orientation.w = 1.0;
+  mkCollisionHull.id = __COUNTER__;
+  mkCollisionHull.type = visualization_msgs::msg::Marker::LINE_STRIP;
+  mkCollisionHull.scale.x = 0.2;
+  mkCollisionHull.color.r = 1.0;
+  mkCollisionHull.color.a = 0.3;
+
+  visualization_msgs::msg::Marker mkCollisionIndicator;
+  mkCollisionIndicator.header.frame_id = map_frame_;
+  mkCollisionIndicator.header.stamp = node_->get_clock()->now();
+  mkCollisionIndicator.ns = "Collision object";
+  mkCollisionIndicator.pose.orientation.w = 1.0;
+  mkCollisionIndicator.id = __COUNTER__;
+  mkCollisionIndicator.type = visualization_msgs::msg::Marker::CYLINDER;
+  mkCollisionIndicator.scale.x = 0.5;
+  mkCollisionIndicator.scale.y = 0.5;
+  mkCollisionIndicator.color.r = 1.0;
+  mkCollisionIndicator.color.a = 0.0;
+  visualization_msgs::msg::MarkerArray mkCollision;
+
+  // Check how far we should check forward
+  double x_vel = pid_controller_.getControllerState().current_x_vel;
+  double collision_look_ahead_distance = x_vel*x_vel / (2*pid_controller_.getConfig().target_x_decc)
+                                         + pid_controller_.getConfig().collision_look_ahead_length_offset;
+  uint n_steps = std::ceil(collision_look_ahead_distance / pid_controller_.getConfig().collision_look_ahead_resolution);
+  double x_resolution = collision_look_ahead_distance / n_steps;
+
+  // Define a x_step transform which will be used to step forward the position.
+  tf2::Transform x_step_tf;
+  x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, x_vel), 0.0, 0.0));
+
+  // Use a controller state to forward project the position on the path
+  ControllerState projected_controller_state = pid_controller_.getControllerState();
+  geometry_msgs::msg::Transform current_tf = tfCurPoseStamped_.transform;
+
+  // Step until lookahead is reached, for every step project the pose back to the path
+  std::vector<tf2::Transform> projected_steps_tf;
+  tf2::Transform projected_step_tf;
+  tf2::fromMsg(current_tf, projected_step_tf);
+  projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
+  projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, &projected_controller_state);
+  projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
+  for (uint step = 0; step < n_steps; step++)
+  {
+    tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
+    projected_step_tf = pid_controller_.findPositionOnPlan(tf2::toMsg(next_straight_step_tf),
+                                                           &projected_controller_state);
+    projected_steps_tf.push_back(projected_step_tf);
+
+    // Fill markers:
+    geometry_msgs::msg::Point mkStep;
+    toMsg(next_straight_step_tf.getOrigin(), mkStep);
+    mkSteps.points.push_back(mkStep);
+    geometry_msgs::msg::Point mkPointOnPath;
+    toMsg(projected_step_tf.getOrigin(), mkPointOnPath);
+    mkPosesOnPath.points.push_back(mkPointOnPath);
+  }
+
+  polygon_t previous_footprint_xy;
+  polygon_t collision_polygon;
+  for (const auto& projection_tf : projected_steps_tf)
+  {
+    // Project footprint forward
+    double x = projection_tf.getOrigin().x();
+    double y = projection_tf.getOrigin().y();
+    double yaw = tf2::getYaw(projection_tf.getRotation());
+    std::vector<geometry_msgs::msg::Point> footprint;
+    nav2_costmap_2d::transformFootprint(x, y, yaw, costmap_ros_->getRobotFootprint(), footprint);
+
+    // Append footprint to polygon
+    polygon_t two_footprints = previous_footprint_xy;
+    previous_footprint_xy.clear();
+    for (const auto& point : footprint)
+    {
+      boost::geometry::append(two_footprints, point);
+      boost::geometry::append(previous_footprint_xy, point);
+    }
+
+    boost::geometry::correct(two_footprints);
+    polygon_t two_footprint_hull;
+    boost::geometry::convex_hull(two_footprints, two_footprint_hull);
+    collision_polygon = union_(collision_polygon, two_footprint_hull);
+
+    // Add footprint to marker
+    geometry_msgs::msg::Point previous_point = footprint.back();
+    for (const auto& point : footprint)
+    {
+      mkCollisionFootprint.points.push_back(previous_point);
+      mkCollisionFootprint.points.push_back(point);
+      previous_point = point;
+    }
+  }
+
+  // Create a convex hull so we can use costmap2d->convexFillCells
+  nav2_costmap_2d::Costmap2D* costmap2d = costmap_ros_->getCostmap();
+  polygon_t collision_polygon_hull;
+  boost::geometry::convex_hull(collision_polygon, collision_polygon_hull);
+  std::vector<nav2_costmap_2d::MapLocation> collision_polygon_hull_map;
+
+  // Convert to map coordinates
+  for (const auto& point : collision_polygon_hull)
+  {
+    int map_x, map_y;
+    costmap2d->worldToMapEnforceBounds(point.x, point.y, map_x, map_y);
+    nav2_costmap_2d::MapLocation map_point{static_cast<uint>(map_x), static_cast<uint>(map_y)};
+    collision_polygon_hull_map.push_back(map_point);
+  }
+
+  // Get the relevant cells
+  std::vector<nav2_costmap_2d::MapLocation> cells_in_polygon;
+  costmap2d->convexFillCells(collision_polygon_hull_map, cells_in_polygon);
+
+  // Get the max cost inside the concave polygon
+  uint8_t max_cost = 0.0;
+  for (const auto& cell_in_polygon : cells_in_polygon)
+  {
+    // Cost checker is cheaper than polygon checker, so lets do that first
+    uint8_t cell_cost = costmap2d->getCost(cell_in_polygon.x, cell_in_polygon.y);
+    if (cell_cost > max_cost && cell_cost != nav2_costmap_2d::NO_INFORMATION)
+    {
+      // Check if in concave polygon
+      geometry_msgs::msg::Point point;
+      costmap2d->mapToWorld(cell_in_polygon.x, cell_in_polygon.y, point.x, point.y);
+      if (boost::geometry::within(point, collision_polygon))
+      {
+        // Protip: uncomment below and 'if (cell_cost > max_cost)' to see evaluated cells
+        // boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock_controller(*(costmap2d->getMutex()));
+        // costmap2d->setCost(cell_in_polygon.x, cell_in_polygon.y, 100);
+
+        max_cost = cell_cost;
+        // Set collision indicator on suspected cell with current cost
+        mkCollisionIndicator.scale.z = cell_cost / 255.0;
+        mkCollisionIndicator.color.a = cell_cost / 255.0;
+        point.z = mkCollisionIndicator.scale.z * 0.5;
+        mkCollisionIndicator.pose.position = point;
+        if (max_cost >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
+        {
+          break;  // Collision detected, no need to evaluate further
+        }
+      }
+    }
+  }
+  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon())
+  {
+    mkCollisionIndicator.action = visualization_msgs::msg::Marker::ADD;
+  }
+  else
+  {
+    mkCollisionIndicator.action = visualization_msgs::msg::Marker::DELETE;
+  }
+  mkCollision.markers.push_back(mkCollisionIndicator);
+
+  // Fiddle the polygon into a marker message
+  for (const geometry_msgs::msg::Point point : collision_polygon)
+  {
+    mkCollisionHull.points.push_back(point);
+  }
+
+  mkCollision.markers.push_back(mkCollisionFootprint);
+  mkCollision.markers.push_back(mkCollisionHull);
+  if (n_steps > 0)
+  {
+    mkCollision.markers.push_back(mkSteps);
+    mkCollision.markers.push_back(mkPosesOnPath);
+  }
+  collision_marker_pub_->publish(mkCollision);
+
+  return max_cost;
 }
-
-// uint8_t PathTrackingPid::projectedCollisionCost()
-// {
-//   // configure rviz visualization
-//   visualization_msgs::msg::Marker mkSteps;
-//   mkSteps.header.frame_id = map_frame_;
-//   mkSteps.header.stamp = node_->get_clock()->now();
-//   mkSteps.ns = "extrapolated poses";
-//   mkSteps.action = visualization_msgs::msg::Marker::ADD;
-//   mkSteps.pose.orientation.w = 1.0;
-//   mkSteps.id = __COUNTER__;
-//   mkSteps.type = visualization_msgs::msg::Marker::POINTS;
-//   mkSteps.scale.x = 0.5;
-//   mkSteps.scale.y = 0.5;
-//   mkSteps.color.r = 1.0;
-//   mkSteps.color.g = 0.5;
-//   mkSteps.color.a = 1.0;
-
-//   visualization_msgs::msg::Marker mkPosesOnPath;
-//   mkPosesOnPath.header.frame_id = map_frame_;
-//   mkPosesOnPath.header.stamp = node_->get_clock()->now();
-//   mkPosesOnPath.ns = "goal poses on path";
-//   mkPosesOnPath.action = visualization_msgs::msg::Marker::ADD;
-//   mkPosesOnPath.pose.orientation.w = 1.0;
-//   mkPosesOnPath.id = __COUNTER__;
-//   mkPosesOnPath.type = visualization_msgs::msg::Marker::POINTS;
-//   mkPosesOnPath.scale.x = 0.5;
-//   mkPosesOnPath.scale.y = 0.5;
-//   mkPosesOnPath.color.r = 1.0;
-//   mkPosesOnPath.color.g = 1.0;
-//   mkPosesOnPath.color.a = 1.0;
-
-//   visualization_msgs::msg::Marker mkCollisionFootprint;
-//   mkCollisionFootprint.header.frame_id = map_frame_;
-//   mkCollisionFootprint.header.stamp = node_->get_clock()->now();
-//   mkCollisionFootprint.ns = "Collision footprint";
-//   mkCollisionFootprint.action = visualization_msgs::msg::Marker::ADD;
-//   mkCollisionFootprint.pose.orientation.w = 1.0;
-//   mkCollisionFootprint.id = __COUNTER__;
-//   mkCollisionFootprint.type = visualization_msgs::msg::Marker::LINE_LIST;
-//   mkCollisionFootprint.scale.x = 0.1;
-//   mkCollisionFootprint.color.b = 1.0;
-//   mkCollisionFootprint.color.a = 0.3;
-
-//   visualization_msgs::msg::Marker mkCollisionHull;
-//   mkCollisionHull.header.frame_id = map_frame_;
-//   mkCollisionHull.header.stamp = node_->get_clock()->now();
-//   mkCollisionHull.ns = "Collision polygon";
-//   mkCollisionHull.action = visualization_msgs::msg::Marker::ADD;
-//   mkCollisionHull.pose.orientation.w = 1.0;
-//   mkCollisionHull.id = __COUNTER__;
-//   mkCollisionHull.type = visualization_msgs::msg::Marker::LINE_STRIP;
-//   mkCollisionHull.scale.x = 0.2;
-//   mkCollisionHull.color.r = 1.0;
-//   mkCollisionHull.color.a = 0.3;
-
-//   visualization_msgs::msg::Marker mkCollisionIndicator;
-//   mkCollisionIndicator.header.frame_id = map_frame_;
-//   mkCollisionIndicator.header.stamp = node_->get_clock()->now();
-//   mkCollisionIndicator.ns = "Collision object";
-//   mkCollisionIndicator.pose.orientation.w = 1.0;
-//   mkCollisionIndicator.id = __COUNTER__;
-//   mkCollisionIndicator.type = visualization_msgs::msg::Marker::CYLINDER;
-//   mkCollisionIndicator.scale.x = 0.5;
-//   mkCollisionIndicator.scale.y = 0.5;
-//   mkCollisionIndicator.color.r = 1.0;
-//   mkCollisionIndicator.color.a = 0.0;
-//   visualization_msgs::msg::MarkerArray mkCollision;
-
-//   // Check how far we should check forward
-//   double x_vel = pid_controller_.getControllerState().current_x_vel;
-//   double collision_look_ahead_distance = x_vel*x_vel / (2*pid_controller_.getConfig().target_x_decc)
-//                                          + pid_controller_.getConfig().collision_look_ahead_length_offset;
-//   uint n_steps = std::ceil(collision_look_ahead_distance / pid_controller_.getConfig().collision_look_ahead_resolution);
-//   double x_resolution = collision_look_ahead_distance / n_steps;
-
-//   // Define a x_step transform which will be used to step forward the position.
-//   tf2::Transform x_step_tf;
-//   x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, x_vel), 0.0, 0.0));
-
-//   // Use a controller state to forward project the position on the path
-//   ControllerState projected_controller_state = pid_controller_.getControllerState();
-//   geometry_msgs::msg::Transform current_tf = tfCurPoseStamped_.transform;
-
-//   // Step until lookahead is reached, for every step project the pose back to the path
-//   std::vector<tf2::Transform> projected_steps_tf;
-//   tf2::Transform projected_step_tf;
-//   tf2::fromMsg(current_tf, projected_step_tf);
-//   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
-//   projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, &projected_controller_state);
-//   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
-//   for (uint step = 0; step < n_steps; step++)
-//   {
-//     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
-//     projected_step_tf = pid_controller_.findPositionOnPlan(tf2::toMsg(next_straight_step_tf),
-//                                                            &projected_controller_state);
-//     projected_steps_tf.push_back(projected_step_tf);
-
-//     // Fill markers:
-//     geometry_msgs::msg::Point mkStep;
-//     toMsg(next_straight_step_tf.getOrigin(), mkStep);
-//     mkSteps.points.push_back(mkStep);
-//     geometry_msgs::msg::Point mkPointOnPath;
-//     toMsg(projected_step_tf.getOrigin(), mkPointOnPath);
-//     mkPosesOnPath.points.push_back(mkPointOnPath);
-//   }
-
-//   polygon_t previous_footprint_xy;
-//   polygon_t collision_polygon;
-//   for (const auto& projection_tf : projected_steps_tf)
-//   {
-//     // Project footprint forward
-//     double x = projection_tf.getOrigin().x();
-//     double y = projection_tf.getOrigin().y();
-//     double yaw = tf2::getYaw(projection_tf.getRotation());
-//     std::vector<geometry_msgs::msg::Point> footprint;
-//     costmap_2d::transformFootprint(x, y, yaw, costmap_->getRobotFootprint(), footprint);
-
-//     // Append footprint to polygon
-//     polygon_t two_footprints = previous_footprint_xy;
-//     previous_footprint_xy.clear();
-//     for (const auto& point : footprint)
-//     {
-//       boost::geometry::append(two_footprints, point);
-//       boost::geometry::append(previous_footprint_xy, point);
-//     }
-
-//     boost::geometry::correct(two_footprints);
-//     polygon_t two_footprint_hull;
-//     boost::geometry::convex_hull(two_footprints, two_footprint_hull);
-//     collision_polygon = union_(collision_polygon, two_footprint_hull);
-
-//     // Add footprint to marker
-//     geometry_msgs::msg::Point previous_point = footprint.back();
-//     for (const auto& point : footprint)
-//     {
-//       mkCollisionFootprint.points.push_back(previous_point);
-//       mkCollisionFootprint.points.push_back(point);
-//       previous_point = point;
-//     }
-//   }
-
-//   // Create a convex hull so we can use costmap2d->convexFillCells
-//   costmap_2d::Costmap2D* costmap2d = costmap_->getCostmap();
-//   polygon_t collision_polygon_hull;
-//   boost::geometry::convex_hull(collision_polygon, collision_polygon_hull);
-//   std::vector<costmap_2d::MapLocation> collision_polygon_hull_map;
-
-//   // Convert to map coordinates
-//   for (const auto& point : collision_polygon_hull)
-//   {
-//     int map_x, map_y;
-//     costmap2d->worldToMapEnforceBounds(point.x, point.y, map_x, map_y);
-//     costmap_2d::MapLocation map_point{static_cast<uint>(map_x), static_cast<uint>(map_y)};
-//     collision_polygon_hull_map.push_back(map_point);
-//   }
-
-//   // Get the relevant cells
-//   std::vector<costmap_2d::MapLocation> cells_in_polygon;
-//   costmap2d->convexFillCells(collision_polygon_hull_map, cells_in_polygon);
-
-//   // Get the max cost inside the concave polygon
-//   uint8_t max_cost = 0.0;
-//   for (const auto& cell_in_polygon : cells_in_polygon)
-//   {
-//     // Cost checker is cheaper than polygon checker, so lets do that first
-//     uint8_t cell_cost = costmap2d->getCost(cell_in_polygon.x, cell_in_polygon.y);
-//     if (cell_cost > max_cost && cell_cost != costmap_2d::NO_INFORMATION)
-//     {
-//       // Check if in concave polygon
-//       geometry_msgs::msg::Point point;
-//       costmap2d->mapToWorld(cell_in_polygon.x, cell_in_polygon.y, point.x, point.y);
-//       if (boost::geometry::within(point, collision_polygon))
-//       {
-//         // Protip: uncomment below and 'if (cell_cost > max_cost)' to see evaluated cells
-//         // boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock_controller(*(costmap2d->getMutex()));
-//         // costmap2d->setCost(cell_in_polygon.x, cell_in_polygon.y, 100);
-
-//         max_cost = cell_cost;
-//         // Set collision indicator on suspected cell with current cost
-//         mkCollisionIndicator.scale.z = cell_cost / 255.0;
-//         mkCollisionIndicator.color.a = cell_cost / 255.0;
-//         point.z = mkCollisionIndicator.scale.z * 0.5;
-//         mkCollisionIndicator.pose.position = point;
-//         if (max_cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
-//         {
-//           break;  // Collision detected, no need to evaluate further
-//         }
-//       }
-//     }
-//   }
-//   if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon())
-//   {
-//     mkCollisionIndicator.action = visualization_msgs::msg::Marker::ADD;
-//   }
-//   else
-//   {
-//     mkCollisionIndicator.action = visualization_msgs::msg::Marker::DELETE;
-//   }
-//   mkCollision.markers.push_back(mkCollisionIndicator);
-
-//   // Fiddle the polygon into a marker message
-//   for (const geometry_msgs::msg::Point point : collision_polygon)
-//   {
-//     mkCollisionHull.points.push_back(point);
-//   }
-
-//   mkCollision.markers.push_back(mkCollisionFootprint);
-//   mkCollision.markers.push_back(mkCollisionHull);
-//   if (n_steps > 0)
-//   {
-//     mkCollision.markers.push_back(mkSteps);
-//     mkCollision.markers.push_back(mkPosesOnPath);
-//   }
-//   collision_marker_pub_.publish(mkCollision);
-
-//   return max_cost;
-// }
 
 void PathTrackingPid::setSpeedLimit(
   const double & speed_limit,
@@ -729,6 +725,16 @@ void PathTrackingPid::setSpeedLimit(
   (void)speed_limit;
   (void)percentage;
 }
+
+void PathTrackingPid::curOdomCallback(const nav_msgs::msg::Odometry& odom_msg)
+{
+  latest_odom_ = odom_msg;
+}
+
+// void PathTrackingPid::velMaxExternalCallback(const std_msgs::Float64& msg)
+// {
+//   pid_controller_.setVelMaxExternal(msg.data);
+// }
 
 }  // namespace path_tracking_pid
 
