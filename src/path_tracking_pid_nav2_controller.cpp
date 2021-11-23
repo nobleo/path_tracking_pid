@@ -227,21 +227,14 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
 
   geometry_msgs::msg::TwistStamped cmd_vel;
 
-  // return cmd_vel;
-
   // ----------------- new --------------- 1
-  // bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
-  // {
-
-  // ros::Time now = ros::Time::now();
-  rclcpp::Time now = node_->get_clock()->now(); //NOTE: get_clock() necessary?
-  // if (prev_time_.isZero()) //NOTE: no available annymore
-  // {
-  //   prev_time_ = now - prev_dt_;  // Initialisation round
-  // }
-  // ros::Duration dt = now - prev_time_;
-  double dt = (now - prev_time_).nanoseconds() / 1e9;
-  if (dt == 0.0)
+  rclcpp::Time now = node_->get_clock()->now();
+  if (isZero(prev_time_)) //NOTE: isZero is an adjusted function from the ros::time api
+  {
+    prev_time_ = now - prev_dt_;  // Initialisation round
+  }
+  builtin_interfaces::msg::Duration dt = now - prev_time_;
+  if ((dt.nanosec/1e9) == 0.0)
   {
     // RCLCPP_ERROR_THROTTLE(node_->get_logger(), node_->get_clock()->now, 5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast"); //NOTE: not working like expected
     RCLCPP_ERROR(node_->get_logger(), "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
@@ -249,9 +242,9 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     cmd_vel.twist.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.twist.angular.z = pid_controller_.getControllerState().current_yaw_vel;
   }
-  else if (dt < 0 || dt > DT_MAX)
+  else if ((dt.nanosec/1e9) < 0.0 || (dt.nanosec/1e9) > DT_MAX)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Invalid time increment: %f. Aborting", dt);
+    RCLCPP_ERROR(node_->get_logger(), "Invalid time increment: %f. Aborting", (dt.nanosec/1e9));
   }
   try
   {
@@ -269,16 +262,16 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   // {
   //   auto cost = projectedCollisionCost();
 
-  //   if (cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
+  //   if (cost >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
   //   {
   //     pid_controller_.setVelMaxObstacle(0.0);
   //   }
   //   else if (pid_controller_.getConfig().obstacle_speed_reduction)
   //   {
   //     double max_vel = pid_controller_.getConfig().max_x_vel;
-  //     double reduction_factor = static_cast<double>(cost) / costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+  //     double reduction_factor = static_cast<double>(cost) / nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
   //     double limit = max_vel * (1 - reduction_factor);
-  //     RCLCPP_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
+  //     RCLCPP_DEBUG(node_->get_logger(), "Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
   //     pid_controller_.setVelMaxObstacle(limit);
   //   }
   //   else
@@ -291,7 +284,7 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   //   pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   // }
 
-  // path_tracking_pid::PidDebug pid_debug;
+  // PidConfig pid_debug;
   // double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
   // double progress = 0.0;
   // cmd_vel = pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
@@ -392,9 +385,8 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   //   marker_pub_.publish(mkPosOnPlan);
   // }
 
-  // prev_time_ = now;
+  prev_time_ = now;
   // prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
-  // return true;
   // ----------------- new --------------- 1
 
   return cmd_vel;

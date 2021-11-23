@@ -145,14 +145,12 @@ public:
   rclcpp::Publisher<path_tracking_pid::msg::PidFeedback>::SharedPtr        feedback_pub_;
   rclcpp::Publisher<path_tracking_pid::msg::PidDebug>::SharedPtr           debug_pub_;
 
-
-  // ----------------------- new -------------------- 1
-
-  /** \brief Convert a tf2 Vector3 type to its equivalent geometry_msgs representation.
- * This function is a specialization of the toMsg template defined in tf2/convert.h.
- * \param in A tf2 Vector3 object.
- * \return The Vector3 converted to a geometry_msgs message type.
- */
+  /**
+   * @brief Convert a tf2 Vector3 type to its equivalent geometry_msgs representation.
+   * This function is a specialization of the toMsg template defined in tf2/convert.h.
+   * @param in A tf2 Vector3 object.
+   * @return The Vector3 converted to a geometry_msgs message type.
+   */
   inline
   void toMsg(const tf2::Vector3 & in, geometry_msgs::msg::Point & out)
   {
@@ -160,6 +158,17 @@ public:
     out.y = in.getY();
     out.z = in.getZ();
   }
+
+  inline
+  bool isZero(const rclcpp::Time & time)
+  {
+    if (time.nanoseconds() == 0.0){
+      return true;
+    } else{
+      return false;
+    }
+  }
+  // ----------------------- new -------------------- 1
 
 private:
   // ----------------------- new -------------------- 0
@@ -182,6 +191,7 @@ private:
 
   nav_msgs::msg::Odometry latest_odom_;
   rclcpp::Time prev_time_;
+  builtin_interfaces::msg::Duration prev_dt_;
 
   // Controller logic
   bool controller_debug_enabled_ = false;
