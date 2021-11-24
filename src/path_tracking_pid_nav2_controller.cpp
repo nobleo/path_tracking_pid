@@ -257,32 +257,32 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     active_goal_ = false;
   }
 
-  // // Handle obstacles
-  // if (pid_controller_.getConfig().anti_collision)
-  // {
-  //   auto cost = projectedCollisionCost();
+  // Handle obstacles
+  if (pid_controller_.getConfig().anti_collision)
+  {
+    auto cost = projectedCollisionCost();
 
-  //   if (cost >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
-  //   {
-  //     pid_controller_.setVelMaxObstacle(0.0);
-  //   }
-  //   else if (pid_controller_.getConfig().obstacle_speed_reduction)
-  //   {
-  //     double max_vel = pid_controller_.getConfig().max_x_vel;
-  //     double reduction_factor = static_cast<double>(cost) / nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
-  //     double limit = max_vel * (1 - reduction_factor);
-  //     RCLCPP_DEBUG(node_->get_logger(), "Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
-  //     pid_controller_.setVelMaxObstacle(limit);
-  //   }
-  //   else
-  //   {
-  //     pid_controller_.setVelMaxObstacle(INFINITY);  // set back to inf
-  //   }
-  // }
-  // else
-  // {
-  //   pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
-  // }
+    if (cost >= nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
+    {
+      pid_controller_.setVelMaxObstacle(0.0);
+    }
+    else if (pid_controller_.getConfig().obstacle_speed_reduction)
+    {
+      double max_vel = pid_controller_.getConfig().max_x_vel;
+      double reduction_factor = static_cast<double>(cost) / nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+      double limit = max_vel * (1 - reduction_factor);
+      RCLCPP_DEBUG(node_->get_logger(), "Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
+      pid_controller_.setVelMaxObstacle(limit);
+    }
+    else
+    {
+      pid_controller_.setVelMaxObstacle(INFINITY);  // set back to inf
+    }
+  }
+  else
+  {
+    pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
+  }
 
   // PidConfig pid_debug;
   // double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
