@@ -229,9 +229,9 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::msg::Twist update_with_limits(const geometry_msgs::msg::Transform current_tf,
+  geometry_msgs::msg::TwistStamped update_with_limits(const geometry_msgs::msg::Transform current_tf,
                                           const geometry_msgs::msg::Twist odom_twist,
-                                          const rclcpp::Duration dt,
+                                          const builtin_interfaces::msg::Duration dt,
                                           double* eda, double* progress
                                         //   path_tracking_pid::PidDebug* pid_debug (NOTE: change to dyn params ros2)
                                           );

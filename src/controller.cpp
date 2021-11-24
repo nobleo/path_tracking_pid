@@ -388,11 +388,11 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
   return current_goal_local;
 }
 
-geometry_msgs::Twist Controller::update(const double target_x_vel,
+geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
                                         const double target_end_x_vel,
-                                        const geometry_msgs::Transform current_tf,
-                                        const geometry_msgs::Twist odom_twist,
-                                        const ros::Duration dt,
+                                        const geometry_msgs::msg::Transform current_tf,
+                                        const geometry_msgs::msg::Twist odom_twist,
+                                        const builtin_interfaces::msg::Duration dt,
                                         double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug)
 {
   double current_x_vel = controller_state_.current_x_vel;
@@ -859,11 +859,12 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   return output_combined;
 }
 
-geometry_msgs::Twist Controller::update_with_limits(const geometry_msgs::Transform current_tf,
-                                                    const geometry_msgs::Twist odom_twist,
-                                                    const ros::Duration dt,
+geometry_msgs::msg::Twist Controller::update_with_limits(const geometry_msgs::msg::Transform current_tf,
+                                                    const geometry_msgs::msg::Twist odom_twist,
+                                                    const builtin_interfaces::msg::Duration dt,
                                                     double* eda, double* progress,
-                                                    path_tracking_pid::PidDebug* pid_debug)
+                                                    // path_tracking_pid::PidDebug* pid_debug   //NOTE!
+                                                    )
 {
   // All limits are absolute
   double max_x_vel = std::abs(target_x_vel_);

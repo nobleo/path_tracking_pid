@@ -186,6 +186,10 @@ private:
 
   uint8_t projectedCollisionCost();
 
+  // Cancel flags (multi threaded, so atomic bools)
+  std::atomic<bool> active_goal_{false};
+  std::atomic<bool> cancel_requested_{false};
+  std::atomic<bool> cancel_in_progress_{false};
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_;
 
@@ -203,12 +207,6 @@ private:
   PidConfig config_;
 
   std::vector<geometry_msgs::msg::PoseStamped> global_plan_;
-
-  // Cancel flags (multi threaded, so atomic bools)
-  std::atomic<bool> active_goal_{false};
-  std::atomic<bool> cancel_requested_{false};
-  std::atomic<bool> cancel_in_progress_{false};
-
 
   // Used for tricycle model
   bool use_tricycle_model_;

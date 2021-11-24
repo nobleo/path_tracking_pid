@@ -234,7 +234,7 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     prev_time_ = now - prev_dt_;  // Initialisation round
   }
   builtin_interfaces::msg::Duration dt = now - prev_time_;
-  if ((dt.nanosec/1e9) == 0.0)
+  if (dt.sec == 0 && dt.nanosec == 0)
   {
     // RCLCPP_ERROR_THROTTLE(node_->get_logger(), node_->get_clock()->now, 5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast"); //NOTE: not working like expected
     RCLCPP_ERROR(node_->get_logger(), "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
@@ -242,9 +242,9 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     cmd_vel.twist.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.twist.angular.z = pid_controller_.getControllerState().current_yaw_vel;
   }
-  else if ((dt.nanosec/1e9) < 0.0 || (dt.nanosec/1e9) > DT_MAX)
+  else if (dt.sec < 0 || dt.sec > DT_MAX)
   {
-    RCLCPP_ERROR(node_->get_logger(), "Invalid time increment: %f. Aborting", (dt.nanosec/1e9));
+    RCLCPP_ERROR(node_->get_logger(), "Invalid time increment: %d. Aborting", dt.sec);
   }
   try
   {
@@ -285,108 +285,105 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   }
 
   // PidConfig pid_debug;
-  // double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
-  // double progress = 0.0;
-  // cmd_vel = pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-  //                                              dt, &eda, &progress, &pid_debug);
+  double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
+  double progress = 0.0;
+  cmd_vel = pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
+                                               dt, &eda, &progress);
+                                              //  &pid_debug);    //NOTE!
 
-  // path_tracking_pid::PidFeedback feedback_msg;
+  path_tracking_pid::msg::PidFeedback feedback_msg;
+  rclcpp::Duration eda_rclcpp = rclcpp::Duration(tf2::durationFromSec(eda));
 
-  // feedback_msg.eda = builtin_interfaces::msg::Duration(); //NOTE: cesar's tip
-  // feedback_msg.eda = ros::Duration(eda);
-  // feedback_msg.progress = progress;
-  // feedback_pub_.publish(feedback_msg);
+  feedback_msg.eda.sec = eda_rclcpp.seconds();
+  feedback_msg.eda.nanosec = eda_rclcpp.nanoseconds();
+  feedback_msg.progress = progress;
+  feedback_pub_->publish(feedback_msg);
 
-  // if (cancel_requested_)
-  // {
-  //   path_tracking_pid::PidConfig config = pid_controller_.getConfig();
-  //   config.target_x_vel = 0.0;
-  //   config.target_end_x_vel = 0.0;
-  //   boost::recursive_mutex::scoped_lock lock(config_mutex_);
-  //   // When updating from own server no callback is called. Thus controller is updated first and then server is notified
-  //   pid_controller_.configure(config);
-  //   pid_server_->updateConfig(config);
-  //   lock.unlock();
-  //   cancel_requested_ =  false;
-  // }
+  if (cancel_requested_)
+  {
+    // path_tracking_pid::PidConfig config = pid_controller_.getConfig();
+    config_.target_x_vel = 0.0;
+    config_.target_end_x_vel = 0.0;
+    cancel_requested_ =  false;
+  }
 
 
-  // if (controller_debug_enabled_)
-  // {
-  //   debug_pub_.publish(pid_debug);
+  if (controller_debug_enabled_)
+  {
+    // debug_pub_->publish(pid_debug); //NOTE!
 
-  //   visualization_msgs::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
+    visualization_msgs::msg::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
 
-  //   // configure rviz visualization
-  //   mkCurPose.header.frame_id = mkControlPose.header.frame_id = map_frame_;
-  //   mkGoalPose.header.frame_id = mkPosOnPlan.header.frame_id = map_frame_;
-  //   mkCurPose.header.stamp = mkControlPose.header.stamp = ros::Time::now();
-  //   mkGoalPose.header.stamp = mkPosOnPlan.header.stamp = ros::Time::now();
-  //   mkCurPose.ns = "axle point";
-  //   mkControlPose.ns = "control point";
-  //   mkGoalPose.ns = "goal point";
-  //   mkPosOnPlan.ns = "plan point";
-  //   mkCurPose.action = mkControlPose.action = visualization_msgs::Marker::ADD;
-  //   mkGoalPose.action = mkPosOnPlan.action = visualization_msgs::Marker::ADD;
-  //   mkCurPose.pose.orientation.w = mkControlPose.pose.orientation.w = 1.0;
-  //   mkGoalPose.pose.orientation.w = mkPosOnPlan.pose.orientation.w = 1.0;
-  //   mkCurPose.id = __COUNTER__;  // id has to be unique, so using a compile-time counter :)
-  //   mkControlPose.id = __COUNTER__;
-  //   mkGoalPose.id = __COUNTER__;
-  //   mkPosOnPlan.id = __COUNTER__;
-  //   mkCurPose.type = mkControlPose.type = visualization_msgs::Marker::POINTS;
-  //   mkGoalPose.type = mkPosOnPlan.type = visualization_msgs::Marker::POINTS;
-  //   mkCurPose.scale.x = 0.5;
-  //   mkCurPose.scale.y = 0.5;
-  //   mkControlPose.scale.x = 0.5;
-  //   mkControlPose.scale.y = 0.5;
-  //   mkGoalPose.scale.x = 0.5;
-  //   mkGoalPose.scale.y = 0.5;
-  //   mkCurPose.color.b = 1.0;
-  //   mkCurPose.color.a = 1.0;
-  //   mkControlPose.color.g = 1.0f;
-  //   mkControlPose.color.a = 1.0;
-  //   mkGoalPose.color.r = 1.0;
-  //   mkGoalPose.color.a = 1.0;
-  //   mkPosOnPlan.scale.x = 0.5;
-  //   mkPosOnPlan.scale.y = 0.5;
-  //   mkPosOnPlan.color.a = 1.0;
-  //   mkPosOnPlan.color.r = 1.0f;
-  //   mkPosOnPlan.color.g = 0.5f;
+    // configure rviz visualization
+    mkCurPose.header.frame_id = mkControlPose.header.frame_id = map_frame_;
+    mkGoalPose.header.frame_id = mkPosOnPlan.header.frame_id = map_frame_;
+    mkCurPose.header.stamp = mkControlPose.header.stamp = node_->now();
+    mkGoalPose.header.stamp = mkPosOnPlan.header.stamp = node_->now();
+    mkCurPose.ns = "axle point";
+    mkControlPose.ns = "control point";
+    mkGoalPose.ns = "goal point";
+    mkPosOnPlan.ns = "plan point";
+    mkCurPose.action = mkControlPose.action = visualization_msgs::msg::Marker::ADD;
+    mkGoalPose.action = mkPosOnPlan.action = visualization_msgs::msg::Marker::ADD;
+    mkCurPose.pose.orientation.w = mkControlPose.pose.orientation.w = 1.0;
+    mkGoalPose.pose.orientation.w = mkPosOnPlan.pose.orientation.w = 1.0;
+    mkCurPose.id = __COUNTER__;  // id has to be unique, so using a compile-time counter :)
+    mkControlPose.id = __COUNTER__;
+    mkGoalPose.id = __COUNTER__;
+    mkPosOnPlan.id = __COUNTER__;
+    mkCurPose.type = mkControlPose.type = visualization_msgs::msg::Marker::POINTS;
+    mkGoalPose.type = mkPosOnPlan.type = visualization_msgs::msg::Marker::POINTS;
+    mkCurPose.scale.x = 0.5;
+    mkCurPose.scale.y = 0.5;
+    mkControlPose.scale.x = 0.5;
+    mkControlPose.scale.y = 0.5;
+    mkGoalPose.scale.x = 0.5;
+    mkGoalPose.scale.y = 0.5;
+    mkCurPose.color.b = 1.0;
+    mkCurPose.color.a = 1.0;
+    mkControlPose.color.g = 1.0f;
+    mkControlPose.color.a = 1.0;
+    mkGoalPose.color.r = 1.0;
+    mkGoalPose.color.a = 1.0;
+    mkPosOnPlan.scale.x = 0.5;
+    mkPosOnPlan.scale.y = 0.5;
+    mkPosOnPlan.color.a = 1.0;
+    mkPosOnPlan.color.r = 1.0f;
+    mkPosOnPlan.color.g = 0.5f;
 
-  //   geometry_msgs::Point p;
-  //   std_msgs::ColorRGBA color;
-  //   p.x = tfCurPoseStamped_.transform.translation.x;
-  //   p.y = tfCurPoseStamped_.transform.translation.y;
-  //   p.z = tfCurPoseStamped_.transform.translation.z;
-  //   mkCurPose.points.push_back(p);
+    geometry_msgs::msg::Point p;
+    std_msgs::msg::ColorRGBA color;
+    p.x = tfCurPoseStamped_.transform.translation.x;
+    p.y = tfCurPoseStamped_.transform.translation.y;
+    p.z = tfCurPoseStamped_.transform.translation.z;
+    mkCurPose.points.push_back(p);
 
-  //   tf2::Transform tfControlPose = pid_controller_.getCurrentWithCarrot();
-  //   p.x = tfControlPose.getOrigin().x();
-  //   p.y = tfControlPose.getOrigin().y();
-  //   p.z = tfControlPose.getOrigin().z();
-  //   mkControlPose.points.push_back(p);
+    tf2::Transform tfControlPose = pid_controller_.getCurrentWithCarrot();
+    p.x = tfControlPose.getOrigin().x();
+    p.y = tfControlPose.getOrigin().y();
+    p.z = tfControlPose.getOrigin().z();
+    mkControlPose.points.push_back(p);
 
-  //   tf2::Transform tfGoalPose = pid_controller_.getCurrentGoal();
-  //   p.x = tfGoalPose.getOrigin().x();
-  //   p.y = tfGoalPose.getOrigin().y();
-  //   p.z = tfGoalPose.getOrigin().z();
-  //   mkGoalPose.points.push_back(p);
+    tf2::Transform tfGoalPose = pid_controller_.getCurrentGoal();
+    p.x = tfGoalPose.getOrigin().x();
+    p.y = tfGoalPose.getOrigin().y();
+    p.z = tfGoalPose.getOrigin().z();
+    mkGoalPose.points.push_back(p);
 
-  //   tf2::Transform tfCurPose = pid_controller_.getCurrentPosOnPlan();
-  //   p.x = tfCurPose.getOrigin().x();
-  //   p.y = tfCurPose.getOrigin().y();
-  //   p.z = tfCurPose.getOrigin().z();
-  //   mkPosOnPlan.points.push_back(p);
+    tf2::Transform tfCurPose = pid_controller_.getCurrentPosOnPlan();
+    p.x = tfCurPose.getOrigin().x();
+    p.y = tfCurPose.getOrigin().y();
+    p.z = tfCurPose.getOrigin().z();
+    mkPosOnPlan.points.push_back(p);
 
-  //   marker_pub_.publish(mkCurPose);
-  //   marker_pub_.publish(mkControlPose);
-  //   marker_pub_.publish(mkGoalPose);
-  //   marker_pub_.publish(mkPosOnPlan);
-  // }
+    marker_pub_->publish(mkCurPose);
+    marker_pub_->publish(mkControlPose);
+    marker_pub_->publish(mkGoalPose);
+    marker_pub_->publish(mkPosOnPlan);
+  }
 
   prev_time_ = now;
-  // prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
+  prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
   // ----------------- new --------------- 1
 
   return cmd_vel;
