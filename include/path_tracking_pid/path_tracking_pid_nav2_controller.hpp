@@ -44,7 +44,7 @@ constexpr double DT_MAX=1.5;
 
 BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::msg::Point, double, cs::cartesian, x, y)
 
-enum init_vel_method_enum {Zero, InternalState, Odom};
+// enum init_vel_method_enum {Zero, InternalState, Odom};
 //-------- new ------------ 1
 
 namespace path_tracking_pid

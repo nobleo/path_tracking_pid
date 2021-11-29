@@ -18,11 +18,15 @@
 
 
 #include <tf2/LinearMath/Transform.h>
-// #include <tf2/utils.h>
+#include <tf2/utils.h>
 #include <tf2/convert.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-
+// Typesafe sign implementation with signum:
+// https://stackoverflow.com/a/4609795
+template <typename T> int sign(T val) {
+    return (T(0) < val) - (val < T(0));
+}
 
 namespace path_tracking_pid
 {
@@ -75,9 +79,9 @@ struct ControllerState
 
 // ------------- new ----------- 0
 enum init_vel_method_enum {
-  Zero = 0,
-  InternaState = 1,
-  Odom = 2
+  Pid_Zero = 0,
+  Pid_InternaState = 1,
+  Pid_Odom = 2
 };
 
 struct PidConfig
@@ -141,6 +145,8 @@ public:
   Controller() = default;
 
   ~Controller() = default;
+
+  void setNodePointer(nav2_util::LifecycleNode::SharedPtr nodePointer); //NOTE: new
 
   /**
    * Set holonomic configuration of the controller
@@ -210,7 +216,7 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::msg::Twist update(const double target_x_vel,
+  geometry_msgs::msg::TwistStamped update(const double target_x_vel,
                               const double target_end_x_vel,
                               const geometry_msgs::msg::Transform current_tf,
                               const geometry_msgs::msg::Twist odom_twist,
@@ -304,6 +310,7 @@ public:
   double getVelMaxObstacle();
 
 private:
+  nav2_util::LifecycleNode::SharedPtr node_; //NOTE: new
   double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w) const;
   double distSquared(const geometry_msgs::msg::Pose& pose_v, const geometry_msgs::msg::Pose& pose_w) const;
   void distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,

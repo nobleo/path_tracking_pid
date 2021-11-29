@@ -46,7 +46,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 set(library_name path_tracking_pid_lib)
 
 add_library(${library_name} SHARED
-        src/path_tracking_pid_nav2_controller.cpp)
+        src/path_tracking_pid_nav2_controller.cpp
+        src/controller.cpp)
 
 # # prevent pluginlib from using boost
 # target_compile_definitions(${library_name} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")

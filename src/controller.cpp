@@ -2,11 +2,18 @@
 
 namespace path_tracking_pid
 {
+// ----------- new ----------- 0
+void Controller::setNodePointer(nav2_util::LifecycleNode::SharedPtr nodePointer){
+  node_ = nodePointer;
+}
+// ----------- new ----------- 1
 
 void Controller::setHolonomic(bool holonomic)
 {
   // Set configuration parameters
-  ROS_WARN_COND(holonomic, "Holonomic mode is unmaintained. Expect bugs with y-direction");
+  if(holonomic){
+  RCLCPP_WARN(node_->get_logger(), "Holonomic mode is unmaintained. Expect bugs with y-direction"); //NOTE: ros_warn_condition fix
+  }
   holonomic_robot_enable_ = holonomic;
 }
 
@@ -16,7 +23,7 @@ void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
   estimate_pose_angle_enabled_ = estimate_pose_angle;
 }
 
-void Controller::setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Transform tf_base_to_steered_wheel)
+void Controller::setTricycleModel(bool tricycle_model_enabled, geometry_msgs::msg::Transform tf_base_to_steered_wheel)
 {
   // Set tricycle model
   use_tricycle_model_ = tricycle_model_enabled;
@@ -37,7 +44,7 @@ void Controller::setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Tr
 
   if (determinant == 0)
   {
-    ROS_ERROR("Steered wheel at base_link. Invalid for tricycle model, it will be disabled.");
+    RCLCPP_ERROR(node_->get_logger(),"Steered wheel at base_link. Invalid for tricycle model, it will be disabled.");
     use_tricycle_model_ = false;
     return;
   }
@@ -50,9 +57,9 @@ void Controller::setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Tr
   controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel_.rotation);
 }
 
-geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(double x_vel, double steering_angle)
+geometry_msgs::msg::Twist Controller::computeTricycleModelForwardKinematics(double x_vel, double steering_angle)
 {
-    geometry_msgs::Twist estimated_base_twist;
+    geometry_msgs::msg::Twist estimated_base_twist;
     double x_alpha = x_vel*cos(steering_angle);
     double y_alpha = x_vel*sin(steering_angle);
 
@@ -63,7 +70,7 @@ geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(double x_
     return estimated_base_twist;
 }
 
-TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometry_msgs::Twist cmd_vel)
+TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometry_msgs::msg::Twist cmd_vel)
 {
     TricycleSteeringCmdVel steering_cmd_vel;
     double x_alpha =  inverse_kinematics_matrix_[0][0]*cmd_vel.linear.x
@@ -79,8 +86,8 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometr
 
 void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs::msg::Twist odom_twist, const std::vector<geometry_msgs::msg::PoseStamped>& global_plan)
 {
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
-  ROS_DEBUG("Plan is defined in frame '%s'", global_plan.at(0).header.frame_id.c_str());
+  RCLCPP_DEBUG(node_->get_logger(), "TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
+  RCLCPP_DEBUG(node_->get_logger(), "Plan is defined in frame '%s'", global_plan.at(0).header.frame_id.c_str());
 
   tf2::Transform current_tf2;
   tf2::convert(current_tf, current_tf2);
@@ -93,7 +100,7 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
   // For now do not allow repeated points or in-place rotation
   // To allow that the way the progress is checked and the interpolation is done needs to be changed
   // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
-  for (int pose_idx = 1; pose_idx < global_plan.size() - 1; ++pose_idx)
+  for (unsigned int pose_idx = 1; pose_idx < global_plan.size() - 1; ++pose_idx)
   {
     auto prev_pose = global_plan[pose_idx - 1].pose;
     auto pose = global_plan[pose_idx].pose;
@@ -110,7 +117,7 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
     }
     else
     {
-      ROS_WARN("Pose %d of path is not used since it is not in the expected direction of the path!", pose_idx);
+      RCLCPP_WARN(node_->get_logger(),"Pose %d of path is not used since it is not in the expected direction of the path!", pose_idx);
     }
   }
   // Add last pose as we didn't evaluate that one
@@ -174,7 +181,7 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
       // turning_radius_vector[idx_path] = 0.5*(1/dpY)*( dpY*dpY + dpX*dpX );
       turning_radius_inv_vector_[idx_path] = 2*dpY/dpXY2;
     }
-    ROS_DEBUG("turning_radius_inv_vector[%d] = %f", idx_path, turning_radius_inv_vector_[idx_path]);
+    RCLCPP_DEBUG(node_->get_logger(), "turning_radius_inv_vector[%d] = %f", idx_path, turning_radius_inv_vector_[idx_path]);
   }
 
   // Set initial velocity
@@ -187,10 +194,10 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
       reset();
       controller_state_.current_x_vel = odom_twist.linear.x;
       controller_state_.current_yaw_vel = odom_twist.angular.z;
-      ROS_INFO("Resuming on odom velocity x: %f, yaw: %f", odom_twist.linear.x, odom_twist.angular.z);
+      RCLCPP_INFO(node_->get_logger(), "Resuming on odom velocity x: %f, yaw: %f", odom_twist.linear.x, odom_twist.angular.z);
       break;
     default:
-      ROS_DEBUG("Internal controller_state stays valid");
+      RCLCPP_DEBUG(node_->get_logger(), "Internal controller_state stays valid");
       break;
   }
 
@@ -198,7 +205,7 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
   if (fabs(odom_twist.linear.x - controller_state_.current_x_vel) > max_error_x_vel_)
   {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
-    ROS_WARN("Large control error. Current_x_vel %f / odometry %f",
+    RCLCPP_WARN(node_->get_logger(), "Large control error. Current_x_vel %f / odometry %f",
             controller_state_.current_x_vel, odom_twist.linear.x);
   }
   controller_state_.end_phase_enabled = false;
@@ -209,6 +216,7 @@ void Controller::setPlan(geometry_msgs::msg::Transform current_tf, geometry_msgs
                           geometry_msgs::msg::Transform tf_base_to_steered_wheel, geometry_msgs::msg::Twist steering_odom_twist,
                           const std::vector<geometry_msgs::msg::PoseStamped>& global_plan)
 {
+  steering_odom_twist = steering_odom_twist; //NOTE: to prevent unused error
   setPlan(current_tf, odom_twist, global_plan);
   controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.rotation);
   // TODO(clopez) use steering_odom_twist to check if setpoint is being followed
@@ -223,7 +231,7 @@ double Controller::distSquared(const tf2::Transform& pose_v, const tf2::Transfor
          (pose_v.getOrigin().y() - pose_w.getOrigin().y()) * (pose_v.getOrigin().y() - pose_w.getOrigin().y());
 }
 
-double Controller::distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w) const
+double Controller::distSquared(const geometry_msgs::msg::Pose& pose_v, const geometry_msgs::msg::Pose& pose_w) const
 {
   // Returns square distance between 2 points
   return (pose_v.position.x - pose_w.position.x) * (pose_v.position.x - pose_w.position.x) +
@@ -270,7 +278,7 @@ void Controller::distToSegmentSquared(
   }
 }
 
-tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform current_tf,
+tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::msg::Transform current_tf,
                                               ControllerState* controller_state_ptr,
                                               size_t &path_pose_idx)
 {
@@ -293,7 +301,7 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
   // Hence, when idx_path==i we are currently tracking the section connection pose i and pose i+1
 
   // First look in current position and in front
-  for (int idx_path = controller_state_ptr->current_global_plan_index; idx_path < global_plan_tf_.size(); idx_path++)
+  for (unsigned int idx_path = controller_state_ptr->current_global_plan_index; idx_path < global_plan_tf_.size(); idx_path++)
   {
     error = current_tf2.inverseTimes(global_plan_tf_[idx_path]);
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
@@ -329,7 +337,7 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
       break;
     }
   }
-  ROS_DEBUG("progress: %lu of %lu", controller_state_ptr->current_global_plan_index, global_plan_tf_.size()-1);
+  RCLCPP_DEBUG(node_->get_logger(), "progress: %lu of %lu", controller_state_ptr->current_global_plan_index, global_plan_tf_.size()-1);
   // To finalize, compute the indexes of the start and end points of
   // the closest line segment to the current carrot
   tf2::Transform current_goal_local;
@@ -392,8 +400,10 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
                                         const double target_end_x_vel,
                                         const geometry_msgs::msg::Transform current_tf,
                                         const geometry_msgs::msg::Twist odom_twist,
-                                        const builtin_interfaces::msg::Duration dt,
-                                        double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug)
+                                        const rclcpp::Duration dt,
+                                        double* eda, double* progress
+                                        // , path_tracking_pid::PidDebug* pid_debug
+                                        )
 {
   double current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
@@ -425,7 +435,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   else
   {
     // find position of current position with projected carrot
-    geometry_msgs::Transform current_with_carrot_g;
+    geometry_msgs::msg::Transform current_with_carrot_g;
     tf2::convert(current_with_carrot_, current_with_carrot_g);
     current_pos_on_plan_ = current_goal_ = findPositionOnPlan(current_with_carrot_g, &controller_state_, path_pose_idx);
   }
@@ -438,10 +448,10 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   //***** Feedback control *****//
   if (!((Kp_lat_ <= 0. && Ki_lat_ <= 0. && Kd_lat_ <= 0.) ||
         (Kp_lat_ >= 0. && Ki_lat_ >= 0. && Kd_lat_ >= 0.)))  // All 3 gains should have the same sign
-    ROS_WARN("All three gains (Kp, Ki, Kd) should have the same sign for stability.");
+    RCLCPP_WARN(node_->get_logger(), "All three gains (Kp, Ki, Kd) should have the same sign for stability.");
   if (!((Kp_ang_ <= 0. && Ki_ang_ <= 0. && Kd_ang_ <= 0.) ||
         (Kp_ang_ >= 0. && Ki_ang_ >= 0. && Kd_ang_ >= 0.)))  // All 3 gains should have the same sign
-    ROS_WARN("All three gains (Kp, Ki, Kd) should have the same sign for stability.");
+    RCLCPP_WARN(node_->get_logger(), "All three gains (Kp, Ki, Kd) should have the same sign for stability.");
 
   controller_state_.error_lat.at(2) = controller_state_.error_lat.at(1);
   controller_state_.error_lat.at(1) = controller_state_.error_lat.at(0);
@@ -471,8 +481,8 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   controller_state_.tracking_error_ang = controller_state_.error_ang.at(0);
 
   // integrate the error
-  controller_state_.error_integral_lat += controller_state_.error_lat.at(0) * dt.toSec();
-  controller_state_.error_integral_ang += controller_state_.error_ang.at(0) * dt.toSec();
+  controller_state_.error_integral_lat += controller_state_.error_lat.at(0) * dt.seconds();
+  controller_state_.error_integral_ang += controller_state_.error_ang.at(0) * dt.seconds();
 
   // Apply windup limit to limit the size of the integral term
   if (controller_state_.error_integral_lat > fabsf(windup_limit_))
@@ -488,7 +498,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   if (cutoff_frequency_lat_ != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    tan_filt_ = tan((cutoff_frequency_lat_ * 6.2832) * dt.toSec() / 2);
+    tan_filt_ = tan((cutoff_frequency_lat_ * 6.2832) * dt.seconds() / 2);
 
     // Avoid tan(0) ==> NaN
     if ((tan_filt_ <= 0.) && (tan_filt_ > -0.01))
@@ -501,7 +511,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   if (cutoff_frequency_ang_ != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    tan_filt_ = tan((cutoff_frequency_ang_ * 6.2832) * dt.toSec() / 2);
+    tan_filt_ = tan((cutoff_frequency_ang_ * 6.2832) * dt.seconds() / 2);
 
     // Avoid tan(0) ==> NaN
     if ((tan_filt_ <= 0.) && (tan_filt_ > -0.01))
@@ -532,7 +542,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   controller_state_.error_deriv_lat.at(2) = controller_state_.error_deriv_lat.at(1);
   controller_state_.error_deriv_lat.at(1) = controller_state_.error_deriv_lat.at(0);
   controller_state_.error_deriv_lat.at(0) =
-      (controller_state_.error_lat.at(0) - controller_state_.error_lat.at(1)) / dt.toSec();
+      (controller_state_.error_lat.at(0) - controller_state_.error_lat.at(1)) / dt.seconds();
   controller_state_.filtered_error_deriv_lat.at(2) = controller_state_.filtered_error_deriv_lat.at(1);
   controller_state_.filtered_error_deriv_lat.at(1) = controller_state_.filtered_error_deriv_lat.at(0);
   controller_state_.filtered_error_deriv_lat.at(0) =
@@ -545,7 +555,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   controller_state_.error_deriv_ang.at(2) = controller_state_.error_deriv_ang.at(1);
   controller_state_.error_deriv_ang.at(1) = controller_state_.error_deriv_ang.at(0);
   controller_state_.error_deriv_ang.at(0) =
-      (controller_state_.error_ang.at(0) - controller_state_.error_ang.at(1)) / dt.toSec();
+      (controller_state_.error_ang.at(0) - controller_state_.error_ang.at(1)) / dt.seconds();
   controller_state_.filtered_error_deriv_ang.at(2) = controller_state_.filtered_error_deriv_ang.at(1);
   controller_state_.filtered_error_deriv_ang.at(1) = controller_state_.filtered_error_deriv_ang.at(0);
   controller_state_.filtered_error_deriv_ang.at(0) =
@@ -583,18 +593,18 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (-target_x_decc_);
     d_end_phase = current_x_vel * t_end_phase_current
                 - 0.5 * (target_x_decc_) * t_end_phase_current * t_end_phase_current
-                + target_x_vel * 2.0 * dt.toSec();
+                + target_x_vel * 2.0 * dt.seconds();
   }
   else
   {
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (target_x_acc_);
     d_end_phase = current_x_vel * t_end_phase_current
                 + 0.5 * (target_x_acc_) * t_end_phase_current * t_end_phase_current
-                + target_x_vel * 2.0 * dt.toSec();
+                + target_x_vel * 2.0 * dt.seconds();
   }
-  ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
-  ROS_DEBUG("d_end_phase: %f", d_end_phase);
-  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
+  RCLCPP_DEBUG(node_->get_logger(), "t_end_phase_current: %f", t_end_phase_current);
+  RCLCPP_DEBUG(node_->get_logger(), "d_end_phase: %f", d_end_phase);
+  RCLCPP_DEBUG(node_->get_logger(), "distance_to_goal: %f", distance_to_goal_);
 
   // Get 'angle' towards current_goal
   tf2::Transform robot_pose;
@@ -634,11 +644,11 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   {
     current_target_acc = 0;
   }
-  double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
+  double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.seconds();
   double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
   acc = copysign(acc_abs, current_target_acc);
 
-  double new_x_vel = current_x_vel + acc * dt.toSec();
+  double new_x_vel = current_x_vel + acc * dt.seconds();
 
   // For low target_end_x_vel we have a minimum velocity to ensure the goal is reached
   double min_vel = copysign(1.0, l_) * abs_minimum_x_vel_;
@@ -654,8 +664,8 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
       fabs(odom_twist.linear.x - new_x_vel) > max_error_x_vel_)
   {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
-    ROS_WARN_THROTTLE(1.0, "Large tracking error. Current_x_vel %f / odometry %f",
-            new_x_vel, odom_twist.linear.x);
+    RCLCPP_WARN(node_->get_logger(), "Large tracking error. Current_x_vel %f / odometry %f",
+            new_x_vel, odom_twist.linear.x); //NOTE: warn_throttle fix
   }
 
   // Force target_end_x_vel at the very end of the path
@@ -712,7 +722,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   if (feedforward_ang_enabled_)
   {
     feedforward_ang_ = turning_radius_inv_vector_[controller_state_.last_visited_pose_index]*control_effort_long_;
-    ROS_DEBUG("turning_radius_inv_vector[%lu] = %f",
+    RCLCPP_DEBUG(node_->get_logger(), "turning_radius_inv_vector[%lu] = %f",
       controller_state_.last_visited_pose_index, turning_radius_inv_vector_[controller_state_.last_visited_pose_index]);
 
     control_effort_ang_ = control_effort_ang_ + feedforward_ang_;
@@ -732,33 +742,34 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   else if (control_effort_ang_ < ang_lower_limit_)
     control_effort_ang_ = ang_lower_limit_;
 
-  // Populate debug output
-  // Error topic containing the 'control' error on which the PID acts
-  pid_debug->control_error.linear.x = 0.0;
-  pid_debug->control_error.linear.y = controller_state_.error_lat.at(0);
-  pid_debug->control_error.angular.z = controller_state_.error_ang.at(0);
-  // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
-  pid_debug->tracking_error.linear.x = 0.0;
-  pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
-  pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
+//NOTE: Pid_debug fix
+  // // Populate debug output
+  // // Error topic containing the 'control' error on which the PID acts
+  // pid_debug->control_error.linear.x = 0.0;
+  // pid_debug->control_error.linear.y = controller_state_.error_lat.at(0);
+  // pid_debug->control_error.angular.z = controller_state_.error_ang.at(0);
+  // // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
+  // pid_debug->tracking_error.linear.x = 0.0;
+  // pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
+  // pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
 
-  pid_debug->proportional.linear.x = 0.0;
-  pid_debug->proportional.linear.y = proportional_lat_;
-  pid_debug->proportional.angular.z = proportional_ang_;
+  // pid_debug->proportional.linear.x = 0.0;
+  // pid_debug->proportional.linear.y = proportional_lat_;
+  // pid_debug->proportional.angular.z = proportional_ang_;
 
-  pid_debug->integral.linear.x = 0.0;
-  pid_debug->integral.linear.y = integral_lat_;
-  pid_debug->integral.angular.z = integral_ang_;
+  // pid_debug->integral.linear.x = 0.0;
+  // pid_debug->integral.linear.y = integral_lat_;
+  // pid_debug->integral.angular.z = integral_ang_;
 
-  pid_debug->derivative.linear.x = 0.0;
-  pid_debug->derivative.linear.y = derivative_lat_;
-  pid_debug->derivative.angular.z = derivative_ang_;
+  // pid_debug->derivative.linear.x = 0.0;
+  // pid_debug->derivative.linear.y = derivative_lat_;
+  // pid_debug->derivative.angular.z = derivative_ang_;
 
-  pid_debug->feedforward.linear.x = new_x_vel;
-  pid_debug->feedforward.linear.y = feedforward_lat_;
-  pid_debug->feedforward.angular.z = feedforward_ang_;
+  // pid_debug->feedforward.linear.x = new_x_vel;
+  // pid_debug->feedforward.linear.y = feedforward_lat_;
+  // pid_debug->feedforward.angular.z = feedforward_ang_;
 
-  geometry_msgs::Twist output_combined;
+  geometry_msgs::msg::Twist output_combined;
   // Generate twist message
   if (holonomic_robot_enable_)
   {
@@ -796,15 +807,15 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
     output_combined.angular.z = std::clamp(output_combined.angular.z, -max_ang_twist_tr, max_ang_twist_tr);
   }
   // Apply max acceleration limit to yaw
-  double yaw_acc = std::clamp((output_combined.angular.z - current_yaw_vel) / dt.toSec(),
+  double yaw_acc = std::clamp((output_combined.angular.z - current_yaw_vel) / dt.seconds(),
                               -max_yaw_acc_, max_yaw_acc_);
-  double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
+  double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.seconds());
   output_combined.angular.z = new_yaw_vel;
 
   // Transform velocity commands at base_link to steer when using tricycle model
   if (use_tricycle_model_)
   {
-    geometry_msgs::Twist output_steering;
+    geometry_msgs::msg::Twist output_steering;
     TricycleSteeringCmdVel steering_cmd = computeTricycleModelInverseKinematics(output_combined);
     if (output_combined.linear.x < 0.0 && steering_cmd.speed > 0.0)
     {
@@ -818,18 +829,18 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
     steering_cmd.steering_angle = std::clamp(steering_cmd.steering_angle,
                                   -max_steering_angle_, max_steering_angle_);
     double steering_yaw_vel = std::clamp((steering_cmd.steering_angle - controller_state_.previous_steering_angle)
-                                          / dt.toSec(), -max_steering_yaw_vel_, max_steering_yaw_vel_);
-    double steering_angle_acc = std::clamp((steering_yaw_vel - controller_state_.previous_steering_yaw_vel)/ dt.toSec(),
+                                          / dt.seconds(), -max_steering_yaw_vel_, max_steering_yaw_vel_);
+    double steering_angle_acc = std::clamp((steering_yaw_vel - controller_state_.previous_steering_yaw_vel)/ dt.seconds(),
                                   -max_steering_yaw_acc_, max_steering_yaw_acc_);
     steering_cmd.steering_angle_velocity =   controller_state_.previous_steering_yaw_vel
-                                          +  (steering_angle_acc * dt.toSec());
+                                          +  (steering_angle_acc * dt.seconds());
     steering_cmd.steering_angle =   controller_state_.previous_steering_angle
-                                  + (steering_cmd.steering_angle_velocity * dt.toSec());
+                                  + (steering_cmd.steering_angle_velocity * dt.seconds());
 
     steering_cmd.speed = std::clamp(steering_cmd.speed, -max_steering_x_vel_, max_steering_x_vel_);
-    steering_cmd.acceleration = std::clamp((steering_cmd.speed - controller_state_.previous_steering_x_vel)/ dt.toSec(),
+    steering_cmd.acceleration = std::clamp((steering_cmd.speed - controller_state_.previous_steering_x_vel)/ dt.seconds(),
                                   -max_steering_x_acc_, max_steering_x_acc_);
-    steering_cmd.speed =  controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.toSec());
+    steering_cmd.speed =  controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.seconds());
 
     controller_state_.previous_steering_angle = steering_cmd.steering_angle;
     controller_state_.previous_steering_yaw_vel = steering_cmd.steering_angle_velocity;
@@ -840,9 +851,10 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
     controller_state_.current_x_vel =  output_steering.linear.x;
     controller_state_.current_yaw_vel = output_steering.angular.z;
 
-    pid_debug->steering_angle = steering_cmd.steering_angle;
-    pid_debug->steering_yaw_vel = steering_cmd.steering_angle_velocity;
-    pid_debug->steering_x_vel = steering_cmd.speed;
+    //NOTE: fix pid_debug
+    // pid_debug->steering_angle = steering_cmd.steering_angle;
+    // pid_debug->steering_yaw_vel = steering_cmd.steering_angle_velocity;
+    // pid_debug->steering_x_vel = steering_cmd.speed;
 
     output_combined = output_steering;
   }
@@ -856,14 +868,22 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
 
   controller_state_.current_x_vel = new_x_vel;
   controller_state_.current_yaw_vel = new_yaw_vel;
-  return output_combined;
+
+  // --------------- new --------------- 0
+  geometry_msgs::msg::TwistStamped output_combined_stamped;
+  output_combined_stamped.twist = output_combined;
+  //NOTE: need for specifying the stamp?
+  output_combined_stamped.header.frame_id = "base_link";
+  // --------------- new --------------- 1
+
+  return output_combined_stamped;
 }
 
-geometry_msgs::msg::Twist Controller::update_with_limits(const geometry_msgs::msg::Transform current_tf,
+geometry_msgs::msg::TwistStamped Controller::update_with_limits(const geometry_msgs::msg::Transform current_tf,
                                                     const geometry_msgs::msg::Twist odom_twist,
                                                     const builtin_interfaces::msg::Duration dt,
-                                                    double* eda, double* progress,
-                                                    // path_tracking_pid::PidDebug* pid_debug   //NOTE!
+                                                    double* eda, double* progress
+                                                    // , path_tracking_pid::PidDebug* pid_debug   //NOTE!
                                                     )
 {
   // All limits are absolute
@@ -884,21 +904,21 @@ geometry_msgs::msg::Twist Controller::update_with_limits(const geometry_msgs::ms
   }
 
   // Some logging:
-  ROS_DEBUG("max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, vel_max_mpc=%.3f",
+  RCLCPP_DEBUG(node_->get_logger(), "max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, vel_max_mpc=%.3f",
              max_x_vel, target_x_vel_, vel_max_external_, vel_max_obstacle_, vel_max_mpc);
   if (max_x_vel != target_x_vel_)
   {
     if (max_x_vel == vel_max_external_)
     {
-      ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_);
+      RCLCPP_WARN(node_->get_logger(), "External velocity limit active %.2fm/s", vel_max_external_); //NOTE: fix warn_throttle (5.0Hz)
     }
     else if (max_x_vel == vel_max_obstacle_)
     {
-      ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_);
+      RCLCPP_WARN(node_->get_logger(), "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_); //NOTE: fix warn_throttle (5.0Hz)
     }
     else if (max_x_vel == vel_max_mpc)
     {
-      ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc);
+      RCLCPP_WARN(node_->get_logger(), "MPC velocity limit active %.2fm/s", vel_max_mpc); //NOTE: fix warn_throttle (5.0Hz)
     }
   }
 
@@ -908,13 +928,15 @@ geometry_msgs::msg::Twist Controller::update_with_limits(const geometry_msgs::ms
 
   // Update the controller with the new setting
   max_x_vel = std::copysign(max_x_vel, target_x_vel_);
-  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
+  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress
+  // , pid_debug //NOTE: fix pid_debug
+  );
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
-double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::Transform current_tf,
-                                     geometry_msgs::Twist odom_twist)
+double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::msg::Transform current_tf,
+                                     geometry_msgs::msg::Twist odom_twist)
 {
   // Temporary save global data
   ControllerState controller_state_saved;
@@ -928,8 +950,8 @@ double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::T
   int mpc_fwd_iter = 0;             // Reset MPC iterations
 
   // Create predicted position vector
-  geometry_msgs::Transform predicted_tf = current_tf;
-  geometry_msgs::Twist pred_twist = odom_twist;
+  geometry_msgs::msg::Transform predicted_tf = current_tf;
+  geometry_msgs::msg::Twist pred_twist = odom_twist;
 
   double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
   double mpc_vel_limit = new_nominal_x_vel;
@@ -986,18 +1008,24 @@ double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::T
       // Warning if new_nominal_x_vel becomes really low
       if (abs(new_nominal_x_vel) < 0.01)
       {
-        ROS_WARN_THROTTLE(5.0, "Lowering velocity did not decrease the lateral error enough.");
+        RCLCPP_WARN(node_->get_logger(), "Lowering velocity did not decrease the lateral error enough."); //NOTE: ROS_WARN_THROTTLE fix (5.0Hz)
       }
     }
     else if (mpc_fwd_iter != mpc_max_fwd_iter_)
     {
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
-      path_tracking_pid::PidDebug pid_debug_unused;
+      // path_tracking_pid::PidDebug pid_debug_unused; //NOTE: fix pid_debug
       double eda_unused, progress_unused;
-      pred_twist = Controller::update(new_nominal_x_vel, target_end_x_vel_, predicted_tf, pred_twist,
-                                      ros::Duration(mpc_simulation_sample_time_),
-                                      &eda_unused, &progress_unused, &pid_debug_unused);
+      // -------- new -------- 0
+      geometry_msgs::msg::TwistStamped pred_twist_stamped;
+      pred_twist_stamped.twist = odom_twist;
+      pred_twist_stamped = Controller::update(new_nominal_x_vel, target_end_x_vel_, predicted_tf, pred_twist,
+                                      rclcpp::Duration(tf2::durationFromSec(mpc_simulation_sample_time_)),
+                                      &eda_unused, &progress_unused
+                                      // , &pid_debug_unused //NOTE: fix pid_debug
+                                      );
+      // -------- new -------- 1
 
       // Run plant model
       double theta = tf2::getYaw(predicted_tf.rotation);
@@ -1063,27 +1091,27 @@ void Controller::selectMode(ControllerMode mode)
 
 void Controller::printParameters()
 {
-  ROS_INFO("CONTROLLER PARAMETERS");
-  ROS_INFO("-----------------------------------------");
-  ROS_INFO("Controller enabled: %i", enabled_);
-  ROS_INFO("Controller DEBUG enabled: %i", debug_enabled_);
-  ROS_INFO("Distance L: %f", l_);
-  ROS_INFO("Track base_link enabled?: %i", track_base_link_enabled_);
+  RCLCPP_INFO(node_->get_logger(), "CONTROLLER PARAMETERS");
+  RCLCPP_INFO(node_->get_logger(), "-----------------------------------------");
+  RCLCPP_INFO(node_->get_logger(), "Controller enabled: %i", enabled_);
+  RCLCPP_INFO(node_->get_logger(), "Controller DEBUG enabled: %i", debug_enabled_);
+  RCLCPP_INFO(node_->get_logger(), "Distance L: %f", l_);
+  RCLCPP_INFO(node_->get_logger(), "Track base_link enabled?: %i", track_base_link_enabled_);
 
-  ROS_INFO("Target forward velocities (xv: %f, xv_end,: %f)", target_x_vel_, target_end_x_vel_);
-  ROS_INFO("Target forward (de)accelerations (xacc: %f, xdecc,: %f)", target_x_acc_, target_x_decc_);
-  ROS_INFO("Maximum allowed forward velocity error: %f", max_error_x_vel_);
-  ROS_INFO("Feedback (lat, ang): ( %i, %i)", feedback_lat_enabled_, feedback_ang_enabled_);
-  ROS_INFO("Feedforward (lat, ang): (%i, %i)", feedforward_lat_enabled_, feedforward_ang_enabled_);
-  ROS_INFO("Lateral gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_lat_, Ki_lat_, Kd_lat_);
-  ROS_INFO("Angular gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_ang_, Ki_ang_, Kd_ang_);
+  RCLCPP_INFO(node_->get_logger(), "Target forward velocities (xv: %f, xv_end,: %f)", target_x_vel_, target_end_x_vel_);
+  RCLCPP_INFO(node_->get_logger(), "Target forward (de)accelerations (xacc: %f, xdecc,: %f)", target_x_acc_, target_x_decc_);
+  RCLCPP_INFO(node_->get_logger(), "Maximum allowed forward velocity error: %f", max_error_x_vel_);
+  RCLCPP_INFO(node_->get_logger(), "Feedback (lat, ang): ( %i, %i)", feedback_lat_enabled_, feedback_ang_enabled_);
+  RCLCPP_INFO(node_->get_logger(), "Feedforward (lat, ang): (%i, %i)", feedforward_lat_enabled_, feedforward_ang_enabled_);
+  RCLCPP_INFO(node_->get_logger(), "Lateral gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_lat_, Ki_lat_, Kd_lat_);
+  RCLCPP_INFO(node_->get_logger(), "Angular gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_ang_, Ki_ang_, Kd_ang_);
 
-  ROS_INFO("Robot type (holonomic): (%i)", holonomic_robot_enable_);
+  RCLCPP_INFO(node_->get_logger(), "Robot type (holonomic): (%i)", holonomic_robot_enable_);
 
-  ROS_INFO("Integral-windup limit: %f", windup_limit_);
-  ROS_INFO("Saturation limits xy: %f/%f", upper_limit_, lower_limit_);
-  ROS_INFO("Saturation limits ang: %f/%f", ang_upper_limit_, ang_lower_limit_);
-  ROS_INFO("-----------------------------------------");
+  RCLCPP_INFO(node_->get_logger(), "Integral-windup limit: %f", windup_limit_);
+  RCLCPP_INFO(node_->get_logger(), "Saturation limits xy: %f/%f", upper_limit_, lower_limit_);
+  RCLCPP_INFO(node_->get_logger(), "Saturation limits ang: %f/%f", ang_upper_limit_, ang_lower_limit_);
+  RCLCPP_INFO(node_->get_logger(), "-----------------------------------------");
 }
 
 void Controller::configure(PidConfig& config)
@@ -1108,16 +1136,22 @@ void Controller::configure(PidConfig& config)
   Kd_ang_ = config.Kd_ang;
 
   track_base_link_enabled_ = config.track_base_link;
-  ROS_DEBUG("Track base_link? Then global path poses are needed! '%d'", (int)track_base_link_enabled_);
+  RCLCPP_DEBUG(node_->get_logger(), "Track base_link? Then global path poses are needed! '%d'", (int)track_base_link_enabled_);
 
   l_ = config.l;
   target_x_vel_ = config.target_x_vel;
   l_ = copysign(1.0, target_x_vel_) * fabs(l_);
   if (controller_state_.end_phase_enabled)
   {
-    ROS_WARN_COND(abs(config.target_end_x_vel - target_end_x_vel_) > 1e-3, "Won't change end velocity in end phase");
-    ROS_WARN_COND(abs(config.target_x_acc - target_x_acc_) > 1e-3, "Won't change accelerations in end phase");
-    ROS_WARN_COND(abs(config.target_x_decc - target_x_decc_) > 1e-3, "Won't change accelerations in end phase");
+    if(abs(config.target_end_x_vel - target_end_x_vel_) > 1e-3){
+      RCLCPP_WARN(node_->get_logger(), "Won't change end velocity in end phase"); //NOTE: warn_cond fix
+    }
+    if(abs(config.target_x_acc - target_x_acc_) > 1e-3){
+      RCLCPP_WARN(node_->get_logger(), "Won't change accelerations in end phase"); //NOTE: warn_cond fix
+    }
+    if(abs(config.target_x_decc - target_x_decc_) > 1e-3){
+      RCLCPP_WARN(node_->get_logger(), "Won't change accelerations in end phase"); //NOTE: warn_cond fix
+    }
     config.target_end_x_vel = target_end_x_vel_;
     config.target_x_acc = target_x_acc_;
     config.target_x_decc = target_x_decc_;
@@ -1136,23 +1170,19 @@ void Controller::configure(PidConfig& config)
 
   minimum_turning_radius_ = config.min_turning_radius;
 
-  debug_enabled_ = config.controller_debug_enabled;
+  // debug_enabled_ = config.controller_debug_enabled; //NOTE fix debug
   feedforward_lat_enabled_ = config.feedforward_lat;
   feedforward_ang_enabled_ = config.feedforward_ang;
   feedback_lat_enabled_ = config.feedback_lat;
   feedback_ang_enabled_ = config.feedback_ang;
 
   // MPC
-  config.groups.mpc_group.state = config.use_mpc;  // Hide config options if disabled
   mpc_max_fwd_iter_ = config.mpc_max_fwd_iterations;
   mpc_max_vel_optimization_iter_ = config.mpc_max_vel_optimization_iterations;
   mpc_simulation_sample_time_ = config.mpc_simulation_sample_time;
   mpc_max_error_lat_ = config.mpc_max_error_lat;
   mpc_min_x_vel_ = config.mpc_min_x_vel;
   mpc_min_x_vel_ = fmin(mpc_min_x_vel_, fabs(target_x_vel_));
-
-  // Obstacle speed reduction
-  config.groups.collision_group.state = config.anti_collision;  // Hide config options if disabled
 
   // Tricycle model
   max_steering_angle_ = config.max_steering_angle;
@@ -1173,7 +1203,7 @@ PidConfig Controller::getConfig()
 
 void Controller::setEnabled(bool value)
 {
-  ROS_DEBUG("Controller::setEnabled(%d)", value);
+  RCLCPP_DEBUG(node_->get_logger(), "Controller::setEnabled(%d)", value);
   enabled_ = value;
 }
 
@@ -1200,17 +1230,19 @@ void Controller::setVelMaxExternal(double value)
 {
   if (value < 0.0)
   {
-    ROS_ERROR_THROTTLE(1.0, "External velocity limit (%f) has to be positive", value);
+    RCLCPP_ERROR(node_->get_logger(), "External velocity limit (%f) has to be positive", value); //NOTE: throttle fix
     return;
   }
   if (value < 0.1)
-    ROS_WARN_THROTTLE(1.0, "External velocity limit is very small (%f), this could result in standstill", value);
+    RCLCPP_ERROR(node_->get_logger(), "External velocity limit is very small (%f), this could result in standstill", value); //NOTE: throttle fix
   vel_max_external_ = value;
 }
 
 void Controller::setVelMaxObstacle(double value)
 {
-  ROS_WARN_COND(vel_max_obstacle_ != 0.0 && value == 0.0, "Collision imminent, slamming the brakes");
+  if(vel_max_obstacle_ != 0.0 && value == 0.0) {
+    RCLCPP_WARN(node_->get_logger(), "Collision imminent, slamming the brakes");
+  }
   vel_max_obstacle_ = value;
 }
 

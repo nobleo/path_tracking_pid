@@ -69,7 +69,7 @@ void PathTrackingPid::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".min_turning_radius", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".track_base_link", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".track_base_link", rclcpp::ParameterValue(true));
 
   // declare_parameter_if_not_declared( //NOTE: look at this again
   //   node, plugin_name_ + ".init_vel_method", rclcpp::ParameterValue(Zero));
@@ -90,30 +90,30 @@ void PathTrackingPid::configure(
     node, plugin_name_ + ".Kd_ang", rclcpp::ParameterValue(0.5));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".feedback_lat", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".feedback_lat", rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".feedback_ang", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".feedback_ang", rclcpp::ParameterValue(false));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".feedforward_lat", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".feedforward_lat", rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".feedforward_ang", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".feedforward_ang", rclcpp::ParameterValue(false));
 
   // declare_parameter_if_not_declared(
   //   node, plugin_name_ + ".controller_debug_enabled", rclcpp::ParameterValue(0.5));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".use_mpc", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".use_mpc", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".mpc_simulation_sample_time", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".mpc_max_error_lat", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".mpc_max_fwd_iterations", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".mpc_max_fwd_iterations", rclcpp::ParameterValue(10));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".mpc_min_x_vel", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".mpc_max_vel_optimization_iterations", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".mpc_max_vel_optimization_iterations", rclcpp::ParameterValue(10));
 
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_steering_angle", rclcpp::ParameterValue(0.5));
@@ -127,9 +127,9 @@ void PathTrackingPid::configure(
     node, plugin_name_ + ".max_steering_yaw_acc", rclcpp::ParameterValue(0.5));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".anti_collision", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".anti_collision", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".obstacle_speed_reduction", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".obstacle_speed_reduction", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".collision_look_ahead_length_offset", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
@@ -185,6 +185,8 @@ void PathTrackingPid::configure(
   node->get_parameter(plugin_name_ + ".collision_look_ahead_resolution", config_.collision_look_ahead_resolution);
 
   //From path_tracking_pid_local_planner::initialize:
+  pid_controller_.setNodePointer(node_); //NOTE: new
+
   pid_controller_.setEnabled(false);
 
   bool holonomic_robot = false;
@@ -493,7 +495,7 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
   }
 
   // Feasability check, but only when not resuming with odom-vel
-  if (pid_controller_.getConfig().init_vel_method != Odom && //NOTE
+  if (pid_controller_.getConfig().init_vel_method != Pid_Odom && //NOTE
       pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
       std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
         pid_controller_.getConfig().init_vel_max_diff)
