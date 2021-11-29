@@ -227,7 +227,52 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
 
   geometry_msgs::msg::TwistStamped cmd_vel;
 
-  // ----------------- new --------------- 1
+  if (!initialized_)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "path_tracking_pid has not been initialized, please call initialize() before using this planner");
+    active_goal_ = false;
+    // return mbf_msgs::ExePathResult::NOT_INITIALIZED;   //NOTE: move_base_flex functionality not available
+  }
+  // TODO(Cesar): Use provided pose and odom
+  if (!computeVelocityCommands(cmd_vel))
+  {
+    active_goal_ = false;
+    // return mbf_msgs::ExePathResult::FAILURE;   //NOTE: move_base_flex functionality not available
+  }
+  cmd_vel.header.stamp = node_->now();
+  cmd_vel.header.frame_id = base_link_frame_;
+
+  bool moving = std::abs(cmd_vel.twist.linear.x) > VELOCITY_EPS;
+  if (cancel_in_progress_)
+  {
+    if (!moving)
+    {
+        RCLCPP_INFO(node_->get_logger(), "Cancel requested and we now (almost) reached velocity 0: %f", cmd_vel.twist.linear.x);
+        cancel_in_progress_ = false;
+        active_goal_ = false;
+        // return mbf_msgs::ExePathResult::CANCELED;   //NOTE: move_base_flex functionality not available
+    }
+    // ROS_INFO_THROTTLE(1.0, "Cancel in progress... remaining x_vel: %f", cmd_vel.twist.linear.x); //NOTE: difficulties with migration
+    RCLCPP_INFO(node_->get_logger(), "Cancel in progress... remaining x_vel: %f", cmd_vel.twist.linear.x); //NOTE: difficulties with migration
+
+    // return PathTrackingPid::GRACEFULLY_CANCELLING;   //NOTE:
+  }
+
+  if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS)
+  {
+    active_goal_ = false;
+    // return mbf_msgs::ExePathResult::BLOCKED_PATH;   //NOTE: move_base_flex functionality not available
+  }
+
+  if (isGoalReached())
+    active_goal_ = false;
+  // return mbf_msgs::ExePathResult::SUCCESS;   //NOTE: move_base_flex functionality not available
+
+  return cmd_vel;
+}
+
+bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& cmd_vel)
+{
   rclcpp::Time now = node_->get_clock()->now();
   if (isZero(prev_time_)) //NOTE: isZero is an adjusted function from the ros::time api
   {
@@ -241,10 +286,12 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     geometry_msgs::msg::TwistStamped cmd_vel;
     cmd_vel.twist.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.twist.angular.z = pid_controller_.getControllerState().current_yaw_vel;
+    return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195!
   }
   else if (dt.sec < 0 || dt.sec > DT_MAX)
   {
     RCLCPP_ERROR(node_->get_logger(), "Invalid time increment: %d. Aborting", dt.sec);
+    return false;
   }
   try
   {
@@ -255,6 +302,7 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   {
     RCLCPP_ERROR(node_->get_logger(), "Received an exception trying to transform: %s", ex.what());
     active_goal_ = false;
+    return false;
   }
 
   // Handle obstacles
@@ -311,7 +359,6 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   if (controller_debug_enabled_)
   {
     // debug_pub_->publish(pid_debug); //NOTE!
-
     visualization_msgs::msg::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
 
     // configure rviz visualization
@@ -384,10 +431,8 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
 
   prev_time_ = now;
   prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
-  // ----------------- new --------------- 1
 
-  return cmd_vel;
-
+  return true;
 }
 
 void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
@@ -705,6 +750,21 @@ uint8_t PathTrackingPid::projectedCollisionCost()
 
   return max_cost;
 }
+
+bool PathTrackingPid::isGoalReached()
+{
+  // Return reached boolean, but never succeed when we're preempting
+  return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
+}
+
+bool PathTrackingPid::isGoalReached(double dist_tolerance, double angle_tolerance)
+{
+  //NOTE: avoid not being used error
+  dist_tolerance = dist_tolerance + 0;
+  angle_tolerance = angle_tolerance + 0;
+  return isGoalReached();
+}
+
 
 void PathTrackingPid::setSpeedLimit(
   const double & speed_limit,

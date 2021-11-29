@@ -107,6 +107,14 @@ public:
   void deactivate() override;
 
   /**
+   * @brief Calculates the velocity command based on the current robot pose given by pose. See the interface in move
+   * base.
+   * @param cmd_vel Output the velocity command
+   * @return true if succeded.
+   */
+  bool computeVelocityCommands(geometry_msgs::msg::TwistStamped& cmd_vel);
+
+  /**
    * @brief Compute the best command given the current pose and velocity, with possible debug information
    *
    * Same as above computeVelocityCommands, but with debug results.
@@ -137,6 +145,29 @@ public:
    * or in absolute values in false case.
    */
   void setSpeedLimit(const double & speed_limit, const bool & percentage) override;
+
+    /**
+   * @brief Returns true, if the goal is reached. Currently does not respect the parameters give
+   * @return true, if the goal is reached
+   */
+  bool isGoalReached();
+
+  /**
+   * @brief Returns true, if the goal is reached. Currently does not respect the parameters given.
+   * @param dist_tolerance Tolerance in distance to the goal
+   * @param angle_tolerance Tolerance in the orientation to the goals orientation
+   * @return true, if the goal is reached
+   */
+  bool isGoalReached(double dist_tolerance, double angle_tolerance);
+
+  /** Enumeration for custom SUCCESS feedback codes. See default ones:
+   * https://github.com/magazino/move_base_flex/blob/master/mbf_msgs/action/ExePath.action
+  */
+  enum
+  {
+    SUCCESS = 0,
+    GRACEFULLY_CANCELLING = 1
+  };
 
   // ----------------------- new -------------------- 0
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr  collision_marker_pub_;
