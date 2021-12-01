@@ -56,7 +56,7 @@ class TestPathTrackingPID(unittest.TestCase):
         self.assertTrue(abs(self.cur_odom.twist.twist.linear.x) < 0.1, msg="Violated deceleration on preempt")
         preempt_in_time = client.wait_for_result(timeout=rospy.Duration(10))
         self.assertTrue(preempt_in_time, msg="Action call didn't preempt in time")
-        self.assertEqual(client.get_state(), GS.ABORTED, msg="Action didn't preempt on request")
+        self.assertEqual(client.get_state(), GS.PREEMPTED, msg="Action didn't preempt on request: {}".format(client.get_state()))
 
         # Resume action
         self.reconfigure()
