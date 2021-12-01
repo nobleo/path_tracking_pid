@@ -63,5 +63,6 @@
     <test test-name="rostest_curve_skip" pkg="path_tracking_pid" type="test_path_tracking_pid_turn_skip.py" time-limit="300.0" />
     <test test-name="rostest_preempt_brake" pkg="path_tracking_pid" type="test_path_tracking_pid_accel.py" time-limit="300.0" />
     <test test-name="rostest_preempt_resume" pkg="path_tracking_pid" type="test_path_tracking_pid_preempt.py" time-limit="300.0" />
+    <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" />
 
 </launch>

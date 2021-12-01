@@ -252,8 +252,10 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
   if (cancel_requested_)
   {
     path_tracking_pid::PidConfig config = pid_controller_.getConfig();
-    config.target_x_vel = 0.0;
-    config.target_end_x_vel = 0.0;
+    // Copysign here, such that when cancelling while driving backwards, we decelerate to -0.0 and hence
+    // the sign propagates correctly
+    config.target_x_vel = std::copysign(0.0, config.target_x_vel);
+    config.target_end_x_vel = std::copysign(0.0, config.target_x_vel);
     boost::recursive_mutex::scoped_lock lock(config_mutex_);
     // When updating from own server no callback is called. Thus controller is updated first and then server is notified
     pid_controller_.configure(config);
