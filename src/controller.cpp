@@ -1170,7 +1170,7 @@ void Controller::configure(PidConfig& config)
 
   minimum_turning_radius_ = config.min_turning_radius;
 
-  // debug_enabled_ = config.controller_debug_enabled; //NOTE fix debug
+  debug_enabled_ = config.controller_debug_enabled;
   feedforward_lat_enabled_ = config.feedforward_lat;
   feedforward_ang_enabled_ = config.feedforward_ang;
   feedback_lat_enabled_ = config.feedback_lat;
@@ -1193,7 +1193,7 @@ void Controller::configure(PidConfig& config)
 
   local_config_ = config;
 
-  // printParameters();
+  printParameters();
 }
 
 PidConfig Controller::getConfig()

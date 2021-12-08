@@ -228,9 +228,6 @@ private:
   rclcpp::Time prev_time_;
   builtin_interfaces::msg::Duration prev_dt_;
 
-  // Controller logic
-  bool controller_debug_enabled_ = false;
-
   nav_msgs::msg::Path received_path_;
 
   geometry_msgs::msg::TransformStamped tfCurPoseStamped_;

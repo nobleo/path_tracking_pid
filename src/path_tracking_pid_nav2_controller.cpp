@@ -68,25 +68,25 @@ void PathTrackingPid::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".target_x_vel", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".target_end_x_vel", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".target_end_x_vel", rclcpp::ParameterValue(0.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".target_x_acc", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".target_x_acc", rclcpp::ParameterValue(1.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".target_x_decc", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".target_x_decc", rclcpp::ParameterValue(1.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".abs_minimum_x_vel", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".abs_minimum_x_vel", rclcpp::ParameterValue(0.05));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_error_x_vel", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".max_x_vel", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".max_x_vel", rclcpp::ParameterValue(2.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".max_yaw_vel", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".max_yaw_vel", rclcpp::ParameterValue(2.0));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_yaw_acc", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".min_turning_radius", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".min_turning_radius", rclcpp::ParameterValue(0.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".track_base_link", rclcpp::ParameterValue(true));
+    node, plugin_name_ + ".track_base_link", rclcpp::ParameterValue(false));
 
   // declare_parameter_if_not_declared( //NOTE: look at this again
   //   node, plugin_name_ + ".init_vel_method", rclcpp::ParameterValue(Zero));
@@ -94,17 +94,17 @@ void PathTrackingPid::configure(
     node, plugin_name_ + ".init_vel_max_diff", rclcpp::ParameterValue(0.5));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Kp_lat", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Kp_lat", rclcpp::ParameterValue(1.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Ki_lat", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Ki_lat", rclcpp::ParameterValue(0.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Kd_lat", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Kd_lat", rclcpp::ParameterValue(0.3));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Kp_ang", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Kp_ang", rclcpp::ParameterValue(1.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Ki_ang", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Ki_ang", rclcpp::ParameterValue(0.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".Kd_ang", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".Kd_ang", rclcpp::ParameterValue(0.3));
 
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".feedback_lat", rclcpp::ParameterValue(true));
@@ -116,28 +116,28 @@ void PathTrackingPid::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".feedforward_ang", rclcpp::ParameterValue(false));
 
-  // declare_parameter_if_not_declared(
-  //   node, plugin_name_ + ".controller_debug_enabled", rclcpp::ParameterValue(0.5));
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".controller_debug_enabled", rclcpp::ParameterValue(false));
 
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".use_mpc", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".mpc_simulation_sample_time", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".mpc_simulation_sample_time", rclcpp::ParameterValue(0.05));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".mpc_max_error_lat", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".mpc_max_fwd_iterations", rclcpp::ParameterValue(10));
+    node, plugin_name_ + ".mpc_max_fwd_iterations", rclcpp::ParameterValue(200));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".mpc_min_x_vel", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".mpc_max_vel_optimization_iterations", rclcpp::ParameterValue(10));
+    node, plugin_name_ + ".mpc_max_vel_optimization_iterations", rclcpp::ParameterValue(5));
 
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".max_steering_angle", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".max_steering_angle", rclcpp::ParameterValue(3.1416));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".max_steering_x_vel", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".max_steering_x_vel", rclcpp::ParameterValue(3.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".max_steering_x_acc", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".max_steering_x_acc", rclcpp::ParameterValue(2.0));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_steering_yaw_vel", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
@@ -146,11 +146,11 @@ void PathTrackingPid::configure(
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".anti_collision", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".obstacle_speed_reduction", rclcpp::ParameterValue(false));
+    node, plugin_name_ + ".obstacle_speed_reduction", rclcpp::ParameterValue(true));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".collision_look_ahead_length_offset", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".collision_look_ahead_length_offset", rclcpp::ParameterValue(1.0));
   declare_parameter_if_not_declared(
-    node, plugin_name_ + ".collision_look_ahead_resolution", rclcpp::ParameterValue(0.5));
+    node, plugin_name_ + ".collision_look_ahead_resolution", rclcpp::ParameterValue(1.0));
 
   node->get_parameter(plugin_name_ + ".l", config_.l);
   node->get_parameter(plugin_name_ + ".target_x_vel", config_.target_x_vel);
@@ -181,7 +181,7 @@ void PathTrackingPid::configure(
   node->get_parameter(plugin_name_ + ".feedforward_lat", config_.feedforward_lat);
   node->get_parameter(plugin_name_ + ".feedforward_ang", config_.feedforward_ang);
 
-  // node->get_parameter(plugin_name_ + ".controller_debug_enabled", controller_debug_enabled);
+  node->get_parameter(plugin_name_ + ".controller_debug_enabled", config_.controller_debug_enabled);
 
   node->get_parameter(plugin_name_ + ".use_mpc", config_.use_mpc);
   node->get_parameter(plugin_name_ + ".mpc_simulation_sample_time", config_.mpc_simulation_sample_time);
@@ -201,21 +201,32 @@ void PathTrackingPid::configure(
   node->get_parameter(plugin_name_ + ".collision_look_ahead_length_offset", config_.collision_look_ahead_length_offset);
   node->get_parameter(plugin_name_ + ".collision_look_ahead_resolution", config_.collision_look_ahead_resolution);
 
-  //From path_tracking_pid_local_planner::initialize:
-  pid_controller_.setNodePointer(node_); //NOTE: new
+  // These are static parameters
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".use_tricycle_model", rclcpp::ParameterValue(false));
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".holonomic_robot", rclcpp::ParameterValue(false));
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".estimate_pose_angle", rclcpp::ParameterValue(false));
 
-  pid_controller_.setEnabled(false);
-
+  node->get_parameter(plugin_name_ + ".use_tricycle_model", use_tricycle_model_);
   bool holonomic_robot = false;
+  node->get_parameter(plugin_name_ + ".holonomic_robot", holonomic_robot);
   pid_controller_.setHolonomic(holonomic_robot);
-
   bool estimate_pose_angle = false;
   pid_controller_.setEstimatePoseAngle(estimate_pose_angle);
 
-  base_link_frame_ = "base_link";
+  //From path_tracking_pid_local_planner::initialize:
+  pid_controller_.setNodePointer(node_); //NOTE: new
+  pid_controller_.configure(config_);
 
-  use_tricycle_model_= false;
-  std::string steered_wheel_frame_ = "steer";
+  pid_controller_.setEnabled(false);
+
+
+  // TODO(BramO): make these static parameters
+  base_link_frame_ = "base_link";
+  std::string steered_wheel_frame_ = "steer_link";
+  // up to here TODO make static parameters
 
   //Publishers:
   collision_marker_pub_ = node->create_publisher<visualization_msgs::msg::MarkerArray>("collision_markers", 3);
@@ -384,7 +395,7 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
   }
 
 
-  if (controller_debug_enabled_)
+  if (pid_controller_.getConfig().controller_debug_enabled)
   {
     // debug_pub_->publish(pid_debug); //NOTE!
     visualization_msgs::msg::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
@@ -507,7 +518,7 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
     }
   }
 
-  if (controller_debug_enabled_)
+  if (pid_controller_.getConfig().controller_debug_enabled)
   {
     received_path_.header = global_plan_.at(0).header;
     received_path_.poses = global_plan_;

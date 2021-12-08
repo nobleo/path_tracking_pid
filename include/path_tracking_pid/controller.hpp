@@ -134,6 +134,8 @@ struct PidConfig
   bool obstacle_speed_reduction;
   double collision_look_ahead_length_offset;
   double collision_look_ahead_resolution;
+
+  bool controller_debug_enabled;
 };
 
 // ------------- new ----------- 0
