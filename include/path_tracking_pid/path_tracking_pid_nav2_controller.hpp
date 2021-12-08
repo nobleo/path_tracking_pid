@@ -170,11 +170,11 @@ public:
   };
 
   // ----------------------- new -------------------- 0
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr  collision_marker_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr       marker_pub_;
-  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr                   path_pub_;
-  rclcpp::Publisher<path_tracking_pid::msg::PidFeedback>::SharedPtr        feedback_pub_;
-  rclcpp::Publisher<path_tracking_pid::msg::PidDebug>::SharedPtr           debug_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>> collision_marker_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::Marker>>      marker_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>>                  path_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<path_tracking_pid::msg::PidFeedback>>  feedback_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<path_tracking_pid::msg::PidDebug>>     debug_pub_;
 
   /**
    * @brief Convert a tf2 Vector3 type to its equivalent geometry_msgs representation.
@@ -193,7 +193,7 @@ public:
   inline
   bool isZero(const rclcpp::Time & time)
   {
-    if (time.nanoseconds() == 0.0){
+    if (time.seconds() == 0.0 && time.nanoseconds() == 0.0){
       return true;
     } else{
       return false;

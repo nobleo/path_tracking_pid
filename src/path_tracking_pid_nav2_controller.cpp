@@ -17,14 +17,29 @@ namespace path_tracking_pid
 
 void PathTrackingPid::cleanup()
 {
+  collision_marker_pub_.reset();
+  marker_pub_.reset();
+  path_pub_.reset();
+  debug_pub_.reset();
+  feedback_pub_.reset();
 }
 
 void PathTrackingPid::activate()
 {
+  collision_marker_pub_ ->on_activate();
+  marker_pub_           ->on_activate();
+  path_pub_             ->on_activate();
+  debug_pub_            ->on_activate();
+  feedback_pub_         ->on_activate();
 }
 
 void PathTrackingPid::deactivate()
 {
+  collision_marker_pub_ ->on_deactivate();
+  marker_pub_           ->on_deactivate();
+  path_pub_             ->on_deactivate();
+  debug_pub_            ->on_deactivate();
+  feedback_pub_         ->on_deactivate();
 }
 
 void PathTrackingPid::configure(
@@ -44,6 +59,8 @@ void PathTrackingPid::configure(
   logger_ = node->get_logger();
   // --------------------------- new --------------------------- 0
   node_ = node;
+
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: start of configure"); //DEBUG
 
   //To be able to dynamically configure params, add them to the node parameters:
   declare_parameter_if_not_declared(
@@ -214,6 +231,9 @@ void PathTrackingPid::configure(
 
   map_frame_ = costmap_ros->getGlobalFrameID();
   initialized_ = true;
+
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: end of configure"); //DEBUG
+
   // --------------------------- new --------------------------- 1
 }
 
@@ -222,6 +242,8 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   const geometry_msgs::msg::Twist & speed,
   nav2_core::GoalChecker * goal_checker)
 {
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: start of computeVelMethodMAIN"); //DEBUG
+
   // Explicitely made useless to avoid compilation error
   (void)speed;
   (void)goal_checker;
@@ -270,11 +292,15 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
     active_goal_ = false;
   // return mbf_msgs::ExePathResult::SUCCESS;   //NOTE: move_base_flex functionality not available
 
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: end of computeVelMethodMAIN"); //DEBUG
+
   return cmd_vel;
 }
 
 bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& cmd_vel)
 {
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: start of computeVelMethod"); //DEBUG
+
   rclcpp::Time now = node_->get_clock()->now();
   if (isZero(prev_time_)) //NOTE: isZero is an adjusted function from the ros::time api
   {
@@ -434,11 +460,15 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
   prev_time_ = now;
   prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
 
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: end of computeVelMethod") ;//DEBUG
+
   return true;
 }
 
 void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
 {
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: start of setPlan"); //DEBUG
+
   if (!initialized_)
   {
     RCLCPP_ERROR(node_->get_logger(), "path_tracking_pid has not been initialized, please call initialize() before using this planner");
@@ -533,6 +563,8 @@ void PathTrackingPid::setPlan(const nav_msgs::msg::Path & path)
   pid_controller_.setEnabled(true);
   active_goal_ = true;
   prev_time_ = node_->get_clock()->now();
+
+  RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: end of setPlan"); //DEBUG
 }
 
 uint8_t PathTrackingPid::projectedCollisionCost()
