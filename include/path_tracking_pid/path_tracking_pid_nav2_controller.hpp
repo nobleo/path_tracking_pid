@@ -171,7 +171,8 @@ public:
 
   // ----------------------- new -------------------- 0
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>> collision_marker_pub_;
-  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::Marker>>      marker_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::Marker>>      marker_poses_pub_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::Marker>>      marker_goals_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>>                  path_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<path_tracking_pid::msg::PidFeedback>>  feedback_pub_;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<path_tracking_pid::msg::PidDebug>>     debug_pub_;

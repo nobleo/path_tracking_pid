@@ -18,7 +18,8 @@ namespace path_tracking_pid
 void PathTrackingPid::cleanup()
 {
   collision_marker_pub_.reset();
-  marker_pub_.reset();
+  marker_poses_pub_.reset();
+  marker_goals_pub_.reset();
   path_pub_.reset();
   debug_pub_.reset();
   feedback_pub_.reset();
@@ -27,7 +28,8 @@ void PathTrackingPid::cleanup()
 void PathTrackingPid::activate()
 {
   collision_marker_pub_ ->on_activate();
-  marker_pub_           ->on_activate();
+  marker_poses_pub_     ->on_activate();
+  marker_goals_pub_     ->on_activate();
   path_pub_             ->on_activate();
   debug_pub_            ->on_activate();
   feedback_pub_         ->on_activate();
@@ -36,7 +38,8 @@ void PathTrackingPid::activate()
 void PathTrackingPid::deactivate()
 {
   collision_marker_pub_ ->on_deactivate();
-  marker_pub_           ->on_deactivate();
+  marker_poses_pub_     ->on_deactivate();
+  marker_goals_pub_     ->on_deactivate();
   path_pub_             ->on_deactivate();
   debug_pub_            ->on_deactivate();
   feedback_pub_         ->on_deactivate();
@@ -208,6 +211,10 @@ void PathTrackingPid::configure(
     node, plugin_name_ + ".holonomic_robot", rclcpp::ParameterValue(false));
   declare_parameter_if_not_declared(
     node, plugin_name_ + ".estimate_pose_angle", rclcpp::ParameterValue(false));
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".base_link_frame", rclcpp::ParameterValue("base_link"));
+  declare_parameter_if_not_declared(
+    node, plugin_name_ + ".steer_link_frame", rclcpp::ParameterValue("steer_link"));
 
   node->get_parameter(plugin_name_ + ".use_tricycle_model", use_tricycle_model_);
   bool holonomic_robot = false;
@@ -215,6 +222,8 @@ void PathTrackingPid::configure(
   pid_controller_.setHolonomic(holonomic_robot);
   bool estimate_pose_angle = false;
   pid_controller_.setEstimatePoseAngle(estimate_pose_angle);
+  node->get_parameter(plugin_name_ + ".base_link_frame", base_link_frame_);
+  node->get_parameter(plugin_name_ + ".steer_link_frame", steered_wheel_frame_);
 
   //From path_tracking_pid_local_planner::initialize:
   pid_controller_.setNodePointer(node_); //NOTE: new
@@ -222,15 +231,10 @@ void PathTrackingPid::configure(
 
   pid_controller_.setEnabled(false);
 
-
-  // TODO(BramO): make these static parameters
-  base_link_frame_ = "base_link";
-  std::string steered_wheel_frame_ = "steer_link";
-  // up to here TODO make static parameters
-
   //Publishers:
   collision_marker_pub_ = node->create_publisher<visualization_msgs::msg::MarkerArray>("collision_markers", 3);
-  marker_pub_           = node->create_publisher<visualization_msgs::msg::Marker>("visualization_marker", 3);
+  marker_poses_pub_     = node->create_publisher<visualization_msgs::msg::Marker>("visualization_marker_poses", 5);
+  marker_goals_pub_     = node->create_publisher<visualization_msgs::msg::Marker>("visualization_marker_goals", 5);
   path_pub_             = node->create_publisher<nav_msgs::msg::Path>("visualization_path", 1);
   debug_pub_            = node->create_publisher<path_tracking_pid::msg::PidDebug>("debug", 1); //NOTE
   feedback_pub_         = node->create_publisher<path_tracking_pid::msg::PidFeedback>("feedback", 1); //NOTE
@@ -266,12 +270,14 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   {
     RCLCPP_ERROR(node_->get_logger(), "path_tracking_pid has not been initialized, please call initialize() before using this planner");
     active_goal_ = false;
+    throw nav2_core::PlannerException("Planner not initialzed");
     // return mbf_msgs::ExePathResult::NOT_INITIALIZED;   //NOTE: move_base_flex functionality not available
   }
   // TODO(Cesar): Use provided pose and odom
   if (!computeVelocityCommands(cmd_vel))
   {
     active_goal_ = false;
+    throw nav2_core::PlannerException("Failed to find suitable velocity command");
     // return mbf_msgs::ExePathResult::FAILURE;   //NOTE: move_base_flex functionality not available
   }
   cmd_vel.header.stamp = node_->now();
@@ -285,6 +291,7 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
         RCLCPP_INFO(node_->get_logger(), "Cancel requested and we now (almost) reached velocity 0: %f", cmd_vel.twist.linear.x);
         cancel_in_progress_ = false;
         active_goal_ = false;
+        throw nav2_core::PlannerException("We need to cancel, how to force a cancel in nav 2?");
         // return mbf_msgs::ExePathResult::CANCELED;   //NOTE: move_base_flex functionality not available
     }
     // ROS_INFO_THROTTLE(1.0, "Cancel in progress... remaining x_vel: %f", cmd_vel.twist.linear.x); //NOTE: difficulties with migration
@@ -296,11 +303,15 @@ geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS)
   {
     active_goal_ = false;
+    RCLCPP_INFO(node_->get_logger(), "Path blocked ahead");
     // return mbf_msgs::ExePathResult::BLOCKED_PATH;   //NOTE: move_base_flex functionality not available
   }
 
   if (isGoalReached())
+  {
     active_goal_ = false;
+    RCLCPP_INFO(node_->get_logger(), "Goal is reached!");
+  }
   // return mbf_msgs::ExePathResult::SUCCESS;   //NOTE: move_base_flex functionality not available
 
   RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: end of computeVelMethodMAIN"); //DEBUG
@@ -371,12 +382,11 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
     pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   }
 
-  // PidConfig pid_debug;
+  path_tracking_pid::msg::PidDebug pid_debug;
   double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
   double progress = 0.0;
   cmd_vel = pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-                                               dt, &eda, &progress);
-                                              //  &pid_debug);    //NOTE!
+                                               dt, &eda, &progress, &pid_debug);
 
   path_tracking_pid::msg::PidFeedback feedback_msg;
   rclcpp::Duration eda_rclcpp = rclcpp::Duration(tf2::durationFromSec(eda));
@@ -397,14 +407,16 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
 
   if (pid_controller_.getConfig().controller_debug_enabled)
   {
-    // debug_pub_->publish(pid_debug); //NOTE!
+    debug_pub_->publish(pid_debug); //NOTE!
     visualization_msgs::msg::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
 
     // configure rviz visualization
     mkCurPose.header.frame_id = mkControlPose.header.frame_id = map_frame_;
     mkGoalPose.header.frame_id = mkPosOnPlan.header.frame_id = map_frame_;
-    mkCurPose.header.stamp = mkControlPose.header.stamp = node_->now();
-    mkGoalPose.header.stamp = mkPosOnPlan.header.stamp = node_->now();
+    mkCurPose.header.stamp = node_->now();
+    mkControlPose.header.stamp = node_->now();
+    mkGoalPose.header.stamp = node_->now();
+    mkPosOnPlan.header.stamp = node_->now();
     mkCurPose.ns = "axle point";
     mkControlPose.ns = "control point";
     mkGoalPose.ns = "goal point";
@@ -427,15 +439,15 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
     mkGoalPose.scale.y = 0.5;
     mkCurPose.color.b = 1.0;
     mkCurPose.color.a = 1.0;
-    mkControlPose.color.g = 1.0f;
+    mkControlPose.color.g = 1.0;
     mkControlPose.color.a = 1.0;
     mkGoalPose.color.r = 1.0;
     mkGoalPose.color.a = 1.0;
     mkPosOnPlan.scale.x = 0.5;
     mkPosOnPlan.scale.y = 0.5;
     mkPosOnPlan.color.a = 1.0;
-    mkPosOnPlan.color.r = 1.0f;
-    mkPosOnPlan.color.g = 0.5f;
+    mkPosOnPlan.color.r = 1.0;
+    mkPosOnPlan.color.g = 0.5;
 
     geometry_msgs::msg::Point p;
     std_msgs::msg::ColorRGBA color;
@@ -445,27 +457,30 @@ bool PathTrackingPid::computeVelocityCommands(geometry_msgs::msg::TwistStamped& 
     mkCurPose.points.push_back(p);
 
     tf2::Transform tfControlPose = pid_controller_.getCurrentWithCarrot();
-    p.x = tfControlPose.getOrigin().x();
-    p.y = tfControlPose.getOrigin().y();
-    p.z = tfControlPose.getOrigin().z();
-    mkControlPose.points.push_back(p);
+    geometry_msgs::msg::Point pControlPose;
+    pControlPose.x = tfControlPose.getOrigin().x();
+    pControlPose.y = tfControlPose.getOrigin().y();
+    pControlPose.z = tfControlPose.getOrigin().z();
+    mkControlPose.points.push_back(pControlPose);
 
     tf2::Transform tfGoalPose = pid_controller_.getCurrentGoal();
-    p.x = tfGoalPose.getOrigin().x();
-    p.y = tfGoalPose.getOrigin().y();
-    p.z = tfGoalPose.getOrigin().z();
-    mkGoalPose.points.push_back(p);
+    geometry_msgs::msg::Point pGoalPose;
+    pGoalPose.x = tfGoalPose.getOrigin().x();
+    pGoalPose.y = tfGoalPose.getOrigin().y();
+    pGoalPose.z = tfGoalPose.getOrigin().z();
+    mkGoalPose.points.push_back(pGoalPose);
 
     tf2::Transform tfCurPose = pid_controller_.getCurrentPosOnPlan();
-    p.x = tfCurPose.getOrigin().x();
-    p.y = tfCurPose.getOrigin().y();
-    p.z = tfCurPose.getOrigin().z();
-    mkPosOnPlan.points.push_back(p);
+    geometry_msgs::msg::Point pCurPose;
+    pCurPose.x = tfCurPose.getOrigin().x();
+    pCurPose.y = tfCurPose.getOrigin().y();
+    pCurPose.z = tfCurPose.getOrigin().z();
+    mkPosOnPlan.points.push_back(pCurPose);
 
-    marker_pub_->publish(mkCurPose);
-    marker_pub_->publish(mkControlPose);
-    marker_pub_->publish(mkGoalPose);
-    marker_pub_->publish(mkPosOnPlan);
+    marker_poses_pub_->publish(mkCurPose);
+    marker_poses_pub_->publish(mkControlPose);
+    marker_goals_pub_->publish(mkGoalPose);
+    marker_goals_pub_->publish(mkPosOnPlan);
   }
 
   prev_time_ = now;
@@ -799,6 +814,7 @@ uint8_t PathTrackingPid::projectedCollisionCost()
 bool PathTrackingPid::isGoalReached()
 {
   // Return reached boolean, but never succeed when we're preempting
+
   return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
 }
 

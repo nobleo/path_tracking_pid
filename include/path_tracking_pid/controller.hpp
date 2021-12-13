@@ -33,6 +33,7 @@ namespace path_tracking_pid
 
 #define RADIUS_EPS 0.001  // Smallest relevant radius [m]
 #define VELOCITY_EPS 1e-3  // Neglegible velocity
+#define POSITION_EPS 1e-3  // Neglegible position
 #define LONG_DURATION 31556926  // A year (ros::Duration cannot be inf)
 
 enum ControllerMode
@@ -223,8 +224,8 @@ public:
                               const geometry_msgs::msg::Transform current_tf,
                               const geometry_msgs::msg::Twist odom_twist,
                               const rclcpp::Duration dt,
-                              double* eda, double* progress
-                            //   , path_tracking_pid::PidDebug* pid_debug (NOTE: change to dynamic param config)
+                              double* eda, double* progress,
+                              path_tracking_pid::msg::PidDebug* pid_debug
                               );
 
   /**
@@ -240,8 +241,8 @@ public:
   geometry_msgs::msg::TwistStamped update_with_limits(const geometry_msgs::msg::Transform current_tf,
                                           const geometry_msgs::msg::Twist odom_twist,
                                           const builtin_interfaces::msg::Duration dt,
-                                          double* eda, double* progress
-                                        //   path_tracking_pid::PidDebug* pid_debug (NOTE: change to dyn params ros2)
+                                          double* eda, double* progress,
+                                          path_tracking_pid::msg::PidDebug* pid_debug
                                           );
 
   /**

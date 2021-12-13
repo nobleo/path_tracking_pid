@@ -401,8 +401,8 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
                                         const geometry_msgs::msg::Transform current_tf,
                                         const geometry_msgs::msg::Twist odom_twist,
                                         const rclcpp::Duration dt,
-                                        double* eda, double* progress
-                                        // , path_tracking_pid::PidDebug* pid_debug
+                                        double* eda, double* progress,
+                                        path_tracking_pid::msg::PidDebug* pid_debug
                                         )
 {
   double current_x_vel = controller_state_.current_x_vel;
@@ -414,10 +414,16 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   current_with_carrot_origin.setX(current_tf.translation.x + l_ * cos(theda_rp));
   current_with_carrot_origin.setY(current_tf.translation.y + l_ * sin(theda_rp));
   current_with_carrot_origin.setZ(0);
+  RCLCPP_INFO(node_->get_logger(), "l_ is: %f", l_);
+  RCLCPP_INFO(node_->get_logger(), "theda_rp is: %f", theda_rp);
 
   current_with_carrot_.setOrigin(current_with_carrot_origin);
   tf2::Quaternion cur_rot(current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
   current_with_carrot_.setRotation(cur_rot);
+
+  RCLCPP_INFO(node_->get_logger(), "current_with_carrot_.x is: %f", current_with_carrot_.getOrigin().x());
+  RCLCPP_INFO(node_->get_logger(), "current_with_carrot_.y is: %f", current_with_carrot_.getOrigin().y());
+
 
   size_t path_pose_idx;
   if (track_base_link_enabled_)
@@ -603,7 +609,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
                 + target_x_vel * 2.0 * dt.seconds();
   }
   RCLCPP_DEBUG(node_->get_logger(), "t_end_phase_current: %f", t_end_phase_current);
-  RCLCPP_DEBUG(node_->get_logger(), "d_end_phase: %f", d_end_phase);
+  RCLCPP_INFO(node_->get_logger(), "d_end_phase: %f", d_end_phase);
   RCLCPP_DEBUG(node_->get_logger(), "distance_to_goal: %f", distance_to_goal_);
 
   // Get 'angle' towards current_goal
@@ -667,13 +673,19 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
     RCLCPP_WARN(node_->get_logger(), "Large tracking error. Current_x_vel %f / odometry %f",
             new_x_vel, odom_twist.linear.x); //NOTE: warn_throttle fix
   }
+  // RCLCPP_INFO(node_->get_logger(), "distance_to_goal_ %f", distance_to_goal_);
+  // RCLCPP_INFO(node_->get_logger(), "new_x_vel %f", new_x_vel);
+  // RCLCPP_INFO(node_->get_logger(), "controller_state_.end_phase_enabled %d", (int)controller_state_.end_phase_enabled);
+  // RCLCPP_INFO(node_->get_logger(), "distance_to_goal_ %f", distance_to_goal_);
 
   // Force target_end_x_vel at the very end of the path
   // Or when the end velocity is reached.
   // Warning! If target_end_x_vel == 0 and min_vel = 0 then the robot might not reach end pose
   if ((distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS)
       || (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS
-          && new_x_vel <= target_end_x_vel + VELOCITY_EPS))
+          && new_x_vel <= target_end_x_vel + VELOCITY_EPS)
+          || ( fabs(distance_to_goal_) <= POSITION_EPS && fabs(target_end_x_vel) <= VELOCITY_EPS
+              && fabs(new_x_vel - min_vel) <= VELOCITY_EPS ) )
   {
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
@@ -695,6 +707,8 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
       *eda = LONG_DURATION;
     }
   }
+  // RCLCPP_INFO(node_->get_logger(), "controller_state_.end_reached %d", (int)controller_state_.end_reached);
+
   /******* end calculation of forward velocity ********/
 
 
@@ -742,32 +756,31 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   else if (control_effort_ang_ < ang_lower_limit_)
     control_effort_ang_ = ang_lower_limit_;
 
-//NOTE: Pid_debug fix
-  // // Populate debug output
-  // // Error topic containing the 'control' error on which the PID acts
-  // pid_debug->control_error.linear.x = 0.0;
-  // pid_debug->control_error.linear.y = controller_state_.error_lat.at(0);
-  // pid_debug->control_error.angular.z = controller_state_.error_ang.at(0);
-  // // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
-  // pid_debug->tracking_error.linear.x = 0.0;
-  // pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
-  // pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
+  // Populate debug output
+  // Error topic containing the 'control' error on which the PID acts
+  pid_debug->control_error.linear.x = 0.0;
+  pid_debug->control_error.linear.y = controller_state_.error_lat.at(0);
+  pid_debug->control_error.angular.z = controller_state_.error_ang.at(0);
+  // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
+  pid_debug->tracking_error.linear.x = 0.0;
+  pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
+  pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
 
-  // pid_debug->proportional.linear.x = 0.0;
-  // pid_debug->proportional.linear.y = proportional_lat_;
-  // pid_debug->proportional.angular.z = proportional_ang_;
+  pid_debug->proportional.linear.x = 0.0;
+  pid_debug->proportional.linear.y = proportional_lat_;
+  pid_debug->proportional.angular.z = proportional_ang_;
 
-  // pid_debug->integral.linear.x = 0.0;
-  // pid_debug->integral.linear.y = integral_lat_;
-  // pid_debug->integral.angular.z = integral_ang_;
+  pid_debug->integral.linear.x = 0.0;
+  pid_debug->integral.linear.y = integral_lat_;
+  pid_debug->integral.angular.z = integral_ang_;
 
-  // pid_debug->derivative.linear.x = 0.0;
-  // pid_debug->derivative.linear.y = derivative_lat_;
-  // pid_debug->derivative.angular.z = derivative_ang_;
+  pid_debug->derivative.linear.x = 0.0;
+  pid_debug->derivative.linear.y = derivative_lat_;
+  pid_debug->derivative.angular.z = derivative_ang_;
 
-  // pid_debug->feedforward.linear.x = new_x_vel;
-  // pid_debug->feedforward.linear.y = feedforward_lat_;
-  // pid_debug->feedforward.angular.z = feedforward_ang_;
+  pid_debug->feedforward.linear.x = new_x_vel;
+  pid_debug->feedforward.linear.y = feedforward_lat_;
+  pid_debug->feedforward.angular.z = feedforward_ang_;
 
   geometry_msgs::msg::Twist output_combined;
   // Generate twist message
@@ -882,8 +895,8 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
 geometry_msgs::msg::TwistStamped Controller::update_with_limits(const geometry_msgs::msg::Transform current_tf,
                                                     const geometry_msgs::msg::Twist odom_twist,
                                                     const builtin_interfaces::msg::Duration dt,
-                                                    double* eda, double* progress
-                                                    // , path_tracking_pid::PidDebug* pid_debug   //NOTE!
+                                                    double* eda, double* progress,
+                                                    path_tracking_pid::msg::PidDebug* pid_debug
                                                     )
 {
   // All limits are absolute
@@ -928,9 +941,7 @@ geometry_msgs::msg::TwistStamped Controller::update_with_limits(const geometry_m
 
   // Update the controller with the new setting
   max_x_vel = std::copysign(max_x_vel, target_x_vel_);
-  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress
-  // , pid_debug //NOTE: fix pid_debug
-  );
+  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
@@ -1015,15 +1026,14 @@ double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::m
     {
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
-      // path_tracking_pid::PidDebug pid_debug_unused; //NOTE: fix pid_debug
+      path_tracking_pid::msg::PidDebug pid_debug_unused;
       double eda_unused, progress_unused;
       // -------- new -------- 0
       geometry_msgs::msg::TwistStamped pred_twist_stamped;
       pred_twist_stamped.twist = odom_twist;
       pred_twist_stamped = Controller::update(new_nominal_x_vel, target_end_x_vel_, predicted_tf, pred_twist,
                                       rclcpp::Duration(tf2::durationFromSec(mpc_simulation_sample_time_)),
-                                      &eda_unused, &progress_unused
-                                      // , &pid_debug_unused //NOTE: fix pid_debug
+                                      &eda_unused, &progress_unused, &pid_debug_unused
                                       );
       // -------- new -------- 1
 
