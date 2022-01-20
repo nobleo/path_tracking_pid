@@ -21,7 +21,7 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
         reconfigure.update_configuration({"target_x_vel": target_vel})
         reconfigure.update_configuration({"target_end_x_vel": 0})
-        reconfigure.update_configuration({"target_x_acc": 3.0})
+        reconfigure.update_configuration({"target_x_acc": 4.0})
         reconfigure.update_configuration({"target_x_decc": 1.0})
 
     def odom_cb(self, msg):
@@ -47,12 +47,12 @@ class TestPathTrackingPID(unittest.TestCase):
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
 
-        rospy.sleep(0.666)
+        rospy.sleep(0.6)
         self.assertTrue(1.0 < self.cur_odom.twist.twist.linear.x < 2.1, msg="Violated acceleration")
         rospy.sleep(4.0)
         self.assertTrue(self.cur_odom.twist.twist.linear.x < 2.0, msg="Deceleration not started on time")
-        rospy.sleep(1.5)
-        self.assertTrue(0.0 < self.cur_odom.twist.twist.linear.x < 0.5, msg="Violated deceleration {}".format(self.cur_odom.twist.twist.linear.x))
+        rospy.sleep(1.4)
+        self.assertTrue(0.0 < self.cur_odom.twist.twist.linear.x < 0.5, msg="Violated deceleration")
 
         finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
 
@@ -76,11 +76,11 @@ class TestPathTrackingPID(unittest.TestCase):
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
 
-        rospy.sleep(0.666)
+        rospy.sleep(0.6)
         self.assertTrue(-1.0 > self.cur_odom.twist.twist.linear.x > -2.1, msg="Violated acceleration")
         rospy.sleep(4.0)
         self.assertTrue(self.cur_odom.twist.twist.linear.x > -2.0, msg="Deceleration not started on time")
-        rospy.sleep(1.5)
+        rospy.sleep(1.4)
         self.assertTrue(0.0 > self.cur_odom.twist.twist.linear.x > -0.5, msg="Violated deceleration")
 
         finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
