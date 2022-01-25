@@ -10,7 +10,7 @@
     <!--Rather than running Gazebo to simulate a robot, just use cmd_vel to calculate odom and TF-->
     <node pkg="mobile_robot_simulator" type="mobile_robot_simulator_node" name="mobile_robot_simulator" output="screen">
         <param name="publish_map_transform" value="true"/>
-        <param name="publish_rate" value="10.0"/>
+        <remap from='mobile_robot_simulator/publish_rate' to='move_base_flex/controller_frequency'/>
         <!-- <remap from="move_base/cmd_vel" to="/cmd_vel"/>
         <remap from="odom" to="/odom"/> -->
     </node>
