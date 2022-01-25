@@ -16,6 +16,8 @@ from paths import create_path
 class TestPathTrackingPID(unittest.TestCase):
     def setUp(self):
         self.cur_odom = Odometry()
+        self.prev_odom = Odometry()
+        self.cur_accel = 0.0
 
     def reconfigure(self, target_vel):
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
@@ -25,7 +27,11 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure.update_configuration({"target_x_decc": 1.0})
 
     def odom_cb(self, msg):
+        self.prev_odom = self.cur_odom
         self.cur_odom = msg
+        dv = self.cur_odom.twist.twist.linear.x - self.prev_odom.twist.twist.linear.x
+        dt = (self.cur_odom.header.stamp - self.prev_odom.header.stamp).to_sec()
+        self.cur_accel = dv / dt
 
     def test_exepath_action(self):
 
@@ -47,12 +53,10 @@ class TestPathTrackingPID(unittest.TestCase):
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
 
-        rospy.sleep(0.6)
-        self.assertTrue(1.0 < self.cur_odom.twist.twist.linear.x < 2.1, msg="Violated acceleration")
-        rospy.sleep(4.0)
-        self.assertTrue(self.cur_odom.twist.twist.linear.x < 2.0, msg="Deceleration not started on time")
-        rospy.sleep(1.4)
-        self.assertTrue(0.0 < self.cur_odom.twist.twist.linear.x < 0.5, msg="Violated deceleration")
+        rospy.sleep(0.5)
+        self.assertTrue(3.5 < self.cur_accel < 4.5, msg="Violated acceleration {}".format(self.cur_accel))
+        rospy.sleep(4.5)
+        self.assertTrue(-1.5 < self.cur_accel < -0.5, msg="Violated deceleration {}".format(self.cur_accel))
 
         finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
 
@@ -76,12 +80,10 @@ class TestPathTrackingPID(unittest.TestCase):
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
 
-        rospy.sleep(0.6)
-        self.assertTrue(-1.0 > self.cur_odom.twist.twist.linear.x > -2.1, msg="Violated acceleration")
-        rospy.sleep(4.0)
-        self.assertTrue(self.cur_odom.twist.twist.linear.x > -2.0, msg="Deceleration not started on time")
-        rospy.sleep(1.4)
-        self.assertTrue(0.0 > self.cur_odom.twist.twist.linear.x > -0.5, msg="Violated deceleration")
+        rospy.sleep(0.5)
+        self.assertTrue(-4.5 < self.cur_accel < -3.5, msg="Violated acceleration {}".format(self.cur_accel))
+        rospy.sleep(4.5)
+        self.assertTrue(0.5 < self.cur_accel < 1.5, msg="Violated deceleration {}".format(self.cur_accel))
 
         finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
 
