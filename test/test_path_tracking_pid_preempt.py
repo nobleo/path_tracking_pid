@@ -23,6 +23,7 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure.update_configuration({"target_end_x_vel": end_vel})
         reconfigure.update_configuration({"target_x_acc": 2.0})
         reconfigure.update_configuration({"target_x_decc": 1.0})
+        reconfigure.update_configuration({"use_mpc": False})
 
     def odom_cb(self, msg):
         self.cur_odom = msg

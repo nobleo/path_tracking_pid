@@ -84,6 +84,7 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure.update_configuration({"target_end_x_vel": endspeed})
         reconfigure.update_configuration({"target_x_acc": 0.5})
         reconfigure.update_configuration({"target_x_decc": 0.5})
+        reconfigure.update_configuration({"use_mpc": False})
         # We require debug enabled here to retrieve the markers!
         reconfigure.update_configuration({"controller_debug_enabled": True})
         rospy.logwarn("Starting path!")
