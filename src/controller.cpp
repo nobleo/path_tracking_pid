@@ -586,8 +586,8 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   // to de-accelerate and thus avoid abrupt velocity changes at the end of the trajectory
   // The sample time plays an important role on how good these estimates are.
   // Thus We add a distance to the end phase distance estimation depending on the sample time
-  if ((sign(current_target_x_vel_) > 0 && current_x_vel > target_end_x_vel) ||
-      (sign(current_target_x_vel_) < 0 && current_x_vel < target_end_x_vel))
+  if ((current_target_x_vel_ > 0.0 && current_x_vel > target_end_x_vel) ||
+      (current_target_x_vel_ < 0.0 && current_x_vel < target_end_x_vel))
   {
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (-target_x_decc_);
     d_end_phase = current_x_vel * t_end_phase_current
