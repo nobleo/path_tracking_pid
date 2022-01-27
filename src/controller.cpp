@@ -644,7 +644,7 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
       current_target_acc = target_x_decc_;
     }
   }
-  else if (sign(current_target_x_vel_) > 0)         // Positive velocity requested
+  else if (current_target_x_vel_ > 0)         // Positive velocity requested
   {
     if (current_x_vel > current_target_x_vel_)
     {
