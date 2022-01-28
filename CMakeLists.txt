@@ -17,10 +17,8 @@ find_package(catkin REQUIRED
     pluginlib
     roscpp
     roslint
-    rospy
     rostest
     std_msgs
-    std_srvs
     tf2
     tf2_geometry_msgs
     tf2_ros
@@ -58,7 +56,6 @@ catkin_package(
     pluginlib
     roscpp
     std_msgs
-    std_srvs
     tf2_geometry_msgs
     tf2_ros
     visualization_msgs
