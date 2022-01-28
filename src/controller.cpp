@@ -483,14 +483,14 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.error_integral_ang += controller_state_.error_ang.at(0) * dt.toSec();
 
   // Apply windup limit to limit the size of the integral term
-  if (controller_state_.error_integral_lat > fabsf(windup_limit_))
-    controller_state_.error_integral_lat = fabsf(windup_limit_);
-  if (controller_state_.error_integral_lat < -fabsf(windup_limit_))
-    controller_state_.error_integral_lat = -fabsf(windup_limit_);
-  if (controller_state_.error_integral_ang > fabsf(windup_limit_))
-    controller_state_.error_integral_ang = fabsf(windup_limit_);
-  if (controller_state_.error_integral_ang < -fabsf(windup_limit_))
-    controller_state_.error_integral_ang = -fabsf(windup_limit_);
+  if (controller_state_.error_integral_lat > std::abs(windup_limit_))
+    controller_state_.error_integral_lat = std::abs(windup_limit_);
+  if (controller_state_.error_integral_lat < -std::abs(windup_limit_))
+    controller_state_.error_integral_lat = -std::abs(windup_limit_);
+  if (controller_state_.error_integral_ang > std::abs(windup_limit_))
+    controller_state_.error_integral_ang = std::abs(windup_limit_);
+  if (controller_state_.error_integral_ang < -std::abs(windup_limit_))
+    controller_state_.error_integral_ang = -std::abs(windup_limit_);
 
   // My filter reference was Julius O. Smith III, Intro. to Digital Filters With Audio Applications.
   if (cutoff_frequency_lat_ != -1)
@@ -1222,7 +1222,7 @@ void Controller::setVelMaxObstacle(double value)
   vel_max_obstacle_ = value;
 }
 
-double Controller::getVelMaxObstacle()
+double Controller::getVelMaxObstacle() const
 {
   return vel_max_obstacle_;
 }

@@ -26,9 +26,7 @@
   <depend>nav_msgs</depend>
   <depend>pluginlib</depend>
   <depend>roscpp</depend>
-  <depend>rospy</depend>
   <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
   <depend>tf2</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>tf2_ros</depend>
@@ -36,6 +34,7 @@
   <exec_depend>mbf_costmap_nav</exec_depend>
   <exec_depend>message_runtime</exec_depend>
   <test_depend>mobile_robot_simulator</test_depend>
+  <test_depend>rospy</test_depend>
 
   <export>
     <nav_core plugin="${prefix}/path_tracking_pid_plugin.xml"/>
