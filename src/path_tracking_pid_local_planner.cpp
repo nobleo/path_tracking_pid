@@ -129,7 +129,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
               base_link_frame_.c_str());
     tfCurPoseStamped_ = tf_->lookupTransform(map_frame_, base_link_frame_, ros::Time(0));
   }
-  catch (tf2::TransformException ex)
+  catch (const tf2::TransformException& ex)
   {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     return false;
@@ -153,7 +153,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
       ROS_DEBUG("base_link_frame: %s, steered_wheel_frame: %s", base_link_frame_.c_str(), steered_wheel_frame_.c_str());
       tf_base_to_steered_wheel_stamped_ = tf_->lookupTransform(base_link_frame_, steered_wheel_frame_, ros::Time(0));
     }
-    catch (tf2::TransformException ex)
+    catch (const tf2::TransformException& ex)
     {
       ROS_ERROR("Received an exception trying to transform: %s", ex.what());
       ROS_ERROR("Invalid transformation from base_link_frame to steered_wheel_frame. Tricycle model will be disabled");
@@ -204,7 +204,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
     ROS_DEBUG("map_frame: %s, base_link_frame: %s", map_frame_.c_str(), base_link_frame_.c_str());
     tfCurPoseStamped_ = tf_->lookupTransform(map_frame_, base_link_frame_, ros::Time(0));
   }
-  catch (tf2::TransformException ex)
+  catch (const tf2::TransformException& ex)
   {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     active_goal_ = false;

@@ -230,7 +230,7 @@ public:
   void setVelMaxObstacle(double value);
 
   // Get vel_max_obstacle value
-  double getVelMaxObstacle();
+  double getVelMaxObstacle() const;
 
 private:
   double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w) const;
