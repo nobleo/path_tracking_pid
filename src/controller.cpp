@@ -586,7 +586,8 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   // to de-accelerate and thus avoid abrupt velocity changes at the end of the trajectory
   // The sample time plays an important role on how good these estimates are.
   // Thus We add a distance to the end phase distance estimation depending on the sample time
-  if (current_x_vel > target_end_x_vel)
+  if ((current_target_x_vel_ > 0.0 && current_x_vel > target_end_x_vel) ||
+      (current_target_x_vel_ < 0.0 && current_x_vel < target_end_x_vel))
   {
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (-target_x_decc_);
     d_end_phase = current_x_vel * t_end_phase_current
@@ -630,18 +631,42 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
     current_target_x_vel_ = target_x_vel;
   }
 
-  if (current_x_vel < current_target_x_vel_)
+  // Determine if we need to accelerate, decelerate or maintain speed
+  current_target_acc = 0;  // Assume maintaining speed
+  if (fabs(current_target_x_vel_) <= VELOCITY_EPS)  // Zero velocity requested
   {
-    current_target_acc = target_x_acc_;
+    if (current_x_vel > current_target_x_vel_)
+    {
+      current_target_acc = -target_x_decc_;
+    }
+    else
+    {
+      current_target_acc = target_x_decc_;
+    }
   }
-  else if (current_x_vel > current_target_x_vel_)
+  else if (current_target_x_vel_ > 0)         // Positive velocity requested
   {
-    current_target_acc = -target_x_decc_;
+    if (current_x_vel > current_target_x_vel_)
+    {
+      current_target_acc = -target_x_decc_;
+    }
+    else
+    {
+      current_target_acc = target_x_acc_;
+    }
   }
-  else
+  else                                              // Negative velocity requested
   {
-    current_target_acc = 0;
+    if (current_x_vel > current_target_x_vel_)
+    {
+      current_target_acc = -target_x_acc_;
+    }
+    else
+    {
+      current_target_acc = target_x_decc_;
+    }
   }
+
   double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
   double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
   acc = copysign(acc_abs, current_target_acc);

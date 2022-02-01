@@ -63,6 +63,7 @@ class TestPathTrackingPID(unittest.TestCase):
             reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
             reconfigure.update_configuration({"target_x_vel": speed})
             reconfigure.update_configuration({"target_end_x_vel": endspeed})
+            reconfigure.update_configuration({"use_mpc": False})
             rospy.logwarn("Starting path!")
             client.send_goal(ExePathGoal(path=path))
 

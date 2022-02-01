@@ -10,7 +10,7 @@
     <!--Rather than running Gazebo to simulate a robot, just use cmd_vel to calculate odom and TF-->
     <node pkg="mobile_robot_simulator" type="mobile_robot_simulator_node" name="mobile_robot_simulator" output="screen">
         <param name="publish_map_transform" value="true"/>
-        <param name="publish_rate" value="10.0"/>
+        <remap from='mobile_robot_simulator/publish_rate' to='move_base_flex/controller_frequency'/>
         <!-- <remap from="move_base/cmd_vel" to="/cmd_vel"/>
         <remap from="odom" to="/odom"/> -->
     </node>
@@ -64,5 +64,6 @@
     <test test-name="rostest_preempt_brake" pkg="path_tracking_pid" type="test_path_tracking_pid_accel.py" time-limit="300.0" />
     <test test-name="rostest_preempt_resume" pkg="path_tracking_pid" type="test_path_tracking_pid_preempt.py" time-limit="300.0" />
     <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" />
+    <test test-name="rostest_fw_bw" pkg="path_tracking_pid" type="test_path_tracking_pid_fw_bw.py" time-limit="20.0" />
 
 </launch>

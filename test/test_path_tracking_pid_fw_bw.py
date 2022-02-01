@@ -16,17 +16,23 @@ from paths import create_path
 class TestPathTrackingPID(unittest.TestCase):
     def setUp(self):
         self.cur_odom = Odometry()
+        self.prev_odom = Odometry()
+        self.cur_accel = 0.0
 
-    def reconfigure(self):
+    def reconfigure(self, target_vel):
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
-        reconfigure.update_configuration({"target_x_vel": 2.0})
+        reconfigure.update_configuration({"target_x_vel": target_vel})
         reconfigure.update_configuration({"target_end_x_vel": 0})
-        reconfigure.update_configuration({"target_x_acc": 1.0})
+        reconfigure.update_configuration({"target_x_acc": 4.0})
         reconfigure.update_configuration({"target_x_decc": 1.0})
         reconfigure.update_configuration({"use_mpc": False})
 
     def odom_cb(self, msg):
+        self.prev_odom = self.cur_odom
         self.cur_odom = msg
+        dv = self.cur_odom.twist.twist.linear.x - self.prev_odom.twist.twist.linear.x
+        dt = (self.cur_odom.header.stamp - self.prev_odom.header.stamp).to_sec()
+        self.cur_accel = dv / dt
 
     def test_exepath_action(self):
 
@@ -44,29 +50,41 @@ class TestPathTrackingPID(unittest.TestCase):
 
         # Start goal and evaluate outcome
         outcome_exp = rospy.get_param("~outcome", GS.SUCCEEDED)
-        self.reconfigure()
+        self.reconfigure(2.0)
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
 
-        # Preempt action after 2s
-        rospy.sleep(2.0)
-        client.cancel_goal()
-        rospy.sleep(1.0)
-        self.assertTrue(1.0 < abs(self.cur_odom.twist.twist.linear.x) < 2.0, msg="Violated deceleration on preempt")
-        rospy.sleep(2.0)
-        self.assertTrue(abs(self.cur_odom.twist.twist.linear.x) < 0.1, msg="Violated deceleration on preempt")
-        preempt_in_time = client.wait_for_result(timeout=rospy.Duration(10))
-        self.assertTrue(preempt_in_time, msg="Action call didn't preempt in time")
-        self.assertEqual(client.get_state(), GS.PREEMPTED, msg="Action didn't preempt on request: {}".format(client.get_state()))
+        rospy.sleep(0.5)
+        self.assertTrue(3.5 < self.cur_accel < 4.5, msg="Violated acceleration {}".format(self.cur_accel))
+        rospy.sleep(4.5)
+        self.assertTrue(-1.5 < self.cur_accel < -0.5, msg="Violated deceleration {}".format(self.cur_accel))
 
-        # Resume action
-        self.reconfigure()
+        finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
+
+        # Get end-pose error
+        endpose_error = hypot(path.poses[-1].pose.position.x - self.cur_odom.pose.pose.position.x,
+                                path.poses[-1].pose.position.y - self.cur_odom.pose.pose.position.y)
+
+        self.assertTrue(finished_in_time, msg="Action call didn't return in time")
+        self.assertEqual(client.get_state(), outcome_exp, msg="Wrong action outcome")
+        self.assertTrue(endpose_error < 0.5, msg="Did not arrive on final path's pose! \
+                                                    pose: {}, {} endpoint: {}, {}".format(
+                                                        self.cur_odom.pose.pose.position.x,
+                                                        self.cur_odom.pose.pose.position.y,
+                                                        path.poses[-1].pose.position.x,
+                                                        path.poses[-1].pose.position.y))
+
+        # Start bw-goal and evaluate outcome
+        path = create_path([10.0, 0.0], [0.0, 0.0], [0.0, 0.0])
+        outcome_exp = rospy.get_param("~outcome", GS.SUCCEEDED)
+        self.reconfigure(-2.0)
+        rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
-        rospy.sleep(1.0)
-        self.assertEqual(client.get_state(), GS.ACTIVE, msg="Action didn't restart on request")
-        self.assertTrue(0.1 < abs(self.cur_odom.twist.twist.linear.x) < 2.0, msg="Violated acceleration on restart")
-        rospy.sleep(1.0)
-        self.assertTrue(abs(self.cur_odom.twist.twist.linear.x) > 1.9, msg="Violated acceleration on restart")
+
+        rospy.sleep(0.5)
+        self.assertTrue(-4.5 < self.cur_accel < -3.5, msg="Violated acceleration {}".format(self.cur_accel))
+        rospy.sleep(4.5)
+        self.assertTrue(0.5 < self.cur_accel < 1.5, msg="Violated deceleration {}".format(self.cur_accel))
 
         finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
 
@@ -85,5 +103,5 @@ class TestPathTrackingPID(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    rospy.init_node("rostest_path_tracking_pid_accel", anonymous=False)
-    rostest.rosrun("forth", "rostest_path_tracking_pid_accel", TestPathTrackingPID)
+    rospy.init_node("rostest_path_tracking_pid_fw_bw", anonymous=False)
+    rostest.rosrun("forth", "rostest_path_tracking_pid_fw_bw", TestPathTrackingPID)
