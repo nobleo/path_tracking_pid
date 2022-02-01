@@ -417,7 +417,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   double collision_look_ahead_distance = x_vel*x_vel / (2*pid_controller_.getConfig().target_x_decc)
                                          + pid_controller_.getConfig().collision_look_ahead_length_offset;
   uint n_steps = std::ceil(collision_look_ahead_distance / pid_controller_.getConfig().collision_look_ahead_resolution);
-  double x_resolution = collision_look_ahead_distance / n_steps;
+  double x_resolution = collision_look_ahead_distance / std::max(static_cast<int>(n_steps), 1);
 
   // Define a x_step transform which will be used to step forward the position.
   tf2::Transform x_step_tf;
