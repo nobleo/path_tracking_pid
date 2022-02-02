@@ -220,14 +220,14 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
   {
     auto cost = projectedCollisionCost();
 
-    if (cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
+    if (cost >= costmap_2d::LETHAL_OBSTACLE)
     {
       pid_controller_.setVelMaxObstacle(0.0);
     }
     else if (pid_controller_.getConfig().obstacle_speed_reduction)
     {
       double max_vel = pid_controller_.getConfig().max_x_vel;
-      double reduction_factor = static_cast<double>(cost) / costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+      double reduction_factor = static_cast<double>(cost) / costmap_2d::LETHAL_OBSTACLE;
       double limit = max_vel * (1 - reduction_factor);
       ROS_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
       pid_controller_.setVelMaxObstacle(limit);
@@ -533,7 +533,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
         mkCollisionIndicator.color.a = cell_cost / 255.0;
         point.z = mkCollisionIndicator.scale.z * 0.5;
         mkCollisionIndicator.pose.position = point;
-        if (max_cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
+        if (max_cost >= costmap_2d::LETHAL_OBSTACLE)
         {
           break;  // Collision detected, no need to evaluate further
         }
