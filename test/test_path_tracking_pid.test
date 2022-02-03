@@ -49,6 +49,7 @@
     <test test-name="rostest_path_lethal_obstacle" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
         <rosparam param="obstacles">[[10.0, 10.0]]</rosparam>
         <rosparam param="outcome">4</rosparam>  <!-- cancelled -->
+        <rosparam param="max_tracking_error_linear_y">1.0</rosparam> <!-- not interested in tracking error for this test -->
     </test>
     <test test-name="rostest_path_close_obstacle" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
         <rosparam param="obstacles">[[15.0, -8.0]]</rosparam>
