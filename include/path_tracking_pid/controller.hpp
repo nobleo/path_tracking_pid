@@ -1,17 +1,14 @@
 #pragma once
 
-#include <angles/angles.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/Twist.h>
-#include <ros/ros.h>
-#include <std_msgs/Duration.h>
-#include <string>
-#include <tf2/LinearMath/Transform.h>
-#include <tf2/utils.h>
+#include <array>
 #include <vector>
-#include <path_tracking_pid/PidConfig.h>
-#include <path_tracking_pid/PidDebug.h>
-#include <path_tracking_pid/PidFeedback.h>
+
+#include "geometry_msgs/PoseStamped.h"
+#include "geometry_msgs/Transform.h"
+#include "geometry_msgs/Twist.h"
+#include "path_tracking_pid/PidConfig.h"
+#include "path_tracking_pid/PidDebug.h"
+#include "tf2/LinearMath/Transform.h"
 
 // Typesafe sign implementation with signum:
 // https://stackoverflow.com/a/4609795

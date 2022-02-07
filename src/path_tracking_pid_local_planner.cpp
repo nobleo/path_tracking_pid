@@ -3,15 +3,19 @@
 //
 
 #include "path_tracking_pid/path_tracking_pid_local_planner.hpp"
-#include <algorithm>
-#include <geometry_msgs/TransformStamped.h>
+
 #include <limits>
 #include <memory>
-#include <pluginlib/class_list_macros.h>
 #include <string>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_ros/transform_listener.h>
 #include <vector>
+
+#include "mbf_msgs/ExePathResult.h"
+#include "path_tracking_pid/PidDebug.h"
+#include "path_tracking_pid/PidFeedback.h"
+#include "pluginlib/class_list_macros.h"
+#include "tf2/utils.h"
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
 
 // register planner as move_base and move_base plugins
 PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, nav_core::BaseLocalPlanner)
@@ -424,7 +428,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, x_vel), 0.0, 0.0));
 
   // Use a controller state to forward project the position on the path
-  ControllerState projected_controller_state = pid_controller_.getControllerState();
+  auto projected_controller_state = pid_controller_.getControllerState();
   geometry_msgs::Transform current_tf = tfCurPoseStamped_.transform;
 
   // Step until lookahead is reached, for every step project the pose back to the path
