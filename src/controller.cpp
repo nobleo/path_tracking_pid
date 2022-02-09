@@ -104,7 +104,7 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
   // For now do not allow repeated points or in-place rotation
   // To allow that the way the progress is checked and the interpolation is done needs to be changed
   // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
-  for (int pose_idx = 1; pose_idx < global_plan.size() - 1; ++pose_idx)
+  for (std::vector<geometry_msgs::PoseStamped>::size_type pose_idx = 1; pose_idx < global_plan.size() - 1; ++pose_idx)
   {
     auto prev_pose = global_plan[pose_idx - 1].pose;
     auto pose = global_plan[pose_idx].pose;
@@ -121,7 +121,7 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
     }
     else
     {
-      ROS_WARN("Pose %d of path is not used since it is not in the expected direction of the path!", pose_idx);
+      ROS_WARN("Pose %zu of path is not used since it is not in the expected direction of the path!", pose_idx);
     }
   }
   // Add last pose as we didn't evaluate that one
@@ -304,7 +304,7 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
   // Hence, when idx_path==i we are currently tracking the section connection pose i and pose i+1
 
   // First look in current position and in front
-  for (int idx_path = controller_state_ptr->current_global_plan_index; idx_path < global_plan_tf_.size(); idx_path++)
+  for (auto idx_path = controller_state_ptr->current_global_plan_index; idx_path < global_plan_tf_.size(); idx_path++)
   {
     error = current_tf2.inverseTimes(global_plan_tf_[idx_path]);
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
