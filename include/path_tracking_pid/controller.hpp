@@ -323,15 +323,6 @@ private:
   // Anti-windup term. Limits the absolute value of the integral term.
   double windup_limit_ = 1000.0;
 
-  // Temporary variables
-
-  double proportional_lat_ = 0;  // proportional term of output
-  double integral_lat_ = 0;      // integral term of output
-  double derivative_lat_ = 0;    // derivative term of output
-  double proportional_ang_ = 0;  // proportional term of output
-  double integral_ang_ = 0;      // integral term of output
-  double derivative_ang_ = 0;    // derivative term of output
-
   // Used in filter calculations. Default 1.0 corresponds to a cutoff frequency at
   // 1/4 of the sample rate.
   double c_lat_ = 1.;
