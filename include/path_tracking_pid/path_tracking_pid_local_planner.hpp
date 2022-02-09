@@ -21,9 +21,6 @@
 #include "tf2_ros/buffer.h"
 #include "path_tracking_pid/visualization.hpp"
 
-inline constexpr double MAP_PARALLEL_THRESH = 0.2;
-inline constexpr double DT_MAX = 1.5;
-
 
 BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::Point, double, cs::cartesian, x, y)
 

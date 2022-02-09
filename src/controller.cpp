@@ -4,6 +4,8 @@
 
 #include "path_tracking_pid/controller.hpp"
 
+#include "common.hpp"
+
 #include <limits>
 #include <vector>
 
@@ -12,6 +14,13 @@
 
 namespace path_tracking_pid
 {
+
+namespace {
+
+constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
+constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
+
+} // namespace anonymous
 
 void Controller::setHolonomic(bool holonomic)
 {

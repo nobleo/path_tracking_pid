@@ -25,6 +25,14 @@ PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, mbf_costmap_c
 
 namespace path_tracking_pid
 {
+
+namespace {
+
+constexpr double MAP_PARALLEL_THRESH = 0.2;
+constexpr double DT_MAX = 1.5;
+
+} // namespace anonymous
+
 TrackingPidLocalPlanner::TrackingPidLocalPlanner() = default;
 
 TrackingPidLocalPlanner::~TrackingPidLocalPlanner() = default;
