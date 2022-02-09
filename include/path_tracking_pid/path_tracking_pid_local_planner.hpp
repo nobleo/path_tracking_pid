@@ -1,5 +1,7 @@
 #pragma once
 
+#include <path_tracking_pid/details/no_copy_no_move.hpp>
+
 #include <atomic>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
@@ -26,7 +28,7 @@ BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::Point, double, cs::cartesian, x,
 
 namespace path_tracking_pid
 {
-class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController
+class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController, private details::NoCopyNoMove
 {
 private:
   typedef boost::geometry::model::ring<geometry_msgs::Point> polygon_t;
@@ -39,9 +41,6 @@ private:
   }
 
 public:
-  TrackingPidLocalPlanner();
-  ~TrackingPidLocalPlanner();
-
   /**
     * @brief Initialize local planner
     * @param name The name of the planner

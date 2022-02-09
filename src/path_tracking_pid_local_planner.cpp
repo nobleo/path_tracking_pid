@@ -33,10 +33,6 @@ constexpr double DT_MAX = 1.5;
 
 } // namespace anonymous
 
-TrackingPidLocalPlanner::TrackingPidLocalPlanner() = default;
-
-TrackingPidLocalPlanner::~TrackingPidLocalPlanner() = default;
-
 void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config)
 {
   pid_controller_.configure(config);

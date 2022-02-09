@@ -1,5 +1,7 @@
 #pragma once
 
+#include <path_tracking_pid/details/no_copy_no_move.hpp>
+
 #include <array>
 #include <vector>
 
@@ -55,13 +57,9 @@ struct ControllerState
   std::array<double, 3> filtered_error_deriv_ang = {0.0, 0.0, 0.0};
 };
 
-class Controller
+class Controller : private details::NoCopyNoMove
 {
 public:
-  Controller() = default;
-
-  ~Controller() = default;
-
   /**
    * Set holonomic configuration of the controller
    * @param holonomic is holonomic robot?
