@@ -514,28 +514,28 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   if (cutoff_frequency_lat_ != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    tan_filt_ = tan((cutoff_frequency_lat_ * 6.2832) * dt.toSec() / 2);
+    auto tan_filt = tan((cutoff_frequency_lat_ * 6.2832) * dt.toSec() / 2);
 
     // Avoid tan(0) ==> NaN
-    if ((tan_filt_ <= 0.) && (tan_filt_ > -0.01))
-      tan_filt_ = -0.01;
-    if ((tan_filt_ >= 0.) && (tan_filt_ < 0.01))
-      tan_filt_ = 0.01;
+    if ((tan_filt <= 0.) && (tan_filt > -0.01))
+      tan_filt = -0.01;
+    if ((tan_filt >= 0.) && (tan_filt < 0.01))
+      tan_filt = 0.01;
 
-    c_lat_ = 1 / tan_filt_;
+    c_lat_ = 1 / tan_filt;
   }
   if (cutoff_frequency_ang_ != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    tan_filt_ = tan((cutoff_frequency_ang_ * 6.2832) * dt.toSec() / 2);
+    auto tan_filt = tan((cutoff_frequency_ang_ * 6.2832) * dt.toSec() / 2);
 
     // Avoid tan(0) ==> NaN
-    if ((tan_filt_ <= 0.) && (tan_filt_ > -0.01))
-      tan_filt_ = -0.01;
-    if ((tan_filt_ >= 0.) && (tan_filt_ < 0.01))
-      tan_filt_ = 0.01;
+    if ((tan_filt <= 0.) && (tan_filt > -0.01))
+      tan_filt = -0.01;
+    if ((tan_filt >= 0.) && (tan_filt < 0.01))
+      tan_filt = 0.01;
 
-    c_ang_ = 1 / tan_filt_;
+    c_ang_ = 1 / tan_filt;
   }
 
   controller_state_.filtered_error_lat.at(2) = controller_state_.filtered_error_lat.at(1);
