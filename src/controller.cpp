@@ -20,6 +20,21 @@ namespace {
 constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
 constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
 
+// Cutoff frequency for the derivative calculation in Hz.
+constexpr double cutoff_frequency_lat = -1.0;
+constexpr double cutoff_frequency_ang = -1.0;
+
+// Upper and lower saturation limits
+constexpr double lat_upper_limit = 100.0;
+constexpr double lat_lower_limit = -100.0;
+
+constexpr double ang_upper_limit = 100.0;
+constexpr double ang_lower_limit = -100.0;
+
+// Anti-windup term. Limits the absolute value of the integral term.
+constexpr double windup_limit = 1000.0;
+
+
 // Typesafe sign implementation with signum:
 // https://stackoverflow.com/a/4609795
 template <typename T> int sign(T val) {
@@ -501,20 +516,20 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.error_integral_ang += controller_state_.error_ang.at(0) * dt.toSec();
 
   // Apply windup limit to limit the size of the integral term
-  if (controller_state_.error_integral_lat > std::abs(windup_limit_))
-    controller_state_.error_integral_lat = std::abs(windup_limit_);
-  if (controller_state_.error_integral_lat < -std::abs(windup_limit_))
-    controller_state_.error_integral_lat = -std::abs(windup_limit_);
-  if (controller_state_.error_integral_ang > std::abs(windup_limit_))
-    controller_state_.error_integral_ang = std::abs(windup_limit_);
-  if (controller_state_.error_integral_ang < -std::abs(windup_limit_))
-    controller_state_.error_integral_ang = -std::abs(windup_limit_);
+  if (controller_state_.error_integral_lat > std::abs(windup_limit))
+    controller_state_.error_integral_lat = std::abs(windup_limit);
+  if (controller_state_.error_integral_lat < -std::abs(windup_limit))
+    controller_state_.error_integral_lat = -std::abs(windup_limit);
+  if (controller_state_.error_integral_ang > std::abs(windup_limit))
+    controller_state_.error_integral_ang = std::abs(windup_limit);
+  if (controller_state_.error_integral_ang < -std::abs(windup_limit))
+    controller_state_.error_integral_ang = -std::abs(windup_limit);
 
   // My filter reference was Julius O. Smith III, Intro. to Digital Filters With Audio Applications.
-  if (cutoff_frequency_lat_ != -1)
+  if (cutoff_frequency_lat != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    auto tan_filt = tan((cutoff_frequency_lat_ * 6.2832) * dt.toSec() / 2);
+    auto tan_filt = tan((cutoff_frequency_lat * 6.2832) * dt.toSec() / 2);
 
     // Avoid tan(0) ==> NaN
     if ((tan_filt <= 0.) && (tan_filt > -0.01))
@@ -524,10 +539,10 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
 
     c_lat_ = 1 / tan_filt;
   }
-  if (cutoff_frequency_ang_ != -1)
+  if (cutoff_frequency_ang != -1)
   {
     // Check if tan(_) is really small, could cause c = NaN
-    auto tan_filt = tan((cutoff_frequency_ang_ * 6.2832) * dt.toSec() / 2);
+    auto tan_filt = tan((cutoff_frequency_ang * 6.2832) * dt.toSec() / 2);
 
     // Avoid tan(0) ==> NaN
     if ((tan_filt <= 0.) && (tan_filt > -0.01))
@@ -773,15 +788,15 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
 
 
   // Apply saturation limits
-  if (control_effort_lat_ > upper_limit_)
-    control_effort_lat_ = upper_limit_;
-  else if (control_effort_lat_ < lower_limit_)
-    control_effort_lat_ = lower_limit_;
+  if (control_effort_lat_ > lat_upper_limit)
+    control_effort_lat_ = lat_upper_limit;
+  else if (control_effort_lat_ < lat_lower_limit)
+    control_effort_lat_ = lat_lower_limit;
 
-  if (control_effort_ang_ > ang_upper_limit_)
-    control_effort_ang_ = ang_upper_limit_;
-  else if (control_effort_ang_ < ang_lower_limit_)
-    control_effort_ang_ = ang_lower_limit_;
+  if (control_effort_ang_ > ang_upper_limit)
+    control_effort_ang_ = ang_upper_limit;
+  else if (control_effort_ang_ < ang_lower_limit)
+    control_effort_ang_ = ang_lower_limit;
 
   // Populate debug output
   // Error topic containing the 'control' error on which the PID acts
@@ -1130,9 +1145,9 @@ void Controller::printParameters()
 
   ROS_INFO("Robot type (holonomic): (%i)", holonomic_robot_enable_);
 
-  ROS_INFO("Integral-windup limit: %f", windup_limit_);
-  ROS_INFO("Saturation limits xy: %f/%f", upper_limit_, lower_limit_);
-  ROS_INFO("Saturation limits ang: %f/%f", ang_upper_limit_, ang_lower_limit_);
+  ROS_INFO("Integral-windup limit: %f", windup_limit);
+  ROS_INFO("Saturation limits xy: %f/%f", lat_upper_limit, lat_lower_limit);
+  ROS_INFO("Saturation limits ang: %f/%f", ang_upper_limit, ang_lower_limit);
   ROS_INFO("-----------------------------------------");
 }
 

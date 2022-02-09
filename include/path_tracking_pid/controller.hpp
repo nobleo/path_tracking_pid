@@ -308,21 +308,6 @@ private:
   double vel_max_external_ = INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
   double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
 
-  // Cutoff frequency for the derivative calculation in Hz.
-  // Negative -> Has not been set by the user yet, so use a default.
-  double cutoff_frequency_lat_ = -1.0;
-  double cutoff_frequency_ang_ = -1.0;
-
-  // Upper and lower saturation limits
-  double upper_limit_ = 100.0;
-  double lower_limit_ = -100.0;
-
-  double ang_upper_limit_ = 100.0;
-  double ang_lower_limit_ = -100.0;
-
-  // Anti-windup term. Limits the absolute value of the integral term.
-  double windup_limit_ = 1000.0;
-
   // Used in filter calculations. Default 1.0 corresponds to a cutoff frequency at
   // 1/4 of the sample rate.
   double c_lat_ = 1.;
