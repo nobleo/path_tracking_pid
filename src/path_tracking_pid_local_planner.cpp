@@ -4,6 +4,8 @@
 
 #include "path_tracking_pid/path_tracking_pid_local_planner.hpp"
 
+#include "common.hpp"
+
 #include <limits>
 #include <memory>
 #include <string>
@@ -540,7 +542,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::P
         return mbf_msgs::ExePathResult::CANCELED;
     }
     ROS_INFO_THROTTLE(1.0, "Cancel in progress... remaining x_vel: %f", cmd_vel.twist.linear.x);
-    return TrackingPidLocalPlanner::GRACEFULLY_CANCELLING;
+    return to_underlying(ComputeVelocityCommandsResult::GRACEFULLY_CANCELLING);
   }
 
   if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS)

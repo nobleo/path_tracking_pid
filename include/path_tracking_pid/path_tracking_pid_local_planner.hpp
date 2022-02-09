@@ -103,7 +103,7 @@ public:
   /** Enumeration for custom SUCCESS feedback codes. See default ones:
    * https://github.com/magazino/move_base_flex/blob/master/mbf_msgs/action/ExePath.action
   */
-  enum
+  enum class ComputeVelocityCommandsResult
   {
     SUCCESS = 0,
     GRACEFULLY_CANCELLING = 1
