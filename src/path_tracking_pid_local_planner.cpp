@@ -425,7 +425,9 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Define a x_step transform which will be used to step forward the position.
   tf2::Transform x_step_tf;
-  x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, x_vel), 0.0, 0.0));
+  double target_x_vel = pid_controller_.getConfig().target_x_vel;
+  double max_abs_x_vel = std::abs(x_vel) > std::abs(target_x_vel) ? x_vel : target_x_vel;
+  x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, max_abs_x_vel), 0.0, 0.0));
 
   // Use a controller state to forward project the position on the path
   auto projected_controller_state = pid_controller_.getControllerState();
