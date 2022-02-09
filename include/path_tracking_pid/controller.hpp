@@ -284,8 +284,8 @@ private:
   double max_steering_x_acc_;
   double max_steering_yaw_vel_;
   double max_steering_yaw_acc_;
-  double inverse_kinematics_matrix_[2][2];
-  double forward_kinematics_matrix_[2][2];
+  std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_;
+  std::array<std::array<double, 2>, 2> forward_kinematics_matrix_;
 
   bool debug_enabled_ = false;
 
