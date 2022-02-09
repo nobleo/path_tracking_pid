@@ -169,4 +169,5 @@ private:
   // Controller logic
   bool controller_debug_enabled_ = false;
 };
-};  // end namespace path_tracking_pid
+
+}  // namespace path_tracking_pid
