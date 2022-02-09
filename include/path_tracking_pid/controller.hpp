@@ -10,12 +10,6 @@
 #include "path_tracking_pid/PidDebug.h"
 #include "tf2/LinearMath/Transform.h"
 
-// Typesafe sign implementation with signum:
-// https://stackoverflow.com/a/4609795
-template <typename T> int sign(T val) {
-    return (T(0) < val) - (val < T(0));
-}
-
 namespace path_tracking_pid
 {
 
