@@ -110,9 +110,8 @@ private:
   /**
    * Accept a new configuration for the PID controller
    * @param config the new configuration
-   * @param level
    */
-  void reconfigure_pid(path_tracking_pid::PidConfig& config, uint32_t level);
+  void reconfigure_pid(path_tracking_pid::PidConfig& config);
 
   void pauseCallback(std_msgs::Bool pause);
 
