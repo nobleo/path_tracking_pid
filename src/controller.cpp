@@ -484,8 +484,9 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     ROS_WARN("All three gains (Kp, Ki, Kd) should have the same sign for stability.");
   }
 
-  controller_state_.error_lat.push(error.getOrigin().y());
-  controller_state_.error_ang.push(angles::normalize_angle(tf2::getYaw(error.getRotation())));
+  const auto dt_chrono = std::chrono::duration<double>{dt.toSec()};
+  controller_state_.error_lat.push(error.getOrigin().y(), dt_chrono);
+  controller_state_.error_ang.push(angles::normalize_angle(tf2::getYaw(error.getRotation())), dt_chrono);
 
   // tracking error for diagnostic purposes
   // Transform current pose into local-path-frame to get tracked-frame-error
@@ -504,30 +505,24 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
 
   // trackin_error here represents the error between tracked link and position on plan
   controller_state_.tracking_error_lat = current_tracking_err.y();
-  controller_state_.tracking_error_ang = controller_state_.error_ang.errors().at<0>();
+  controller_state_.tracking_error_ang = controller_state_.error_ang.current_error();
 
   // integrate the error
-  controller_state_.error_integral_lat += controller_state_.error_lat.errors().at<0>() * dt.toSec();
-  controller_state_.error_integral_ang += controller_state_.error_ang.errors().at<0>() * dt.toSec();
+  controller_state_.error_integral_lat += controller_state_.error_lat.current_error() * dt.toSec();
+  controller_state_.error_integral_ang += controller_state_.error_ang.current_error() * dt.toSec();
 
   // Apply windup limit to limit the size of the integral term
   controller_state_.error_integral_lat = std::clamp(controller_state_.error_integral_lat, -windup_limit, windup_limit);
   controller_state_.error_integral_ang = std::clamp(controller_state_.error_integral_ang, -windup_limit, windup_limit);
 
-  // Take derivative of error, first the raw unfiltered data:
-  controller_state_.error_deriv_lat.push(
-    (controller_state_.error_lat.errors().at<0>() - controller_state_.error_lat.errors().at<1>()) / dt.toSec());
-  controller_state_.error_deriv_ang.push(
-    (controller_state_.error_ang.errors().at<0>() - controller_state_.error_ang.errors().at<1>()) / dt.toSec());
-
   // calculate the control effort
-  const auto proportional_lat = Kp_lat_ * controller_state_.error_lat.filtered_errors().at<0>();
+  const auto proportional_lat = Kp_lat_ * controller_state_.error_lat.current_filtered_error();
   const auto integral_lat = Ki_lat_ * controller_state_.error_integral_lat;
-  const auto derivative_lat = Kd_lat_ * controller_state_.error_deriv_lat.filtered_errors().at<0>();
+  const auto derivative_lat = Kd_lat_ * controller_state_.error_lat.current_filtered_derivative_error();
 
-  const auto proportional_ang = Kp_ang_ * controller_state_.error_ang.filtered_errors().at<0>();
+  const auto proportional_ang = Kp_ang_ * controller_state_.error_ang.current_filtered_error();
   const auto integral_ang = Ki_ang_ * controller_state_.error_integral_ang;
-  const auto derivative_ang = Kd_ang_ * controller_state_.error_deriv_ang.filtered_errors().at<0>();
+  const auto derivative_ang = Kd_ang_ * controller_state_.error_ang.current_filtered_derivative_error();
 
 
   /***** Compute forward velocity *****/
@@ -723,8 +718,8 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   // Populate debug output
   // Error topic containing the 'control' error on which the PID acts
   pid_debug->control_error.linear.x = 0.0;
-  pid_debug->control_error.linear.y = controller_state_.error_lat.errors().at<0>();
-  pid_debug->control_error.angular.z = controller_state_.error_ang.errors().at<0>();
+  pid_debug->control_error.linear.y = controller_state_.error_lat.current_error();
+  pid_debug->control_error.angular.z = controller_state_.error_ang.current_error();
   // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
   pid_debug->tracking_error.linear.x = 0.0;
   pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
@@ -931,7 +926,7 @@ double Controller::mpc_based_max_vel(double target_x_vel, geometry_msgs::Transfo
 
     // Check if robot stays within bounds for all iterations, if the new_nominal_x_vel is smaller than
     // max_target_x_vel we can increase it
-    if (mpc_fwd_iter == mpc_max_fwd_iter_ && fabs(controller_state_.error_lat.errors().at<0>()) <= mpc_max_error_lat_ &&
+    if (mpc_fwd_iter == mpc_max_fwd_iter_ && fabs(controller_state_.error_lat.current_error()) <= mpc_max_error_lat_ &&
         fabs(new_nominal_x_vel) < abs(target_x_vel))
     {
       mpc_vel_optimization_iter += 1;
@@ -955,7 +950,7 @@ double Controller::mpc_based_max_vel(double target_x_vel, geometry_msgs::Transfo
       mpc_fwd_iter = 0;
     }
     // If the robot gets out of bounds earlier we decrease the velocity
-    else if (abs(controller_state_.error_lat.errors().at<0>()) >= mpc_max_error_lat_)
+    else if (abs(controller_state_.error_lat.current_error()) >= mpc_max_error_lat_)
     {
       mpc_vel_optimization_iter += 1;
 
@@ -1037,10 +1032,7 @@ void Controller::configure(path_tracking_pid::PidConfig& config)
   // Erase all queues when config changes
 
   controller_state_.error_lat.reset();
-  controller_state_.error_deriv_lat.reset();
-
   controller_state_.error_ang.reset();
-  controller_state_.error_deriv_ang.reset();
 
   Kp_lat_ = config.Kp_lat;
   Ki_lat_ = config.Ki_lat;
@@ -1130,9 +1122,7 @@ void Controller::reset()
   controller_state_.error_integral_lat = 0.0;
   controller_state_.error_integral_ang = 0.0;
   controller_state_.error_lat.reset();
-  controller_state_.error_deriv_lat.reset();
   controller_state_.error_ang.reset();
-  controller_state_.error_deriv_ang.reset();
 }
 
 void Controller::setVelMaxExternal(double value)

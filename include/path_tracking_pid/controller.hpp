@@ -1,7 +1,7 @@
 #pragma once
 
 #include <path_tracking_pid/details/fifo_array.hpp>
-#include <path_tracking_pid/details/filtered_error_tracker.hpp>
+#include <path_tracking_pid/details/derivative_filtered_error_tracker.hpp>
 
 #include <array>
 #include <vector>
@@ -41,10 +41,8 @@ struct ControllerState
   double tracking_error_lat = 0.0;
   double tracking_error_ang = 0.0;
   // Errors with little history
-  details::FilteredErrorTracker error_lat;
-  details::FilteredErrorTracker error_deriv_lat;
-  details::FilteredErrorTracker error_ang;
-  details::FilteredErrorTracker error_deriv_ang;
+  details::DerivativeFilteredErrorTracker error_lat;
+  details::DerivativeFilteredErrorTracker error_ang;
 };
 
 class Controller : private boost::noncopyable
