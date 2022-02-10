@@ -174,7 +174,7 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
 
   // find closest current position to global plan
   double minimum_distance_to_path = 1e3;
-  double dist_to_segment;
+  double dist_to_segment = 0;
   double iterative_dist_to_goal = 0.0;
   distance_to_goal_vector_.clear();
   distance_to_goal_vector_.resize(global_plan_tf_.size());
@@ -328,7 +328,7 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
 
   // find closest current position to global plan
   double minimum_distance_to_path = FLT_MAX;
-  double distance_to_path;
+  double distance_to_path = 0;
   tf2::Transform error;
 
   // We define segment0 to be the segment connecting pose0 and pose1.
@@ -379,10 +379,10 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
 
   tf2::Transform pose_projection_ahead;
   tf2::Transform pose_projection_behind;
-  double distance2_to_line_ahead;
-  double distance2_to_line_behind;
-  double distance_to_end_line_ahead;
-  double distance_to_end_line_behind;
+  double distance2_to_line_ahead = 0;
+  double distance2_to_line_behind = 0;
+  double distance_to_end_line_ahead = 0;
+  double distance_to_end_line_behind = 0;
   if (controller_state_ptr->current_global_plan_index == 0)
   {
     distToSegmentSquared(current_tf2, global_plan_tf_[0], global_plan_tf_[1],
@@ -451,7 +451,7 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   tf2::Quaternion cur_rot(current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
   current_with_carrot_.setRotation(cur_rot);
 
-  size_t path_pose_idx;
+  size_t path_pose_idx = 0;
   if (track_base_link_enabled_)
   {
     // Find closes robot position to path and then project carrot on goal
@@ -575,10 +575,10 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
 
   /***** Compute forward velocity *****/
   // Apply acceleration limits and end velocity
-  double current_target_acc;
-  double acc;
-  double t_end_phase_current;
-  double d_end_phase;
+  double current_target_acc = 0;
+  double acc = 0;
+  double t_end_phase_current = 0;
+  double d_end_phase = 0;
 
   // Compute time to reach end velocity from current velocity
   // Compute estimate overall distance during end_phase
@@ -807,7 +807,7 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
                                 control_effort_ang_;  // Take the sign of l for the lateral control effort
     output_combined.angular.z = std::clamp(output_combined.angular.z, -max_yaw_vel_, max_yaw_vel_);
     // For non-holonomic robots apply saturation based on minimum turning radius
-    double max_ang_twist_tr;
+    double max_ang_twist_tr = 0;
     if (minimum_turning_radius_ < RADIUS_EPS)
     {
       // Rotation in place is allowed
@@ -1019,7 +1019,8 @@ double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::T
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
       path_tracking_pid::PidDebug pid_debug_unused;
-      double eda_unused, progress_unused;
+      double eda_unused = 0;
+      double progress_unused = 0;
       pred_twist = Controller::update(new_nominal_x_vel, target_end_x_vel_, predicted_tf, pred_twist,
                                       ros::Duration(mpc_simulation_sample_time_),
                                       &eda_unused, &progress_unused, &pid_debug_unused);

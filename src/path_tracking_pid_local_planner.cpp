@@ -56,11 +56,11 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   pid_server_->setCallback([this](auto& config, auto) { this->reconfigure_pid(config); });
   pid_controller_.setEnabled(false);
 
-  bool holonomic_robot;
+  bool holonomic_robot = false;
   nh.param<bool>("holonomic_robot", holonomic_robot, false);
   pid_controller_.setHolonomic(holonomic_robot);
 
-  bool estimate_pose_angle;
+  bool estimate_pose_angle = false;
   nh.param<bool>("estimate_pose_angle", estimate_pose_angle, false);
   pid_controller_.setEstimatePoseAngle(estimate_pose_angle);
 
@@ -108,7 +108,9 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     geometry_msgs::TransformStamped tf_transform;
     tf_transform = tf_->lookupTransform(map_frame_, path_frame, ros::Time(0));
     // Check alignment, when path-frame is severly mis-aligned show error
-    double yaw, pitch, roll;
+    double yaw = 0;
+    double pitch = 0;
+    double roll = 0;
     tf2::getEulerYPR(tf_transform.transform.rotation, yaw, pitch, roll);
     if (std::fabs(pitch) > MAP_PARALLEL_THRESH || std::fabs(roll) > MAP_PARALLEL_THRESH)
     {
@@ -446,7 +448,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   // Convert to map coordinates
   for (const auto& point : collision_polygon_hull)
   {
-    int map_x, map_y;
+    int map_x = 0;
+    int map_y = 0;
     costmap2d->worldToMapEnforceBounds(point.x, point.y, map_x, map_y);
     costmap_2d::MapLocation map_point{static_cast<uint>(map_x), static_cast<uint>(map_y)};
     collision_polygon_hull_map.push_back(map_point);

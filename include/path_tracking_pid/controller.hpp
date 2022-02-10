@@ -105,7 +105,7 @@ public:
   tf2::Transform findPositionOnPlan(const geometry_msgs::Transform current_tf,
                                     ControllerState* controller_state_ptr)
   {
-    size_t path_pose_idx;
+    size_t path_pose_idx = 0;
     return findPositionOnPlan(current_tf, controller_state_ptr, path_pose_idx);
   }
 
@@ -213,8 +213,8 @@ private:
   double distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w)
   {
     tf2::Transform dummy_tf;
-    double dummy_double;
-    double result;
+    double dummy_double = 0;
+    double result = 0;
     distToSegmentSquared(pose_p,pose_v, pose_w, dummy_tf, result, dummy_double);
     return result;
   }
