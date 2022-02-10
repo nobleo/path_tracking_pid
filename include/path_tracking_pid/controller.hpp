@@ -227,13 +227,13 @@ private:
   void printParameters();
 
   path_tracking_pid::PidConfig local_config_;
-  ControllerState controller_state_ = ControllerState();
+  ControllerState controller_state_;
 
   // Global Plan variables
   std::vector<tf2::Transform> global_plan_tf_;  // Global plan vector
   std::vector<double> distance_to_goal_vector_;  // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
-  double distance_to_goal_;
+  double distance_to_goal_ = 0;
   tf2::Transform current_goal_;
   tf2::Transform current_pos_on_plan_;
   tf2::Transform current_with_carrot_;
@@ -260,13 +260,13 @@ private:
   // tricycle model
   bool use_tricycle_model_ = false;
   geometry_msgs::Transform tf_base_to_steered_wheel_;
-  double max_steering_angle_;
-  double max_steering_x_vel_;
-  double max_steering_x_acc_;
-  double max_steering_yaw_vel_;
-  double max_steering_yaw_acc_;
-  std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_;
-  std::array<std::array<double, 2>, 2> forward_kinematics_matrix_;
+  double max_steering_angle_ = 0;
+  double max_steering_x_vel_ = 0;
+  double max_steering_x_acc_ = 0;
+  double max_steering_yaw_vel_ = 0;
+  double max_steering_yaw_acc_ = 0;
+  std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_{};
+  std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 
   bool debug_enabled_ = false;
 
@@ -293,11 +293,11 @@ private:
   double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
 
   // MPC settings
-  int mpc_max_fwd_iter_;               // Define # of steps that you look into the future with MPC [-]
-  int mpc_max_vel_optimization_iter_;  // Set maximum # of velocity bisection iterations
-                                       // (maximum total iterations = max_opt_iter*max_iter) [-]
-  double mpc_simulation_sample_time_;  // Define timestep [s]
-  double mpc_max_error_lat_;           // Maximum allowed lateral error [m]
-  double mpc_min_x_vel_;               // Minimum forward x velocity [m/s]
+  int mpc_max_fwd_iter_ = 0;               // Define # of steps that you look into the future with MPC [-]
+  int mpc_max_vel_optimization_iter_ = 0;  // Set maximum # of velocity bisection iterations
+                                           // (maximum total iterations = max_opt_iter*max_iter) [-]
+  double mpc_simulation_sample_time_ = 0;  // Define timestep [s]
+  double mpc_max_error_lat_ = 0;           // Maximum allowed lateral error [m]
+  double mpc_min_x_vel_ = 0;               // Minimum forward x velocity [m/s]
 };
 }  // namespace path_tracking_pid

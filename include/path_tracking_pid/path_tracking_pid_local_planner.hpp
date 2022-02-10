@@ -129,7 +129,7 @@ private:
   nav_msgs::Path received_path_;
 
   // Obstacle collision detection
-  costmap_2d::Costmap2DROS* costmap_;
+  costmap_2d::Costmap2DROS* costmap_ = nullptr;
 
   // Cancel flags (multi threaded, so atomic bools)
   std::atomic<bool> active_goal_{false};
@@ -140,7 +140,7 @@ private:
   boost::recursive_mutex config_mutex_;
   std::unique_ptr<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>> pid_server_;
 
-  tf2_ros::Buffer* tf_;
+  tf2_ros::Buffer* tf_ = nullptr;
   geometry_msgs::TransformStamped tfCurPoseStamped_;
 
   ros::Publisher debug_pub_;  // Debugging of controller internal parameters
@@ -160,7 +160,7 @@ private:
   bool initialized_ = false;
 
   // Used for tricycle model
-  bool use_tricycle_model_;
+  bool use_tricycle_model_ = false;
   std::string steered_wheel_frame_;
   geometry_msgs::TransformStamped tf_base_to_steered_wheel_stamped_;
 
