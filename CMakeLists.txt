@@ -65,6 +65,7 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}_local_planner.cpp
   src/controller.cpp
   src/visualization.cpp
+  src/details/filtered_error_tracker.cpp
 )
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
