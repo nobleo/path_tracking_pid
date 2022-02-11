@@ -57,19 +57,19 @@ void Controller::setTricycleModel(bool tricycle_model_enabled, const geometry_ms
   // Set tricycle model
   use_tricycle_model_ = tricycle_model_enabled;
   tf_base_to_steered_wheel_ = tf_base_to_steered_wheel;
-  double wheel_x = tf_base_to_steered_wheel_.translation.x;
-  double wheel_y = tf_base_to_steered_wheel_.translation.y;
+  const double wheel_x = tf_base_to_steered_wheel_.translation.x;
+  const double wheel_y = tf_base_to_steered_wheel_.translation.y;
 
-  double distance_base_to_steered_wheel = hypot(wheel_x, wheel_y);
-  double wheel_theta = atan2(wheel_y, wheel_x);
+  const double distance_base_to_steered_wheel = hypot(wheel_x, wheel_y);
+  const double wheel_theta = atan2(wheel_y, wheel_x);
   inverse_kinematics_matrix_[0][0] = 1;
   inverse_kinematics_matrix_[0][1] = - distance_base_to_steered_wheel * sin(wheel_theta);
   inverse_kinematics_matrix_[1][0] = 0;
   inverse_kinematics_matrix_[1][1] = - distance_base_to_steered_wheel * cos(wheel_theta);
 
 
-  double determinant =    inverse_kinematics_matrix_[0][0] * inverse_kinematics_matrix_[1][1]
-                        - inverse_kinematics_matrix_[0][1] * inverse_kinematics_matrix_[1][0];
+  const double determinant =  inverse_kinematics_matrix_[0][0] * inverse_kinematics_matrix_[1][1]
+                            - inverse_kinematics_matrix_[0][1] * inverse_kinematics_matrix_[1][0];
 
   if (determinant == 0)
   {
@@ -89,8 +89,8 @@ void Controller::setTricycleModel(bool tricycle_model_enabled, const geometry_ms
 geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(double x_vel, double steering_angle)
 {
     geometry_msgs::Twist estimated_base_twist;
-    double x_alpha = x_vel*cos(steering_angle);
-    double y_alpha = x_vel*sin(steering_angle);
+    const double x_alpha = x_vel*cos(steering_angle);
+    const double y_alpha = x_vel*sin(steering_angle);
 
     estimated_base_twist.linear.x = forward_kinematics_matrix_[0][0]*x_alpha + forward_kinematics_matrix_[0][1]*y_alpha;
     estimated_base_twist.angular.z =
@@ -102,10 +102,10 @@ geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(double x_
 TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(const geometry_msgs::Twist& cmd_vel)
 {
     TricycleSteeringCmdVel steering_cmd_vel;
-    double x_alpha =  inverse_kinematics_matrix_[0][0]*cmd_vel.linear.x
-                    + inverse_kinematics_matrix_[0][1]*cmd_vel.angular.z;
-    double y_alpha =  inverse_kinematics_matrix_[1][0]*cmd_vel.linear.x
-                    + inverse_kinematics_matrix_[1][1]*cmd_vel.angular.z;
+    const double x_alpha =  inverse_kinematics_matrix_[0][0]*cmd_vel.linear.x
+                          + inverse_kinematics_matrix_[0][1]*cmd_vel.angular.z;
+    const double y_alpha =  inverse_kinematics_matrix_[1][0]*cmd_vel.linear.x
+                          + inverse_kinematics_matrix_[1][1]*cmd_vel.angular.z;
 
     steering_cmd_vel.steering_angle = atan2(y_alpha, x_alpha);
     steering_cmd_vel.speed = hypot(x_alpha, y_alpha);
@@ -132,14 +132,14 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
   // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
   for (std::vector<geometry_msgs::PoseStamped>::size_type pose_idx = 1; pose_idx < global_plan.size() - 1; ++pose_idx)
   {
-    auto prev_pose = global_plan[pose_idx - 1].pose;
-    auto pose = global_plan[pose_idx].pose;
-    auto next_pose = global_plan[pose_idx + 1].pose;
+    const auto prev_pose = global_plan[pose_idx - 1].pose;
+    const auto pose = global_plan[pose_idx].pose;
+    const auto next_pose = global_plan[pose_idx + 1].pose;
     // Check if the angle of the pose is obtuse, otherwise warn and ignore this pose
     // We check using Pythagorean theorem: if c*c > (a*a + b*b) it is an obtuse angle and thus we can follow it
-    double a_squared = distSquared(prev_pose, pose);
-    double b_squared = distSquared(pose, next_pose);
-    double c_squared = distSquared(prev_pose, next_pose);
+    const double a_squared = distSquared(prev_pose, pose);
+    const double b_squared = distSquared(pose, next_pose);
+    const double c_squared = distSquared(prev_pose, next_pose);
     if (c_squared > (a_squared + b_squared))
     {
       tf2::fromMsg(pose, transform);
@@ -194,13 +194,13 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
 
     /* Create distance and turning radius vectors once for usage later */
     deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
-    double dpX = deltaPlan.getOrigin().x();
-    double dpY = deltaPlan.getOrigin().y();
+    const double dpX = deltaPlan.getOrigin().x();
+    const double dpY = deltaPlan.getOrigin().y();
     iterative_dist_to_goal += hypot(dpX, dpY);
     distance_to_goal_vector_[idx_path] = iterative_dist_to_goal;
     // compute turning radius based on trigonometric analysis
     // radius such that next pose is connected from current pose with a semi-circle
-    double dpXY2 = dpY*dpY + dpX*dpX;
+    const double dpXY2 = dpY * dpY + dpX * dpX;
     if (dpXY2 < FLT_EPSILON)
     {
       turning_radius_inv_vector_[idx_path] = std::numeric_limits<double>::infinity();
@@ -271,7 +271,7 @@ void Controller::distToSegmentSquared(
   const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,
   tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w) const
 {
-  double l2 = distSquared(pose_v, pose_w);
+  const double l2 = distSquared(pose_v, pose_w);
   if (l2 == 0)
   {
     pose_projection = pose_w;
@@ -432,11 +432,11 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
                                         ros::Duration dt,
                                         double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug)
 {
-  double current_x_vel = controller_state_.current_x_vel;
+  const double current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute location of the point to be controlled
-  double theda_rp = tf2::getYaw(current_tf.rotation);
+  const double theda_rp = tf2::getYaw(current_tf.rotation);
   tf2::Vector3 current_with_carrot_origin;
   current_with_carrot_origin.setX(current_tf.translation.x + l_ * cos(theda_rp));
   current_with_carrot_origin.setY(current_tf.translation.y + l_ * sin(theda_rp));
@@ -532,7 +532,6 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
 
   /***** Compute forward velocity *****/
   // Apply acceleration limits and end velocity
-  double acc;
   double t_end_phase_current;
   double d_end_phase;
 
@@ -565,7 +564,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   tf2::Transform robot_pose;
   tf2::convert(current_tf, robot_pose);
   tf2::Transform base_to_goal = robot_pose.inverseTimes(current_goal_);
-  double angle_to_goal = atan2(base_to_goal.getOrigin().x(), -base_to_goal.getOrigin().y());
+  const double angle_to_goal = atan2(base_to_goal.getOrigin().x(), -base_to_goal.getOrigin().y());
 
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
@@ -623,9 +622,9 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     }
   }
 
-  double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
-  double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
-  acc = copysign(acc_abs, current_target_acc);
+  const double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
+  const double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
+  const auto acc = copysign(acc_abs, current_target_acc);
 
   double new_x_vel = current_x_vel + acc * dt.toSec();
 
@@ -666,7 +665,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     // eda (Estimated duration of arrival) estimation
     if (fabs(target_x_vel) > VELOCITY_EPS)
     {
-      double t_const = (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
+      const double t_const = (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
       *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
     }
     else
@@ -784,9 +783,9 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     output_combined.angular.z = std::clamp(output_combined.angular.z, -max_ang_twist_tr, max_ang_twist_tr);
   }
   // Apply max acceleration limit to yaw
-  double yaw_acc = std::clamp((output_combined.angular.z - current_yaw_vel) / dt.toSec(),
-                              -max_yaw_acc_, max_yaw_acc_);
-  double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
+  const double yaw_acc = std::clamp((output_combined.angular.z - current_yaw_vel) / dt.toSec(),
+                                    -max_yaw_acc_, max_yaw_acc_);
+  const double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
   output_combined.angular.z = new_yaw_vel;
 
   // Transform velocity commands at base_link to steer when using tricycle model
@@ -809,9 +808,9 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     // Apply limits to steering commands
     steering_cmd.steering_angle = std::clamp(steering_cmd.steering_angle,
                                   -max_steering_angle_, max_steering_angle_);
-    double steering_yaw_vel = std::clamp((steering_cmd.steering_angle - controller_state_.previous_steering_angle)
+    const double steering_yaw_vel = std::clamp((steering_cmd.steering_angle - controller_state_.previous_steering_angle)
                                           / dt.toSec(), -max_steering_yaw_vel_, max_steering_yaw_vel_);
-    double steering_angle_acc = std::clamp((steering_yaw_vel - controller_state_.previous_steering_yaw_vel)/ dt.toSec(),
+    const double steering_angle_acc = std::clamp((steering_yaw_vel - controller_state_.previous_steering_yaw_vel)/ dt.toSec(),
                                   -max_steering_yaw_acc_, max_steering_yaw_acc_);
     steering_cmd.steering_angle_velocity =   controller_state_.previous_steering_yaw_vel
                                           +  (steering_angle_acc * dt.toSec());
@@ -989,7 +988,7 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
                                       &eda_unused, &progress_unused, &pid_debug_unused);
 
       // Run plant model
-      double theta = tf2::getYaw(predicted_tf.rotation);
+      const double theta = tf2::getYaw(predicted_tf.rotation);
       predicted_tf.translation.x += pred_twist.linear.x * cos(theta) * mpc_simulation_sample_time_;
       predicted_tf.translation.y += pred_twist.linear.x * sin(theta) * mpc_simulation_sample_time_;
       tf2::Quaternion q;
