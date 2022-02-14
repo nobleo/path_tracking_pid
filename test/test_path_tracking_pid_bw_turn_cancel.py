@@ -34,9 +34,9 @@ class TestPathTrackingPID(unittest.TestCase):
 
     def vis_cb(self, msg):
         if msg.ns == 'control point':
-            self.carrot = msg.points[0]
+            self.carrot = msg.pose.position
         elif msg.ns == 'plan point':
-            self.pos_on_plan = msg.points[0]
+            self.pos_on_plan = msg.pose.position
 
         # Only start checking when both markers are received
         if self.carrot is None or self.pos_on_plan is None:
