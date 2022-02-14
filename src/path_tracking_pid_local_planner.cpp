@@ -67,7 +67,7 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
 
 
   collision_marker_pub_ = nh.advertise<visualization_msgs::MarkerArray>("collision_markers", 3);
-  marker_pub_ = nh.advertise<visualization_msgs::Marker>("visualization_marker", 3);
+  visualization_ = std::make_unique<Visualization>(nh);
   debug_pub_ = nh.advertise<path_tracking_pid::PidDebug>("debug", 1);
   path_pub_ = nh.advertise<nav_msgs::Path>("visualization_path", 1, true);
 
@@ -273,74 +273,16 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
   {
     debug_pub_.publish(pid_debug);
 
-    visualization_msgs::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
-
-    // configure rviz visualization
-    mkCurPose.header.frame_id = mkControlPose.header.frame_id = map_frame_;
-    mkGoalPose.header.frame_id = mkPosOnPlan.header.frame_id = map_frame_;
-    mkCurPose.header.stamp = mkControlPose.header.stamp = ros::Time::now();
-    mkGoalPose.header.stamp = mkPosOnPlan.header.stamp = ros::Time::now();
-    mkCurPose.ns = "axle point";
-    mkControlPose.ns = "control point";
-    mkGoalPose.ns = "goal point";
-    mkPosOnPlan.ns = "plan point";
-    mkCurPose.action = mkControlPose.action = visualization_msgs::Marker::ADD;
-    mkGoalPose.action = mkPosOnPlan.action = visualization_msgs::Marker::ADD;
-    mkCurPose.pose.orientation.w = mkControlPose.pose.orientation.w = 1.0;
-    mkGoalPose.pose.orientation.w = mkPosOnPlan.pose.orientation.w = 1.0;
-    mkCurPose.id = __COUNTER__;  // id has to be unique, so using a compile-time counter :)
-    mkControlPose.id = __COUNTER__;
-    mkGoalPose.id = __COUNTER__;
-    mkPosOnPlan.id = __COUNTER__;
-    mkCurPose.type = mkControlPose.type = visualization_msgs::Marker::POINTS;
-    mkGoalPose.type = mkPosOnPlan.type = visualization_msgs::Marker::POINTS;
-    mkCurPose.scale.x = 0.5;
-    mkCurPose.scale.y = 0.5;
-    mkControlPose.scale.x = 0.5;
-    mkControlPose.scale.y = 0.5;
-    mkGoalPose.scale.x = 0.5;
-    mkGoalPose.scale.y = 0.5;
-    mkCurPose.color.b = 1.0;
-    mkCurPose.color.a = 1.0;
-    mkControlPose.color.g = 1.0f;
-    mkControlPose.color.a = 1.0;
-    mkGoalPose.color.r = 1.0;
-    mkGoalPose.color.a = 1.0;
-    mkPosOnPlan.scale.x = 0.5;
-    mkPosOnPlan.scale.y = 0.5;
-    mkPosOnPlan.color.a = 1.0;
-    mkPosOnPlan.color.r = 1.0f;
-    mkPosOnPlan.color.g = 0.5f;
-
-    geometry_msgs::Point p;
-    std_msgs::ColorRGBA color;
-    p.x = tfCurPoseStamped_.transform.translation.x;
-    p.y = tfCurPoseStamped_.transform.translation.y;
-    p.z = tfCurPoseStamped_.transform.translation.z;
-    mkCurPose.points.push_back(p);
-
-    tf2::Transform tfControlPose = pid_controller_.getCurrentWithCarrot();
-    p.x = tfControlPose.getOrigin().x();
-    p.y = tfControlPose.getOrigin().y();
-    p.z = tfControlPose.getOrigin().z();
-    mkControlPose.points.push_back(p);
-
-    tf2::Transform tfGoalPose = pid_controller_.getCurrentGoal();
-    p.x = tfGoalPose.getOrigin().x();
-    p.y = tfGoalPose.getOrigin().y();
-    p.z = tfGoalPose.getOrigin().z();
-    mkGoalPose.points.push_back(p);
-
-    tf2::Transform tfCurPose = pid_controller_.getCurrentPosOnPlan();
-    p.x = tfCurPose.getOrigin().x();
-    p.y = tfCurPose.getOrigin().y();
-    p.z = tfCurPose.getOrigin().z();
-    mkPosOnPlan.points.push_back(p);
-
-    marker_pub_.publish(mkCurPose);
-    marker_pub_.publish(mkControlPose);
-    marker_pub_.publish(mkGoalPose);
-    marker_pub_.publish(mkPosOnPlan);
+    // publish rviz visualization
+    std_msgs::Header header;
+    header.stamp = now;
+    header.frame_id = map_frame_;
+    tf2::Transform tfCurPose;
+    tf2::fromMsg(tfCurPoseStamped_.transform, tfCurPose);
+    visualization_->publishAxlePoint(header, tfCurPose);
+    visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
+    visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
+    visualization_->publishPlanPoint(header, pid_controller_.getCurrentPosOnPlan());
   }
 
   prev_time_ = now;

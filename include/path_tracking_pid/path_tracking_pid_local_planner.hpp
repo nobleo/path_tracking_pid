@@ -19,6 +19,7 @@
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float64.h"
 #include "tf2_ros/buffer.h"
+#include "path_tracking_pid/visualization.hpp"
 
 #define MAP_PARALLEL_THRESH 0.2
 constexpr double DT_MAX=1.5;
@@ -150,7 +151,7 @@ private:
   ros::Publisher debug_pub_;  // Debugging of controller internal parameters
 
   // Rviz visualization
-  ros::Publisher marker_pub_;
+  std::unique_ptr<Visualization> visualization_;
   ros::Publisher path_pub_;
   ros::Publisher collision_marker_pub_;
 
