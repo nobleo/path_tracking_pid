@@ -216,7 +216,7 @@ private:
    */
   void printParameters() const;
 
-  path_tracking_pid::PidConfig local_config_;
+  path_tracking_pid::PidConfig config_;
   ControllerState controller_state_;
 
   // Global Plan variables
@@ -235,12 +235,7 @@ private:
   double control_effort_ang_ = 0.0;   // output of pid controller
 
   bool enabled_ = true;
-  bool feedback_lat_enabled_ = false;
-  bool feedback_ang_enabled_ = false;
-  bool feedforward_lat_enabled_ = false;
-  bool feedforward_ang_enabled_ = false;
   bool holonomic_robot_enable_ = false;
-  bool track_base_link_enabled_ = false;
   bool estimate_pose_angle_enabled_ = false;
 
   // feedforward controller
@@ -250,44 +245,12 @@ private:
   // tricycle model
   bool use_tricycle_model_ = false;
   geometry_msgs::Transform tf_base_to_steered_wheel_;
-  double max_steering_angle_ = NAN;
-  double max_steering_x_vel_ = NAN;
-  double max_steering_x_acc_ = NAN;
-  double max_steering_yaw_vel_ = NAN;
-  double max_steering_yaw_acc_ = NAN;
   std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_{};
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
-
-  bool debug_enabled_ = false;
-
-  // Primary feedback controller parameters
-  double Kp_lat_ = 0.0;
-  double Ki_lat_ = 0.0;
-  double Kd_lat_ = 0.0;
-  double Kp_ang_ = 0.0;
-  double Ki_ang_ = 0.0;
-  double Kd_ang_ = 0.0;
-  double l_ = 0.0;
-  double target_x_vel_ = 0.0;
-  double target_end_x_vel_ = 0.0;
-  double target_x_acc_ = 0.0;
-  double target_x_decc_ = 0.0;
-  double max_error_x_vel_ = 0.0;
-  double abs_minimum_x_vel_ = 0.0;
-  double max_yaw_vel_ = 0.0;
-  double max_yaw_acc_ = 0.0;
-  double minimum_turning_radius_ = FLT_EPSILON;
 
   // Velocity limits that can be active external to the pid controller:
   double vel_max_external_ = INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
   double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
-
-  // MPC settings
-  int mpc_max_fwd_iter_ = -1;                // Define # of steps that you look into the future with MPC [-]
-  int mpc_max_vel_optimization_iter_ = -1;   // Set maximum # of velocity bisection iterations
-                                             // (maximum total iterations = max_opt_iter*max_iter) [-]
-  double mpc_simulation_sample_time_ = NAN;  // Define timestep [s]
-  double mpc_max_error_lat_ = NAN;           // Maximum allowed lateral error [m]
-  double mpc_min_x_vel_ = NAN;               // Minimum forward x velocity [m/s]
 };
+
 }  // namespace path_tracking_pid
