@@ -19,9 +19,9 @@ template <typename T> int sign(T val) {
 namespace path_tracking_pid
 {
 
-#define RADIUS_EPS 0.001  // Smallest relevant radius [m]
-#define VELOCITY_EPS 1e-3  // Neglegible velocity
-#define LONG_DURATION 31556926  // A year (ros::Duration cannot be inf)
+inline constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
+inline constexpr double VELOCITY_EPS = 1e-3;       // Neglegible velocity
+inline constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
 
 enum class ControllerMode
 {
