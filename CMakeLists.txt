@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
+add_compile_options(-std=c++17 -Wall -Wextra -Wno-unused-parameter -Werror)
 project(path_tracking_pid)
 
 ## Find catkin and any catkin packages
@@ -66,7 +67,6 @@ add_library(${PROJECT_NAME}
   src/visualization.cpp
 )
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
-target_compile_options(${PROJECT_NAME} PUBLIC -std=c++17 -Wall -Wextra -Wno-unused-parameter -Werror)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 include_directories(
