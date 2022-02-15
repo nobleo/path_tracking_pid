@@ -34,9 +34,9 @@ class TestPathTrackingPID(unittest.TestCase):
 
     def vis_cb(self, msg):
         if msg.ns == 'control point':
-            self.carrot = msg.points[0]
+            self.carrot = msg.pose.position
         elif msg.ns == 'plan point':
-            self.pos_on_plan = msg.points[0]
+            self.pos_on_plan = msg.pose.position
 
         # Only start checking when both markers are received
         if self.carrot is None or self.pos_on_plan is None:
@@ -68,7 +68,7 @@ class TestPathTrackingPID(unittest.TestCase):
         self.carrot = None
         self.pos_on_plan = None
         self.marker_angle = None
-        self.carrot_dir_flipped = False
+        self.carrot_dir_flipped = None
         # Subscribe to visualization-markers to track control direction
         self.vis_sub = rospy.Subscriber("move_base_flex/PathTrackingPID/visualization_marker", Marker, self.vis_cb)
 
@@ -98,7 +98,7 @@ class TestPathTrackingPID(unittest.TestCase):
         rospy.logwarn("Got result")
         self.assertTrue(preempt_in_time, msg="Action call didn't preempt in time")
 
-        self.assertFalse(self.carrot_dir_flipped, msg="Guiding direction flipped while stopping!")
+        self.assertTrue(self.carrot_dir_flipped is False, msg="Guiding direction flipped while stopping!")
 
 
 if __name__ == "__main__":
