@@ -23,7 +23,7 @@ namespace path_tracking_pid
 #define VELOCITY_EPS 1e-3  // Neglegible velocity
 #define LONG_DURATION 31556926  // A year (ros::Duration cannot be inf)
 
-enum ControllerMode
+enum class ControllerMode
 {
   frontAxleLateral = 0,
   rearAxleLateral = 1,
