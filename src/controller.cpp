@@ -516,14 +516,8 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.error_integral_ang += controller_state_.error_ang.at(0) * dt.toSec();
 
   // Apply windup limit to limit the size of the integral term
-  if (controller_state_.error_integral_lat > std::abs(windup_limit))
-    controller_state_.error_integral_lat = std::abs(windup_limit);
-  if (controller_state_.error_integral_lat < -std::abs(windup_limit))
-    controller_state_.error_integral_lat = -std::abs(windup_limit);
-  if (controller_state_.error_integral_ang > std::abs(windup_limit))
-    controller_state_.error_integral_ang = std::abs(windup_limit);
-  if (controller_state_.error_integral_ang < -std::abs(windup_limit))
-    controller_state_.error_integral_ang = -std::abs(windup_limit);
+  controller_state_.error_integral_lat = std::clamp(controller_state_.error_integral_lat, -windup_limit, windup_limit);
+  controller_state_.error_integral_ang = std::clamp(controller_state_.error_integral_ang, -windup_limit, windup_limit);
 
   // My filter reference was Julius O. Smith III, Intro. to Digital Filters With Audio Applications.
   if (cutoff_frequency_lat != -1)
@@ -788,15 +782,8 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
 
 
   // Apply saturation limits
-  if (control_effort_lat_ > lat_upper_limit)
-    control_effort_lat_ = lat_upper_limit;
-  else if (control_effort_lat_ < lat_lower_limit)
-    control_effort_lat_ = lat_lower_limit;
-
-  if (control_effort_ang_ > ang_upper_limit)
-    control_effort_ang_ = ang_upper_limit;
-  else if (control_effort_ang_ < ang_lower_limit)
-    control_effort_ang_ = ang_lower_limit;
+  control_effort_lat_ = std::clamp(control_effort_lat_, lat_lower_limit, lat_upper_limit);
+  control_effort_ang_ = std::clamp(control_effort_ang_, ang_lower_limit, ang_upper_limit);
 
   // Populate debug output
   // Error topic containing the 'control' error on which the PID acts
