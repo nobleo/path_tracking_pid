@@ -98,11 +98,10 @@ public:
    * @return tf of found position on plan
    * @return index of current path-pose if requested
    */
-  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform current_tf,
-                                    ControllerState* controller_state_ptr,
-                                    size_t &path_pose_idx);
+  tf2::Transform findPositionOnPlan(geometry_msgs::Transform current_tf, ControllerState* controller_state_ptr,
+                                    size_t& path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
-  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform current_tf,
+  tf2::Transform findPositionOnPlan(geometry_msgs::Transform current_tf,
                                     ControllerState* controller_state_ptr)
   {
     size_t path_pose_idx;
@@ -120,12 +119,9 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update(const double target_x_vel,
-                              const double target_end_x_vel,
-                              const geometry_msgs::Transform current_tf,
-                              const geometry_msgs::Twist odom_twist,
-                              const ros::Duration dt,
-                              double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug);
+  geometry_msgs::Twist update(double target_x_vel, double target_end_x_vel, geometry_msgs::Transform current_tf,
+                              geometry_msgs::Twist odom_twist, ros::Duration dt, double* eda, double* progress,
+                              path_tracking_pid::PidDebug* pid_debug);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
@@ -137,10 +133,9 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update_with_limits(const geometry_msgs::Transform current_tf,
-                                          const geometry_msgs::Twist odom_twist,
-                                          const ros::Duration dt,
-                                          double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug);
+  geometry_msgs::Twist update_with_limits(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+                                          ros::Duration dt, double* eda, double* progress,
+                                          path_tracking_pid::PidDebug* pid_debug);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
@@ -148,8 +143,7 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(const double target_x_vel, geometry_msgs::Transform current_tf,
-                           geometry_msgs::Twist odom_twist);
+  double mpc_based_max_vel(double target_x_vel, geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist);
 
   /**
    * Set dynamic parameters for the PID controller
@@ -204,13 +198,13 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w) const;
-  double distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w) const;
+  static double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w);
+  static double distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w);
   void distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,
-                            tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w);
+                            tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w) const;
 
   // Overloaded function for callers that don't need the additional results
-  double distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w)
+  double distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w) const
   {
     tf2::Transform dummy_tf;
     double dummy_double;
@@ -224,7 +218,7 @@ private:
   /**
    * Output some debug information about the current parameters
    */
-  void printParameters();
+  void printParameters() const;
 
   path_tracking_pid::PidConfig local_config_;
   ControllerState controller_state_;
