@@ -1,10 +1,10 @@
 #pragma once
 
-#include <path_tracking_pid/details/no_copy_no_move.hpp>
 
 #include <array>
 #include <vector>
 
+#include "boost/noncopyable.hpp"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Transform.h"
 #include "geometry_msgs/Twist.h"
@@ -57,7 +57,7 @@ struct ControllerState
   std::array<double, 3> filtered_error_deriv_ang = {0.0, 0.0, 0.0};
 };
 
-class Controller : private details::NoCopyNoMove
+class Controller : private boost::noncopyable
 {
 public:
   /**
