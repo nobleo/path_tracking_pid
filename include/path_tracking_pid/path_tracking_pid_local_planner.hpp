@@ -48,14 +48,14 @@ public:
     * @param tf a pointer to TransformListener in TF Buffer
     * @param costmap Costmap indicating free/occupied space
     */
-  void initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap);
+  void initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap) override;
 
   /**
     * @brief Set the plan we should be following
     * @param global_plan Plan to follow as closely as we can
     * @return whether the plan was successfully updated or not
     */
-  bool setPlan(const std::vector<geometry_msgs::PoseStamped>& global_plan);
+  bool setPlan(const std::vector<geometry_msgs::PoseStamped>& global_plan) override;
 
   /**
    * @brief Calculates the velocity command based on the current robot pose given by pose. See the interface in move
@@ -63,7 +63,7 @@ public:
    * @param cmd_vel Output the velocity command
    * @return true if succeded.
    */
-  bool computeVelocityCommands(geometry_msgs::Twist& cmd_vel);  // NOLINT
+  bool computeVelocityCommands(geometry_msgs::Twist& cmd_vel) override;  // NOLINT
 
   /**
    * @brief Calculates the velocity command based on the current robot pose given by pose. The velocity
@@ -75,13 +75,13 @@ public:
    * @return a status code defined in the move base flex ExePath action.
    */
   uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,
-                                   geometry_msgs::TwistStamped& cmd_vel, std::string& message);  // NOLINT
+                                   geometry_msgs::TwistStamped& cmd_vel, std::string& message) override;  // NOLINT
 
   /**
    * @brief Returns true, if the goal is reached. Currently does not respect the parameters give
    * @return true, if the goal is reached
    */
-  bool isGoalReached();
+  bool isGoalReached() override;
 
   /**
    * @brief Returns true, if the goal is reached. Currently does not respect the parameters given.
@@ -89,13 +89,13 @@ public:
    * @param angle_tolerance Tolerance in the orientation to the goals orientation
    * @return true, if the goal is reached
    */
-  bool isGoalReached(double dist_tolerance, double angle_tolerance);
+  bool isGoalReached(double dist_tolerance, double angle_tolerance) override;
 
   /**
    * @brief Canceles the planner.
    * @return True on cancel success.
    */
-  bool cancel();
+  bool cancel() override;
 
   /** Enumeration for custom SUCCESS feedback codes. See default ones:
    * https://github.com/magazino/move_base_flex/blob/master/mbf_msgs/action/ExePath.action
