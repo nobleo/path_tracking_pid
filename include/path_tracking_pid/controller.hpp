@@ -272,9 +272,6 @@ private:
   // feedforward controller
   double feedforward_lat_ = 0.0;
   double feedforward_ang_ = 0.0;
-  double xvel_ = 0.0;
-  double yvel_ = 0.0;
-  double thvel_ = 0.0;
 
   // tricycle model
   bool use_tricycle_model_ = false;
@@ -313,7 +310,6 @@ private:
 
   // Cutoff frequency for the derivative calculation in Hz.
   // Negative -> Has not been set by the user yet, so use a default.
-  double cutoff_frequency_long_ = -1.0;
   double cutoff_frequency_lat_ = -1.0;
   double cutoff_frequency_ang_ = -1.0;
 
