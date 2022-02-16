@@ -582,13 +582,13 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
        (-2 * c_ang_ * c_ang_ + 2) * controller_state_.filtered_error_deriv_ang.at(1));
 
   // calculate the control effort
-  proportional_lat_ = Kp_lat_ * controller_state_.filtered_error_lat.at(0);
-  integral_lat_ = Ki_lat_ * controller_state_.error_integral_lat;
-  derivative_lat_ = Kd_lat_ * controller_state_.filtered_error_deriv_lat.at(0);
+  const auto proportional_lat = Kp_lat_ * controller_state_.filtered_error_lat.at(0);
+  const auto integral_lat = Ki_lat_ * controller_state_.error_integral_lat;
+  const auto derivative_lat = Kd_lat_ * controller_state_.filtered_error_deriv_lat.at(0);
 
-  proportional_ang_ = Kp_ang_ * controller_state_.filtered_error_ang.at(0);
-  integral_ang_ = Ki_ang_ * controller_state_.error_integral_ang;
-  derivative_ang_ = Kd_ang_ * controller_state_.filtered_error_deriv_ang.at(0);
+  const auto proportional_ang = Kp_ang_ * controller_state_.filtered_error_ang.at(0);
+  const auto integral_ang = Ki_ang_ * controller_state_.error_integral_ang;
+  const auto derivative_ang = Kd_ang_ * controller_state_.filtered_error_deriv_ang.at(0);
 
 
   /***** Compute forward velocity *****/
@@ -746,9 +746,9 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   control_effort_ang_ = 0.0;
 
   if (feedback_lat_enabled_)
-    control_effort_lat_ = proportional_lat_ + integral_lat_ + derivative_lat_;
+    control_effort_lat_ = proportional_lat + integral_lat + derivative_lat;
   if (feedback_ang_enabled_)
-    control_effort_ang_ = proportional_ang_ + integral_ang_ + derivative_ang_;
+    control_effort_ang_ = proportional_ang + integral_ang + derivative_ang;
 
 
   //***** Feedforward control *****//
@@ -794,16 +794,16 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
 
   pid_debug->proportional.linear.x = 0.0;
-  pid_debug->proportional.linear.y = proportional_lat_;
-  pid_debug->proportional.angular.z = proportional_ang_;
+  pid_debug->proportional.linear.y = proportional_lat;
+  pid_debug->proportional.angular.z = proportional_ang;
 
   pid_debug->integral.linear.x = 0.0;
-  pid_debug->integral.linear.y = integral_lat_;
-  pid_debug->integral.angular.z = integral_ang_;
+  pid_debug->integral.linear.y = integral_lat;
+  pid_debug->integral.angular.z = integral_ang;
 
   pid_debug->derivative.linear.x = 0.0;
-  pid_debug->derivative.linear.y = derivative_lat_;
-  pid_debug->derivative.angular.z = derivative_ang_;
+  pid_debug->derivative.linear.y = derivative_lat;
+  pid_debug->derivative.angular.z = derivative_ang;
 
   pid_debug->feedforward.linear.x = new_x_vel;
   pid_debug->feedforward.linear.y = feedforward_lat_;
