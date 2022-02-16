@@ -232,7 +232,7 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
 }
 
 void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
-                          geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist steering_odom_twist,
+                          geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist /* steering_odom_twist */,
                           const std::vector<geometry_msgs::PoseStamped>& global_plan)
 {
   setPlan(current_tf, odom_twist, global_plan);

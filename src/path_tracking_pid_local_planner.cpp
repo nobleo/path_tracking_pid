@@ -37,7 +37,7 @@ TrackingPidLocalPlanner::TrackingPidLocalPlanner() = default;
 
 TrackingPidLocalPlanner::~TrackingPidLocalPlanner() = default;
 
-void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config, uint32_t level)
+void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config, uint32_t /* level */)
 {
   pid_controller_.configure(config);
   controller_debug_enabled_ = config.controller_debug_enabled;
@@ -520,9 +520,9 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   return max_cost;
 }
 
-uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
-                                                          const geometry_msgs::TwistStamped& velocity,
-                                                          geometry_msgs::TwistStamped& cmd_vel, std::string& message)
+uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::PoseStamped& /* pose */,
+                                                          const geometry_msgs::TwistStamped& /* velocity */,
+                                                          geometry_msgs::TwistStamped& cmd_vel, std::string& /* message */)
 {
   if (!initialized_)
   {
@@ -570,7 +570,7 @@ bool TrackingPidLocalPlanner::isGoalReached()
   return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
 }
 
-bool TrackingPidLocalPlanner::isGoalReached(double dist_tolerance, double angle_tolerance)
+bool TrackingPidLocalPlanner::isGoalReached(double /* dist_tolerance */, double /* angle_tolerance */)
 {
   return isGoalReached();
 }

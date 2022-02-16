@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-add_compile_options(-std=c++17 -Wall -Wextra -Wno-unused-parameter -Werror)
+add_compile_options(-std=c++17 -Wall -Wextra -Wpedantic -Werror)
 project(path_tracking_pid)
 
 ## Find catkin and any catkin packages
