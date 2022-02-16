@@ -33,7 +33,7 @@ class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner, public mbf_co
 private:
   typedef boost::geometry::model::ring<geometry_msgs::Point> polygon_t;
 
-  inline polygon_t union_(polygon_t polygon1, polygon_t polygon2)
+  static inline polygon_t union_(const polygon_t& polygon1, const polygon_t& polygon2)
   {
     std::vector<polygon_t> output_vec;
     boost::geometry::union_(polygon1, polygon2, output_vec);

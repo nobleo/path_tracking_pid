@@ -53,7 +53,7 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   ROS_DEBUG("TrackingPidLocalPlanner::initialize(%s, ..., ...)", name.c_str());
   // setup dynamic reconfigure
   pid_server_ = std::make_unique<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>>(config_mutex_, nh);
-  pid_server_->setCallback([this](auto& config, auto) { this->reconfigure_pid(config); });
+  pid_server_->setCallback([this](auto& config, auto /*unused*/) { this->reconfigure_pid(config); });
   pid_controller_.setEnabled(false);
 
   bool holonomic_robot = false;
@@ -101,7 +101,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   global_plan_ = global_plan;
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
-  if (map_frame_.compare(path_frame))
+  if (map_frame_ != path_frame)
   {
     ROS_DEBUG("Transforming plan since my global_frame = '%s' and my plan is in frame: '%s'", map_frame_.c_str(),
               path_frame.c_str());
@@ -204,7 +204,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
-  else if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
+  if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
   {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
     return false;
@@ -557,7 +557,9 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::P
   }
 
   if (isGoalReached())
+  {
     active_goal_ = false;
+  }
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
