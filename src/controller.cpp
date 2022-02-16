@@ -20,6 +20,12 @@ namespace {
 constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
 constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
 
+// Typesafe sign implementation with signum:
+// https://stackoverflow.com/a/4609795
+template <typename T> int sign(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 } // namespace anonymous
 
 void Controller::setHolonomic(bool holonomic)
