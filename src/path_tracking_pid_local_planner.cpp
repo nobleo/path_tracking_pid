@@ -37,7 +37,7 @@ TrackingPidLocalPlanner::TrackingPidLocalPlanner() = default;
 
 TrackingPidLocalPlanner::~TrackingPidLocalPlanner() = default;
 
-void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config, uint32_t /* level */)
+void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config)
 {
   pid_controller_.configure(config);
   controller_debug_enabled_ = config.controller_debug_enabled;
@@ -57,9 +57,7 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   ROS_DEBUG("TrackingPidLocalPlanner::initialize(%s, ..., ...)", name.c_str());
   // setup dynamic reconfigure
   pid_server_ = std::make_unique<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>>(config_mutex_, nh);
-  dynamic_reconfigure::Server<path_tracking_pid::PidConfig>::CallbackType cb1;
-  cb1 = boost::bind(&TrackingPidLocalPlanner::reconfigure_pid, this, _1, _2);
-  pid_server_->setCallback(cb1);
+  pid_server_->setCallback([this](auto& config, auto) { this->reconfigure_pid(config); });
   pid_controller_.setEnabled(false);
 
   bool holonomic_robot;
