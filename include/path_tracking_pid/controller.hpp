@@ -328,9 +328,6 @@ private:
   double c_lat_ = 1.;
   double c_ang_ = 1.;
 
-  // Used to check for tan(0)==>NaN in the filter calculation
-  double tan_filt_ = 1.;
-
   // MPC settings
   int mpc_max_fwd_iter_;               // Define # of steps that you look into the future with MPC [-]
   int mpc_max_vel_optimization_iter_;  // Set maximum # of velocity bisection iterations
