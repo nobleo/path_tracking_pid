@@ -132,8 +132,8 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
   if (!track_base_link_enabled_)
   {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
-    tf2::Transform carrotTF(tf2::Matrix3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0));
-    carrotTF.setOrigin(tf2::Vector3(l_, 0.0, 0.0));
+    tf2::Transform carrotTF(tf2::Matrix3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
+                            tf2::Vector3(l_, 0.0, 0.0));
     global_plan_tf_.push_back(last_transform * carrotTF);
   }
 
