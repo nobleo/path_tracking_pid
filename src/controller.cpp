@@ -59,7 +59,15 @@ double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
          std::pow(a.position.y - b.position.y, 2);
 }
 
-} // namespace anonymous
+// Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
+bool is_pose_angle_obtuse(
+  const geometry_msgs::Pose & prev, const geometry_msgs::Pose & cur,
+  const geometry_msgs::Pose & next)
+{
+  return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
+}
+
+}  // namespace anonymous
 
 void Controller::setHolonomic(bool holonomic)
 {
@@ -155,12 +163,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
     const auto prev_pose = global_plan[pose_idx - 1].pose;
     const auto pose = global_plan[pose_idx].pose;
     const auto next_pose = global_plan[pose_idx + 1].pose;
-    // Check if the angle of the pose is obtuse, otherwise warn and ignore this pose
-    // We check using Pythagorean theorem: if c*c > (a*a + b*b) it is an obtuse angle and thus we can follow it
-    const double a_squared = distSquared(prev_pose, pose);
-    const double b_squared = distSquared(pose, next_pose);
-    const double c_squared = distSquared(prev_pose, next_pose);
-    if (c_squared > (a_squared + b_squared))
+    if (is_pose_angle_obtuse(prev_pose, pose, next_pose))
     {
       global_plan_tf_.push_back(to_transform(pose));
     }
