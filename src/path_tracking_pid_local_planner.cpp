@@ -53,7 +53,7 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   ROS_DEBUG("TrackingPidLocalPlanner::initialize(%s, ..., ...)", name.c_str());
   // setup dynamic reconfigure
   pid_server_ = std::make_unique<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>>(config_mutex_, nh);
-  pid_server_->setCallback([this](auto& config, auto) { this->reconfigure_pid(config); });
+  pid_server_->setCallback([this](auto& config, auto /*unused*/) { this->reconfigure_pid(config); });
   pid_controller_.setEnabled(false);
 
   bool holonomic_robot;
@@ -101,14 +101,16 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   global_plan_ = global_plan;
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
-  if (map_frame_.compare(path_frame))
+  if (map_frame_ != path_frame)
   {
     ROS_DEBUG("Transforming plan since my global_frame = '%s' and my plan is in frame: '%s'", map_frame_.c_str(),
               path_frame.c_str());
     geometry_msgs::TransformStamped tf_transform;
     tf_transform = tf_->lookupTransform(map_frame_, path_frame, ros::Time(0));
     // Check alignment, when path-frame is severly mis-aligned show error
-    double yaw, pitch, roll;
+    double yaw;
+    double pitch;
+    double roll;
     tf2::getEulerYPR(tf_transform.transform.rotation, yaw, pitch, roll);
     if (std::fabs(pitch) > MAP_PARALLEL_THRESH || std::fabs(roll) > MAP_PARALLEL_THRESH)
     {
@@ -202,7 +204,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
-  else if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
+  if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
   {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
     return false;
@@ -446,7 +448,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   // Convert to map coordinates
   for (const auto& point : collision_polygon_hull)
   {
-    int map_x, map_y;
+    int map_x;
+    int map_y;
     costmap2d->worldToMapEnforceBounds(point.x, point.y, map_x, map_y);
     costmap_2d::MapLocation map_point{static_cast<uint>(map_x), static_cast<uint>(map_y)};
     collision_polygon_hull_map.push_back(map_point);
@@ -554,7 +557,9 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::P
   }
 
   if (isGoalReached())
+  {
     active_goal_ = false;
+  }
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
