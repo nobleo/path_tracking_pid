@@ -1,10 +1,12 @@
 #pragma once
 
+#include <path_tracking_pid/units.hpp>
 #include <type_traits>
 
 namespace path_tracking_pid
 {
-inline constexpr double VELOCITY_EPS = 1e-3;  // Neglegible velocity
+
+inline constexpr auto VELOCITY_EPS = units::Speed{1e-3};  // Neglegible velocity
 
 // Converts an enumeration to its underlying type.
 template <typename enum_type>
