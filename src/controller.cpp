@@ -20,10 +20,6 @@ namespace {
 constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
 constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
 
-// Cutoff frequency for the derivative calculation in Hz.
-constexpr double cutoff_frequency_lat = -1.0;
-constexpr double cutoff_frequency_ang = -1.0;
-
 // Upper and lower saturation limits
 constexpr double lat_upper_limit = 100.0;
 constexpr double lat_lower_limit = -100.0;
@@ -33,6 +29,11 @@ constexpr double ang_lower_limit = -100.0;
 
 // Anti-windup term. Limits the absolute value of the integral term.
 constexpr double windup_limit = 1000.0;
+
+// Used in filter calculations. Default 1.0 corresponds to a cutoff frequency at
+// 1/4 of the sample rate.
+constexpr double c_lat = 1.;
+constexpr double c_ang = 1.;
 
 
 // Typesafe sign implementation with signum:
@@ -519,49 +520,21 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.error_integral_lat = std::clamp(controller_state_.error_integral_lat, -windup_limit, windup_limit);
   controller_state_.error_integral_ang = std::clamp(controller_state_.error_integral_ang, -windup_limit, windup_limit);
 
-  // My filter reference was Julius O. Smith III, Intro. to Digital Filters With Audio Applications.
-  if (cutoff_frequency_lat != -1)
-  {
-    // Check if tan(_) is really small, could cause c = NaN
-    auto tan_filt = tan((cutoff_frequency_lat * 6.2832) * dt.toSec() / 2);
-
-    // Avoid tan(0) ==> NaN
-    if ((tan_filt <= 0.) && (tan_filt > -0.01))
-      tan_filt = -0.01;
-    if ((tan_filt >= 0.) && (tan_filt < 0.01))
-      tan_filt = 0.01;
-
-    c_lat_ = 1 / tan_filt;
-  }
-  if (cutoff_frequency_ang != -1)
-  {
-    // Check if tan(_) is really small, could cause c = NaN
-    auto tan_filt = tan((cutoff_frequency_ang * 6.2832) * dt.toSec() / 2);
-
-    // Avoid tan(0) ==> NaN
-    if ((tan_filt <= 0.) && (tan_filt > -0.01))
-      tan_filt = -0.01;
-    if ((tan_filt >= 0.) && (tan_filt < 0.01))
-      tan_filt = 0.01;
-
-    c_ang_ = 1 / tan_filt;
-  }
-
   controller_state_.filtered_error_lat.at(2) = controller_state_.filtered_error_lat.at(1);
   controller_state_.filtered_error_lat.at(1) = controller_state_.filtered_error_lat.at(0);
   controller_state_.filtered_error_lat.at(0) =
-      (1 / (1 + c_lat_ * c_lat_ + M_SQRT2 * c_lat_)) *
+      (1 / (1 + c_lat * c_lat + M_SQRT2 * c_lat)) *
       (controller_state_.error_lat.at(2) + 2 * controller_state_.error_lat.at(1) + controller_state_.error_lat.at(0) -
-       (c_lat_ * c_lat_ - M_SQRT2 * c_lat_ + 1) * controller_state_.filtered_error_lat.at(2) -
-       (-2 * c_lat_ * c_lat_ + 2) * controller_state_.filtered_error_lat.at(1));
+       (c_lat * c_lat - M_SQRT2 * c_lat + 1) * controller_state_.filtered_error_lat.at(2) -
+       (-2 * c_lat * c_lat + 2) * controller_state_.filtered_error_lat.at(1));
 
   controller_state_.filtered_error_ang.at(2) = controller_state_.filtered_error_ang.at(1);
   controller_state_.filtered_error_ang.at(1) = controller_state_.filtered_error_ang.at(0);
   controller_state_.filtered_error_ang.at(0) =
-      (1 / (1 + c_ang_ * c_ang_ + M_SQRT2 * c_ang_)) *
+      (1 / (1 + c_ang * c_ang + M_SQRT2 * c_ang)) *
       (controller_state_.error_ang.at(2) + 2 * controller_state_.error_ang.at(1) + controller_state_.error_ang.at(0) -
-       (c_ang_ * c_ang_ - M_SQRT2 * c_ang_ + 1) * controller_state_.filtered_error_ang.at(2) -
-       (-2 * c_ang_ * c_ang_ + 2) * controller_state_.filtered_error_ang.at(1));
+       (c_ang * c_ang - M_SQRT2 * c_ang + 1) * controller_state_.filtered_error_ang.at(2) -
+       (-2 * c_ang * c_ang + 2) * controller_state_.filtered_error_ang.at(1));
 
   // Take derivative of error, first the raw unfiltered data:
   controller_state_.error_deriv_lat.at(2) = controller_state_.error_deriv_lat.at(1);
@@ -571,11 +544,11 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.filtered_error_deriv_lat.at(2) = controller_state_.filtered_error_deriv_lat.at(1);
   controller_state_.filtered_error_deriv_lat.at(1) = controller_state_.filtered_error_deriv_lat.at(0);
   controller_state_.filtered_error_deriv_lat.at(0) =
-      (1 / (1 + c_lat_ * c_lat_ + M_SQRT2 * c_lat_)) *
+      (1 / (1 + c_lat * c_lat + M_SQRT2 * c_lat)) *
       (controller_state_.error_deriv_lat.at(2) + 2 * controller_state_.error_deriv_lat.at(1) +
        controller_state_.error_deriv_lat.at(0) -
-       (c_lat_ * c_lat_ - M_SQRT2 * c_lat_ + 1) * controller_state_.filtered_error_deriv_lat.at(2) -
-       (-2 * c_lat_ * c_lat_ + 2) * controller_state_.filtered_error_deriv_lat.at(1));
+       (c_lat * c_lat - M_SQRT2 * c_lat + 1) * controller_state_.filtered_error_deriv_lat.at(2) -
+       (-2 * c_lat * c_lat + 2) * controller_state_.filtered_error_deriv_lat.at(1));
 
   controller_state_.error_deriv_ang.at(2) = controller_state_.error_deriv_ang.at(1);
   controller_state_.error_deriv_ang.at(1) = controller_state_.error_deriv_ang.at(0);
@@ -584,11 +557,11 @@ geometry_msgs::Twist Controller::update(const double target_x_vel,
   controller_state_.filtered_error_deriv_ang.at(2) = controller_state_.filtered_error_deriv_ang.at(1);
   controller_state_.filtered_error_deriv_ang.at(1) = controller_state_.filtered_error_deriv_ang.at(0);
   controller_state_.filtered_error_deriv_ang.at(0) =
-      (1 / (1 + c_ang_ * c_ang_ + M_SQRT2 * c_ang_)) *
+      (1 / (1 + c_ang * c_ang + M_SQRT2 * c_ang)) *
       (controller_state_.error_deriv_ang.at(2) + 2 * controller_state_.error_deriv_ang.at(1) +
        controller_state_.error_deriv_ang.at(0) -
-       (c_ang_ * c_ang_ - M_SQRT2 * c_ang_ + 1) * controller_state_.filtered_error_deriv_ang.at(2) -
-       (-2 * c_ang_ * c_ang_ + 2) * controller_state_.filtered_error_deriv_ang.at(1));
+       (c_ang * c_ang - M_SQRT2 * c_ang + 1) * controller_state_.filtered_error_deriv_ang.at(2) -
+       (-2 * c_ang * c_ang + 2) * controller_state_.filtered_error_deriv_ang.at(1));
 
   // calculate the control effort
   const auto proportional_lat = Kp_lat_ * controller_state_.filtered_error_lat.at(0);
