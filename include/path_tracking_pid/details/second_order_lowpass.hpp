@@ -6,7 +6,7 @@ namespace path_tracking_pid::details
 {
 
 // Error tracker for the last 3 error and filtered error values.
-class FilteredErrorTracker
+class SecondOrderLowpass
 {
 public:
   // Pushes the given value to the errors FIFO buffer. A corresponding filtered error value is calculated and pushed

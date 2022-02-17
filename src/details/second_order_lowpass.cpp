@@ -1,4 +1,4 @@
-#include <path_tracking_pid/details/filtered_error_tracker.hpp>
+#include <path_tracking_pid/details/second_order_lowpass.hpp>
 
 #include <cmath>
 
@@ -13,7 +13,7 @@ constexpr double cutoff = 1.;
 
 }  // namespace
 
-void FilteredErrorTracker::push(double value)
+void SecondOrderLowpass::push(double value)
 {
   errors_.push(value);
 
@@ -23,17 +23,17 @@ void FilteredErrorTracker::push(double value)
                          (-2 * cutoff * cutoff + 2) * filtered_errors_.at<0>()));
 }
 
-void FilteredErrorTracker::reset()
+void SecondOrderLowpass::reset()
 {
   errors_.reset();
   filtered_errors_.reset();
 }
 
-const FifoArray<double, 3>& FilteredErrorTracker::errors() const
+const FifoArray<double, 3>& SecondOrderLowpass::errors() const
 {
   return errors_;
 }
-const FifoArray<double, 3>& FilteredErrorTracker::filtered_errors() const
+const FifoArray<double, 3>& SecondOrderLowpass::filtered_errors() const
 {
   return filtered_errors_;
 }
