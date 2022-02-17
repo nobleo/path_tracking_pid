@@ -185,7 +185,7 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
   tf2::Transform deltaPlan;
   // We define segment0 to be the segment connecting pose0 and pose1.
   // Hence, when picking the starting path's pose, we mean to start at the segment connecting that and the next pose.
-  for (int idx_path = global_plan_tf_.size() - 2; idx_path >= 0; --idx_path)
+  for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path)
   {
     /* Get distance to segment to determine if this is the segment to start at */
     dist_to_segment = distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1]);
@@ -354,9 +354,9 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
   }
 
   // Then look backwards
-  for (int idx_path = controller_state_ptr->current_global_plan_index - 1; idx_path >= 0; idx_path--)
+  for (auto idx_path = controller_state_ptr->current_global_plan_index; idx_path > 0; --idx_path)
   {
-    error = current_tf2.inverseTimes(global_plan_tf_[idx_path]);
+    error = current_tf2.inverseTimes(global_plan_tf_[idx_path - 1]);
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
     distance_to_path = hypot(error.getOrigin().x(), error.getOrigin().y(), error.getOrigin().z());
@@ -364,7 +364,7 @@ tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform cur
     if (distance_to_path < minimum_distance_to_path)
     {
       minimum_distance_to_path = distance_to_path;
-      controller_state_ptr->current_global_plan_index = idx_path;
+      controller_state_ptr->current_global_plan_index = idx_path - 1;
     }
     else
     {
