@@ -69,7 +69,7 @@ public:
    * @param tricycle_model_enabled If tricycle model should be used
    * @param estimate_pose_angle The transformation from base to steered wheel
    */
-  void setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Transform tf_base_to_steered_wheel);
+  void setTricycleModel(bool tricycle_model_enabled, const geometry_msgs::Transform& tf_base_to_steered_wheel);
 
   /**
    * Set plan
@@ -77,7 +77,7 @@ public:
    * @param odom_twist Robot odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+  void setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
                const std::vector<geometry_msgs::PoseStamped>& global_plan);
 
   /**
@@ -88,8 +88,8 @@ public:
    * @param steering_odom_twist Steered wheel odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
-                           geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist steering_odom_twist,
+  void setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
+                           const geometry_msgs::Transform& tf_base_to_steered_wheel, const geometry_msgs::Twist& steering_odom_twist,
                            const std::vector<geometry_msgs::PoseStamped>& global_plan);
   /**
    * Find position on plan by looking at the surroundings of last known pose.
@@ -98,10 +98,10 @@ public:
    * @return tf of found position on plan
    * @return index of current path-pose if requested
    */
-  tf2::Transform findPositionOnPlan(geometry_msgs::Transform current_tf, ControllerState* controller_state_ptr,
+  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform& current_tf, ControllerState* controller_state_ptr,
                                     size_t& path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
-  tf2::Transform findPositionOnPlan(geometry_msgs::Transform current_tf,
+  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform& current_tf,
                                     ControllerState* controller_state_ptr)
   {
     size_t path_pose_idx;
@@ -119,8 +119,8 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update(double target_x_vel, double target_end_x_vel, geometry_msgs::Transform current_tf,
-                              geometry_msgs::Twist odom_twist, ros::Duration dt, double* eda, double* progress,
+  geometry_msgs::Twist update(double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform& current_tf,
+                              const geometry_msgs::Twist& odom_twist, ros::Duration dt, double* eda, double* progress,
                               path_tracking_pid::PidDebug* pid_debug);
 
   /**
@@ -133,7 +133,7 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update_with_limits(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+  geometry_msgs::Twist update_with_limits(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
                                           ros::Duration dt, double* eda, double* progress,
                                           path_tracking_pid::PidDebug* pid_debug);
 
@@ -143,7 +143,7 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(double target_x_vel, geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist);
+  double mpc_based_max_vel(double target_x_vel, const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist);
 
   /**
    * Set dynamic parameters for the PID controller
@@ -214,7 +214,7 @@ private:
   }
 
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
-  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(geometry_msgs::Twist cmd_vel);
+  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(const geometry_msgs::Twist& cmd_vel);
   /**
    * Output some debug information about the current parameters
    */

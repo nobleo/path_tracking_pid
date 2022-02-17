@@ -57,7 +57,7 @@ void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
   estimate_pose_angle_enabled_ = estimate_pose_angle;
 }
 
-void Controller::setTricycleModel(bool tricycle_model_enabled, geometry_msgs::Transform tf_base_to_steered_wheel)
+void Controller::setTricycleModel(bool tricycle_model_enabled, const geometry_msgs::Transform& tf_base_to_steered_wheel)
 {
   // Set tricycle model
   use_tricycle_model_ = tricycle_model_enabled;
@@ -104,7 +104,7 @@ geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(double x_
     return estimated_base_twist;
 }
 
-TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometry_msgs::Twist cmd_vel)
+TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(const geometry_msgs::Twist& cmd_vel)
 {
     TricycleSteeringCmdVel steering_cmd_vel;
     double x_alpha =  inverse_kinematics_matrix_[0][0]*cmd_vel.linear.x
@@ -118,7 +118,7 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(geometr
     return steering_cmd_vel;
 }
 
-void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
+void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
                          const std::vector<geometry_msgs::PoseStamped>& global_plan)
 {
   ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
@@ -247,8 +247,8 @@ void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twi
   controller_state_.end_reached = false;
 }
 
-void Controller::setPlan(geometry_msgs::Transform current_tf, geometry_msgs::Twist odom_twist,
-                          geometry_msgs::Transform tf_base_to_steered_wheel, geometry_msgs::Twist /* steering_odom_twist */,
+void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
+                          const geometry_msgs::Transform& tf_base_to_steered_wheel, const geometry_msgs::Twist& /* steering_odom_twist */,
                           const std::vector<geometry_msgs::PoseStamped>& global_plan)
 {
   setPlan(current_tf, odom_twist, global_plan);
@@ -312,7 +312,7 @@ void Controller::distToSegmentSquared(
   }
 }
 
-tf2::Transform Controller::findPositionOnPlan(geometry_msgs::Transform current_tf,
+tf2::Transform Controller::findPositionOnPlan(const geometry_msgs::Transform& current_tf,
                                               ControllerState* controller_state_ptr,
                                               size_t &path_pose_idx)
 {
@@ -432,8 +432,8 @@ tf2::Transform Controller::findPositionOnPlan(geometry_msgs::Transform current_t
 
 geometry_msgs::Twist Controller::update(double target_x_vel,
                                         double target_end_x_vel,
-                                        geometry_msgs::Transform current_tf,
-                                        geometry_msgs::Twist odom_twist,
+                                        const geometry_msgs::Transform& current_tf,
+                                        const geometry_msgs::Twist& odom_twist,
                                         ros::Duration dt,
                                         double* eda, double* progress, path_tracking_pid::PidDebug* pid_debug)
 {
@@ -898,8 +898,8 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   return output_combined;
 }
 
-geometry_msgs::Twist Controller::update_with_limits(geometry_msgs::Transform current_tf,
-                                                    geometry_msgs::Twist odom_twist,
+geometry_msgs::Twist Controller::update_with_limits(const geometry_msgs::Transform& current_tf,
+                                                    const geometry_msgs::Twist& odom_twist,
                                                     ros::Duration dt,
                                                     double* eda, double* progress,
                                                     path_tracking_pid::PidDebug* pid_debug)
@@ -951,8 +951,8 @@ geometry_msgs::Twist Controller::update_with_limits(geometry_msgs::Transform cur
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
-double Controller::mpc_based_max_vel(double target_x_vel, geometry_msgs::Transform current_tf,
-                                     geometry_msgs::Twist odom_twist)
+double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::Transform& current_tf,
+                                     const geometry_msgs::Twist& odom_twist)
 {
   // Temporary save global data
   ControllerState controller_state_saved;
