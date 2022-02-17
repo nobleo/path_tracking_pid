@@ -990,10 +990,9 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
       }
 
       // Increase speed
-      double prev_save = new_nominal_x_vel;
-      new_nominal_x_vel = copysign(1.0, new_nominal_x_vel)
-                                  * abs(target_x_vel_prev - new_nominal_x_vel) / 2 + new_nominal_x_vel;
-      target_x_vel_prev = prev_save;
+      target_x_vel_prev = std::exchange(
+          new_nominal_x_vel,
+          copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 + new_nominal_x_vel);
 
       // Reset variables
       controller_state_ = controller_state_saved;
@@ -1008,10 +1007,9 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
       mpc_vel_optimization_iter += 1;
 
       // Lower speed
-      double prev_save = new_nominal_x_vel;
-      new_nominal_x_vel = -copysign(1.0, new_nominal_x_vel)
-                                  * abs(target_x_vel_prev - new_nominal_x_vel) / 2 + new_nominal_x_vel;
-      target_x_vel_prev = prev_save;
+      target_x_vel_prev = std::exchange(
+          new_nominal_x_vel,
+          -copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 + new_nominal_x_vel);
 
       // Reset variables
       controller_state_ = controller_state_saved;
