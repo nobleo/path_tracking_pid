@@ -1045,47 +1045,6 @@ double Controller::mpc_based_max_vel(const double target_x_vel, geometry_msgs::T
   return std::abs(mpc_vel_limit);
 }
 
-void Controller::selectMode(ControllerMode mode)
-{
-  switch (mode)
-  {
-    case ControllerMode::frontAxleLateral:
-      // Front axle lateral controller (default)
-      l_ = 0.5;
-      feedback_lat_enabled_ = true;
-      feedback_ang_enabled_ = false;
-      feedforward_lat_enabled_ = true;
-      feedforward_ang_enabled_ = false;
-      break;
-    case ControllerMode::rearAxleLateral:
-      // Rear axle lateral control
-      l_ = 0.0;  // To prevent singular configuration
-      feedback_lat_enabled_ = true;
-      feedback_ang_enabled_ = false;
-      feedforward_lat_enabled_ = true;
-      feedforward_ang_enabled_ = false;
-      break;
-    case ControllerMode::rearAxleAngular:
-      // Rear axle angular controller
-      l_ = 0.0;
-      feedback_lat_enabled_ = false;
-      feedback_ang_enabled_ = true;
-      feedforward_lat_enabled_ = false;
-      feedforward_ang_enabled_ = false;
-      break;
-    case ControllerMode::fixOrientation:
-      // Fix orientation controller
-      l_ = 0.0;
-      feedback_lat_enabled_ = false;
-      feedback_ang_enabled_ = true;
-      feedforward_lat_enabled_ = false;
-      feedforward_ang_enabled_ = true;
-      break;
-  }
-
-  printParameters();
-}
-
 void Controller::printParameters()
 {
   ROS_INFO("CONTROLLER PARAMETERS");

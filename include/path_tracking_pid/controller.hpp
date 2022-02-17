@@ -15,14 +15,6 @@
 namespace path_tracking_pid
 {
 
-enum class ControllerMode
-{
-  frontAxleLateral = 0,
-  rearAxleLateral = 1,
-  rearAxleAngular = 2,
-  fixOrientation = 3,
-};
-
 struct TricycleSteeringCmdVel
 {
   double steering_angle = 0.0;
@@ -158,12 +150,6 @@ public:
    */
   double mpc_based_max_vel(const double target_x_vel, geometry_msgs::Transform current_tf,
                            geometry_msgs::Twist odom_twist);
-
-  /**
-   * Select mode for the controller
-   * @param mode
-   */
-  void selectMode(ControllerMode mode);
 
   /**
    * Set dynamic parameters for the PID controller
