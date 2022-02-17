@@ -1,9 +1,8 @@
 #pragma once
 
+#include <array>
 #include <path_tracking_pid/details/fifo_array.hpp>
 #include <path_tracking_pid/details/second_order_lowpass.hpp>
-
-#include <array>
 #include <vector>
 
 #include "boost/noncopyable.hpp"
@@ -16,7 +15,6 @@
 
 namespace path_tracking_pid
 {
-
 struct TricycleSteeringCmdVel
 {
   double steering_angle = 0.0;
@@ -56,18 +54,19 @@ public:
    */
   void setHolonomic(bool holonomic);
 
-   /**
+  /**
    * Enable estimation of pose angles by looking at consecutive path points
    * @param estimate_pose_angle
    */
   void setEstimatePoseAngle(bool estimate_pose_angle);
 
-   /**
+  /**
    * Set static configuration of the controller
    * @param tricycle_model_enabled If tricycle model should be used
    * @param estimate_pose_angle The transformation from base to steered wheel
    */
-  void setTricycleModel(bool tricycle_model_enabled, const geometry_msgs::Transform& tf_base_to_steered_wheel);
+  void setTricycleModel(
+    bool tricycle_model_enabled, const geometry_msgs::Transform & tf_base_to_steered_wheel);
 
   /**
    * Set plan
@@ -75,8 +74,9 @@ public:
    * @param odom_twist Robot odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
-               const std::vector<geometry_msgs::PoseStamped>& global_plan);
+  void setPlan(
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const std::vector<geometry_msgs::PoseStamped> & global_plan);
 
   /**
    * Set plan
@@ -86,9 +86,11 @@ public:
    * @param steering_odom_twist Steered wheel odometry
    * @param global_plan Plan to follow
    */
-  void setPlan(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
-                           const geometry_msgs::Transform& tf_base_to_steered_wheel, const geometry_msgs::Twist& steering_odom_twist,
-                           const std::vector<geometry_msgs::PoseStamped>& global_plan);
+  void setPlan(
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const geometry_msgs::Transform & tf_base_to_steered_wheel,
+    const geometry_msgs::Twist & steering_odom_twist,
+    const std::vector<geometry_msgs::PoseStamped> & global_plan);
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
@@ -96,11 +98,12 @@ public:
    * @return tf of found position on plan
    * @return index of current path-pose if requested
    */
-  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform& current_tf, ControllerState* controller_state_ptr,
-                                    size_t& path_pose_idx);
+  tf2::Transform findPositionOnPlan(
+    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr,
+    size_t & path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
-  tf2::Transform findPositionOnPlan(const geometry_msgs::Transform& current_tf,
-                                    ControllerState* controller_state_ptr)
+  tf2::Transform findPositionOnPlan(
+    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr)
   {
     size_t path_pose_idx;
     return findPositionOnPlan(current_tf, controller_state_ptr, path_pose_idx);
@@ -117,9 +120,10 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update(double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform& current_tf,
-                              const geometry_msgs::Twist& odom_twist, ros::Duration dt, double* eda, double* progress,
-                              path_tracking_pid::PidDebug* pid_debug);
+  geometry_msgs::Twist update(
+    double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
+    const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
+    path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
@@ -131,9 +135,9 @@ public:
    * @return progress Progress along the path [0,1]
    * @return pid_debug Variable with information to debug the controller
    */
-  geometry_msgs::Twist update_with_limits(const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist,
-                                          ros::Duration dt, double* eda, double* progress,
-                                          path_tracking_pid::PidDebug* pid_debug);
+  geometry_msgs::Twist update_with_limits(
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
@@ -141,13 +145,15 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(double target_x_vel, const geometry_msgs::Transform& current_tf, const geometry_msgs::Twist& odom_twist);
+  double mpc_based_max_vel(
+    double target_x_vel, const geometry_msgs::Transform & current_tf,
+    const geometry_msgs::Twist & odom_twist);
 
   /**
    * Set dynamic parameters for the PID controller
    * @param config
    */
-  void configure(path_tracking_pid::PidConfig& config);
+  void configure(path_tracking_pid::PidConfig & config);
 
   /**
    * Set whether the controller is enabled
@@ -167,24 +173,12 @@ public:
   path_tracking_pid::PidConfig getConfig();
 
   // Inline get-functions for transforms
-  tf2::Transform getCurrentGoal() const
-  {
-    return current_goal_;
-  }
-  tf2::Transform getCurrentWithCarrot() const
-  {
-    return current_with_carrot_;
-  }
-  tf2::Transform getCurrentPosOnPlan() const
-  {
-    return current_pos_on_plan_;
-  }
+  tf2::Transform getCurrentGoal() const { return current_goal_; }
+  tf2::Transform getCurrentWithCarrot() const { return current_with_carrot_; }
+  tf2::Transform getCurrentPosOnPlan() const { return current_pos_on_plan_; }
 
   // Inline get-function for controller-state
-  ControllerState getControllerState() const
-  {
-    return controller_state_;
-  }
+  ControllerState getControllerState() const { return controller_state_; }
 
   // Set new vel_max_external value
   void setVelMaxExternal(double value);
@@ -196,21 +190,25 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  void distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,
-                            tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w) const;
+  void distToSegmentSquared(
+    const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
+    tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const;
 
   // Overloaded function for callers that don't need the additional results
-  double distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w) const
+  double distToSegmentSquared(
+    const tf2::Transform & pose_p, const tf2::Transform & pose_v,
+    const tf2::Transform & pose_w) const
   {
     tf2::Transform dummy_tf;
     double dummy_double;
     double result;
-    distToSegmentSquared(pose_p,pose_v, pose_w, dummy_tf, result, dummy_double);
+    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_double);
     return result;
   }
 
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
-  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(const geometry_msgs::Twist& cmd_vel);
+  TricycleSteeringCmdVel computeTricycleModelInverseKinematics(
+    const geometry_msgs::Twist & cmd_vel);
   /**
    * Output some debug information about the current parameters
    */
@@ -220,8 +218,8 @@ private:
   ControllerState controller_state_;
 
   // Global Plan variables
-  std::vector<tf2::Transform> global_plan_tf_;  // Global plan vector
-  std::vector<double> distance_to_goal_vector_;  // Vector with distances to goal
+  std::vector<tf2::Transform> global_plan_tf_;     // Global plan vector
+  std::vector<double> distance_to_goal_vector_;    // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
   double distance_to_goal_ = NAN;
   tf2::Transform current_goal_;
@@ -249,7 +247,8 @@ private:
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 
   // Velocity limits that can be active external to the pid controller:
-  double vel_max_external_ = INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
+  double vel_max_external_ =
+    INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
   double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
 };
 

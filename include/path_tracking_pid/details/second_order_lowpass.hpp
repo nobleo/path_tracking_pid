@@ -4,7 +4,6 @@
 
 namespace path_tracking_pid::details
 {
-
 // Error tracker for the last 3 error and filtered error values.
 class SecondOrderLowpass
 {
@@ -17,10 +16,10 @@ public:
   void reset();
 
   // Read-only access to the errors FIFO buffer.
-  const FifoArray<double, 3>& errors() const;
+  const FifoArray<double, 3> & errors() const;
 
   // Read-only access to the filtered errors FIFO buffer.
-  const FifoArray<double, 3>& filtered_errors() const;
+  const FifoArray<double, 3> & filtered_errors() const;
 
 private:
   FifoArray<double, 3> errors_;
