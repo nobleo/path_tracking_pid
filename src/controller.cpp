@@ -63,6 +63,31 @@ bool is_pose_angle_obtuse(
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
 
+// Three-way conditional version of std::transform(). Iterates over three ranges: one defined by
+// [first1, last1), the other beginning at first2 and the last beginning at first3. For each triple
+// of elements from those ranges it applies the if-predicate and if (and only if) that returns
+// true, applies the transform-predicate and stores the result in another range, keeping the
+// original elements order and beginning at d_first.
+template <
+  typename input_iter_type, typename output_iter_type, typename if_predicate_type,
+  typename transform_predicate_type>
+output_iter_type transform_if(
+  input_iter_type first1, input_iter_type last1, input_iter_type first2, input_iter_type first3,
+  output_iter_type d_first, if_predicate_type if_predicate,
+  transform_predicate_type transform_predicate)
+{
+  while (first1 != last1) {
+    if (if_predicate(*first1, *first2, *first3)) {
+      *d_first = transform_predicate(*first1, *first2, *first3);
+      ++d_first;
+    }
+    ++first1;
+    ++first2;
+    ++first3;
+  }
+  return d_first;
+}
+
 }  // namespace
 
 void Controller::setHolonomic(bool holonomic)
@@ -154,24 +179,33 @@ void Controller::setPlan(
   /* Minimal sanity check */
   global_plan_tf_.clear();
   global_plan_tf_.push_back(to_transform(global_plan[0].pose));
+
   // For now do not allow repeated points or in-place rotation
   // To allow that the way the progress is checked and the interpolation is done needs to be changed
   // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
-  for (int pose_idx = 1; pose_idx < static_cast<int>(global_plan.size()) - 1; ++pose_idx) {
-    const auto prev_pose = global_plan[pose_idx - 1].pose;
-    const auto pose = global_plan[pose_idx].pose;
-    const auto next_pose = global_plan[pose_idx + 1].pose;
-    if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
-      global_plan_tf_.push_back(to_transform(pose));
-    } else {
-      ROS_WARN(
-        "Pose %i of path is not used since it is not in the expected direction of the path!",
-        pose_idx);
-    }
+  if (global_plan.size() > 2) {
+    const auto it_begin = global_plan.cbegin();
+    const auto it_end = global_plan.cend() - 2;
+    const auto if_predicate = [](const auto & prev, const auto & cur, const auto & next) {
+      return is_pose_angle_obtuse(prev.pose, cur.pose, next.pose);
+    };
+    const auto transform_predicate = [](
+                                       const auto & /* prev */, const auto & cur,
+                                       const auto & /* next */) { return to_transform(cur.pose); };
+
+    transform_if(
+      it_begin, it_end, it_begin + 1, it_begin + 2, std::back_inserter(global_plan_tf_),
+      if_predicate, transform_predicate);
   }
+
   // Add last pose as we didn't evaluate that one
   const auto last_transform = to_transform(global_plan.back().pose);
   global_plan_tf_.push_back(last_transform);
+
+  if (global_plan_tf_.size() < global_plan.size()) {
+    ROS_WARN(
+      "Some poses of path are not used since they're not in the expected direction of the path!");
+  }
 
   if (!config_.track_base_link) {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
