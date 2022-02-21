@@ -46,6 +46,19 @@ tf2::Transform to_transform(const geometry_msgs::Pose & pose)
   return result;
 }
 
+// Returns the square distance between two points
+double distSquared(const tf2::Transform & a, const tf2::Transform & b)
+{
+  return a.getOrigin().distance2(b.getOrigin());
+}
+
+// Return the square distance between two points.
+double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
+{
+  return std::pow(a.position.x - b.position.x, 2) +
+         std::pow(a.position.y - b.position.y, 2);
+}
+
 } // namespace anonymous
 
 void Controller::setHolonomic(bool holonomic)
@@ -254,22 +267,6 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
   setPlan(current_tf, odom_twist, global_plan);
   controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.rotation);
   // TODO(clopez) use steering_odom_twist to check if setpoint is being followed
-}
-
-// https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
-// TODO(Cesar): expand to 3 dimensions
-double Controller::distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w)
-{
-  // Returns square distance between 2 points
-  return (pose_v.getOrigin().x() - pose_w.getOrigin().x()) * (pose_v.getOrigin().x() - pose_w.getOrigin().x()) +
-         (pose_v.getOrigin().y() - pose_w.getOrigin().y()) * (pose_v.getOrigin().y() - pose_w.getOrigin().y());
-}
-
-double Controller::distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w)
-{
-  // Returns square distance between 2 points
-  return (pose_v.position.x - pose_w.position.x) * (pose_v.position.x - pose_w.position.x) +
-         (pose_v.position.y - pose_w.position.y) * (pose_v.position.y - pose_w.position.y);
 }
 
 void Controller::distToSegmentSquared(

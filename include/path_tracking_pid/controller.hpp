@@ -196,8 +196,6 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  static double distSquared(const tf2::Transform& pose_v, const tf2::Transform& pose_w);
-  static double distSquared(const geometry_msgs::Pose& pose_v, const geometry_msgs::Pose& pose_w);
   void distToSegmentSquared(const tf2::Transform& pose_p, const tf2::Transform& pose_v, const tf2::Transform& pose_w,
                             tf2::Transform& pose_projection, double& distance_to_p, double& distance_to_w) const;
 
