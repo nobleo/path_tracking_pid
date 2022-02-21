@@ -5,6 +5,7 @@
 #include <angles/angles.h>
 #include <tf2/utils.h>
 
+#include <boost/units/cmath.hpp>
 #include <limits>
 #include <path_tracking_pid/controller.hpp>
 #include <vector>
@@ -15,8 +16,10 @@ namespace path_tracking_pid
 {
 namespace
 {
-constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
-constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
+
+constexpr double RADIUS_EPS = 0.001;  // Smallest relevant radius [m]
+constexpr auto LONG_DURATION =
+  31556926.0 * boost::units::si::second;  // A year (ros::Duration cannot be inf)
 
 // Upper and lower saturation limits
 constexpr double lat_upper_limit = 100.0;
@@ -44,15 +47,18 @@ tf2::Transform to_transform(const geometry_msgs::Pose & pose)
 }
 
 // Returns the square distance between two points
-double distSquared(const tf2::Transform & a, const tf2::Transform & b)
+boost::units::quantity<boost::units::si::area> distSquared(
+  const tf2::Transform & a, const tf2::Transform & b)
 {
-  return a.getOrigin().distance2(b.getOrigin());
+  return a.getOrigin().distance2(b.getOrigin()) * boost::units::si::square_meter;
 }
 
 // Return the square distance between two points.
-double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
+boost::units::quantity<boost::units::si::area> distSquared(
+  const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
 {
-  return std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2);
+  return (std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2)) *
+         boost::units::si::square_meter;
 }
 
 // Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
@@ -62,6 +68,19 @@ bool is_pose_angle_obtuse(
 {
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
+
+// Overload of copysign which works with different argument types.
+template <
+  typename U1, typename U2, typename V, typename = std::enable_if_t<!std::is_same_v<U1, U2>>>
+boost::units::quantity<U1, V> copysign(
+  boost::units::quantity<U1, V> lhs, boost::units::quantity<U2, V> rhs)
+{
+  return boost::units::quantity<U1, V>::from_value(std::copysign(lhs.value(), rhs.value()));
+}
+
+// Pull in other overloads of copysign (else they would no longer be considered).
+using boost::units::copysign;
+using std::copysign;
 
 // Three-way conditional version of std::transform(). Iterates over three ranges: one defined by
 // [first1, last1), the other beginning at first2 and the last beginning at first3. For each triple
@@ -220,12 +239,12 @@ void Controller::setPlan(
   controller_state_.current_global_plan_index = 0;
 
   // find closest current position to global plan
-  double minimum_distance_to_path = 1e3;
-  double dist_to_segment;
-  double iterative_dist_to_goal = 0.0;
+  auto minimum_distance_to_path = 1e3 * boost::units::si::square_meter;
+  auto dist_to_segment = 0.0 * boost::units::si::square_meter;
+  auto iterative_dist_to_goal = 0.0 * boost::units::si::meter;
   distance_to_goal_vector_.clear();
-  distance_to_goal_vector_.resize(global_plan_tf_.size());
-  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0;
+  distance_to_goal_vector_.resize(global_plan_tf_.size(), 0.0 * boost::units::si::meter);
+  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0 * boost::units::si::meter;
   turning_radius_inv_vector_.clear();
   turning_radius_inv_vector_.resize(global_plan_tf_.size());
   turning_radius_inv_vector_[global_plan_tf_.size() - 1] = 0.0;
@@ -247,7 +266,7 @@ void Controller::setPlan(
     deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
     const double dpX = deltaPlan.getOrigin().x();
     const double dpY = deltaPlan.getOrigin().y();
-    iterative_dist_to_goal += hypot(dpX, dpY);
+    iterative_dist_to_goal += hypot(dpX, dpY) * boost::units::si::meter;
     distance_to_goal_vector_[idx_path] = iterative_dist_to_goal;
     // compute turning radius based on trigonometric analysis
     // radius such that next pose is connected from current pose with a semi-circle
@@ -269,7 +288,7 @@ void Controller::setPlan(
       break;
     case Pid_Odom:
       reset();
-      controller_state_.current_x_vel = odom_twist.linear.x;
+      controller_state_.current_x_vel = odom_twist.linear.x * boost::units::si::meter_per_second;
       controller_state_.current_yaw_vel = odom_twist.angular.z;
       ROS_INFO(
         "Resuming on odom velocity x: %f, yaw: %f", odom_twist.linear.x, odom_twist.angular.z);
@@ -280,11 +299,12 @@ void Controller::setPlan(
   }
 
   // When velocity error is too big reset current_x_vel
-  if (fabs(odom_twist.linear.x - controller_state_.current_x_vel) > config_.max_error_x_vel) {
+  if (
+    fabs(odom_twist.linear.x - controller_state_.current_x_vel.value()) > config_.max_error_x_vel) {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN(
-      "Large control error. Current_x_vel %f / odometry %f", controller_state_.current_x_vel,
-      odom_twist.linear.x);
+      "Large control error. Current_x_vel %f / odometry %f",
+      controller_state_.current_x_vel.value(), odom_twist.linear.x);
   }
   controller_state_.end_phase_enabled = false;
   controller_state_.end_reached = false;
@@ -303,26 +323,27 @@ void Controller::setPlan(
 
 void Controller::distToSegmentSquared(
   const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-  tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const
+  tf2::Transform & pose_projection, boost::units::quantity<boost::units::si::area> & distance_to_p,
+  boost::units::quantity<boost::units::si::length> & distance_to_w) const
 {
-  const double l2 = distSquared(pose_v, pose_w);
-  if (l2 == 0) {
+  const auto l2 = distSquared(pose_v, pose_w);
+  if (l2 == 0.0 * boost::units::si::square_meter) {
     pose_projection = pose_w;
-    distance_to_w = 0.0;
+    distance_to_w = 0.0 * boost::units::si::meter;
     distance_to_p = distSquared(pose_p, pose_w);
   } else {
     double t = ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
                   (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
                 (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
                   (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
-               l2;
+               l2.value();
     t = fmax(0.0, fmin(1.0, t));
     pose_projection.setOrigin(tf2::Vector3(
       pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
       pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
     double yaw_projection = tf2::getYaw(pose_v.getRotation());  // get yaw of the first vector + t *
-      // (tf2::getYaw(pose_w.getRotation()) -
-      // tf2::getYaw(pose_v.getRotation()));
+    // (tf2::getYaw(pose_w.getRotation()) -
+    // tf2::getYaw(pose_v.getRotation()));
     tf2::Quaternion pose_quaternion;
     if (estimate_pose_angle_enabled_) {
       pose_quaternion.setRPY(
@@ -402,10 +423,10 @@ tf2::Transform Controller::findPositionOnPlan(
 
   tf2::Transform pose_projection_ahead;
   tf2::Transform pose_projection_behind;
-  double distance2_to_line_ahead;
-  double distance2_to_line_behind;
-  double distance_to_end_line_ahead;
-  double distance_to_end_line_behind;
+  auto distance2_to_line_ahead = 0.0 * boost::units::si::square_meter;
+  auto distance2_to_line_behind = 0.0 * boost::units::si::square_meter;
+  auto distance_to_end_line_ahead = 0.0 * boost::units::si::meter;
+  auto distance_to_end_line_behind = 0.0 * boost::units::si::meter;
   if (controller_state_ptr->current_global_plan_index == 0) {
     distToSegmentSquared(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], pose_projection_ahead,
@@ -454,11 +475,13 @@ tf2::Transform Controller::findPositionOnPlan(
 }
 
 geometry_msgs::Twist Controller::update(
-  double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
+  boost::units::quantity<boost::units::si::velocity> target_x_vel,
+  boost::units::quantity<boost::units::si::velocity> target_end_x_vel,
+  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  ros::Duration dt, boost::units::quantity<boost::units::si::time> * eda, double * progress,
   path_tracking_pid::PidDebug * pid_debug)
 {
-  const double current_x_vel = controller_state_.current_x_vel;
+  const auto current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute location of the point to be controlled
@@ -572,8 +595,8 @@ geometry_msgs::Twist Controller::update(
 
   /***** Compute forward velocity *****/
   // Apply acceleration limits and end velocity
-  double t_end_phase_current;
-  double d_end_phase;
+  auto t_end_phase_current = 0. * boost::units::si::second;
+  auto d_end_phase = 0. * boost::units::si::meter;
 
   // Compute time to reach end velocity from current velocity
   // Compute estimate overall distance during end_phase
@@ -582,21 +605,27 @@ geometry_msgs::Twist Controller::update(
   // The sample time plays an important role on how good these estimates are.
   // Thus We add a distance to the end phase distance estimation depending on the sample time
   if (
-    (current_target_x_vel_ > 0.0 && current_x_vel > target_end_x_vel) ||
-    (current_target_x_vel_ < 0.0 && current_x_vel < target_end_x_vel)) {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (-config_.target_x_decc);
+    (current_target_x_vel_ > 0.0 * boost::units::si::meter_per_second &&
+     current_x_vel > target_end_x_vel) ||
+    (current_target_x_vel_ < 0.0 * boost::units::si::meter_per_second &&
+     current_x_vel < target_end_x_vel)) {
+    t_end_phase_current = (target_end_x_vel - current_x_vel) /
+                          (-config_.target_x_decc * boost::units::si::meter_per_second_squared);
     d_end_phase = current_x_vel * t_end_phase_current -
-                  0.5 * (config_.target_x_decc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  0.5 * (config_.target_x_decc * boost::units::si::meter_per_second_squared) *
+                    t_end_phase_current * t_end_phase_current +
+                  target_x_vel * 2.0 * (dt.toSec() * boost::units::si::second);
   } else {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (config_.target_x_acc);
+    t_end_phase_current = (target_end_x_vel - current_x_vel) /
+                          (config_.target_x_acc * boost::units::si::meter_per_second_squared);
     d_end_phase = current_x_vel * t_end_phase_current +
-                  0.5 * (config_.target_x_acc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  0.5 * (config_.target_x_acc * boost::units::si::meter_per_second_squared) *
+                    t_end_phase_current * t_end_phase_current +
+                  target_x_vel * 2.0 * (dt.toSec() * boost::units::si::second);
   }
-  ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
-  ROS_DEBUG("d_end_phase: %f", d_end_phase);
-  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
+  ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current.value());
+  ROS_DEBUG("d_end_phase: %f", d_end_phase.value());
+  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_.value());
 
   // Get 'angle' towards current_goal
   tf2::Transform robot_pose;
@@ -607,12 +636,13 @@ geometry_msgs::Twist Controller::update(
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
   // This is to avoid skipping paths that start with opposite velocity.
-  if ((distance_to_goal_ <= fabs(d_end_phase)) && have_same_sign(target_x_vel, angle_to_goal)) {
+  if (
+    distance_to_goal_ <= abs(d_end_phase) && have_same_sign(target_x_vel.value(), angle_to_goal)) {
     // This state will be remebered to avoid jittering on target_x_vel
     controller_state_.end_phase_enabled = true;
   }
 
-  if (controller_state_.end_phase_enabled && fabs(target_x_vel) > VELOCITY_EPS) {
+  if (controller_state_.end_phase_enabled && abs(target_x_vel) > VELOCITY_EPS) {
     current_target_x_vel_ = target_end_x_vel;
   } else {
     controller_state_.end_phase_enabled = false;
@@ -620,73 +650,82 @@ geometry_msgs::Twist Controller::update(
   }
 
   // Determine if we need to accelerate, decelerate or maintain speed
-  double current_target_acc = 0;                    // Assume maintaining speed
-  if (fabs(current_target_x_vel_) <= VELOCITY_EPS)  // Zero velocity requested
+  auto current_target_acc =
+    0.0 * boost::units::si::meter_per_second_squared;  // Assume maintaining speed
+  if (abs(current_target_x_vel_) <= VELOCITY_EPS)      // Zero velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_decc;
+      current_target_acc = -config_.target_x_decc * boost::units::si::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_decc;
+      current_target_acc = config_.target_x_decc * boost::units::si::meter_per_second_squared;
     }
-  } else if (current_target_x_vel_ > 0)  // Positive velocity requested
+  } else if (
+    current_target_x_vel_ >
+    0.0 * boost::units::si::meter_per_second)  // Positive velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_decc;
+      current_target_acc = -config_.target_x_decc * boost::units::si::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_acc;
+      current_target_acc = config_.target_x_acc * boost::units::si::meter_per_second_squared;
     }
   } else  // Negative velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_acc;
+      current_target_acc = -config_.target_x_acc * boost::units::si::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_decc;
+      current_target_acc = config_.target_x_decc * boost::units::si::meter_per_second_squared;
     }
   }
 
-  const double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
-  const double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
+  const auto acc_desired =
+    (current_target_x_vel_ - current_x_vel) / (dt.toSec() * boost::units::si::second);
+  const auto acc_abs = fmin(abs(acc_desired), abs(current_target_acc));
   const auto acc = copysign(acc_abs, current_target_acc);
 
-  double new_x_vel = current_x_vel + acc * dt.toSec();
+  auto new_x_vel = current_x_vel + (acc * (dt.toSec() * boost::units::si::second));
 
   // For low target_end_x_vel we have a minimum velocity to ensure the goal is reached
-  double min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel;
+  auto min_vel =
+    copysign(1.0, config_.l) * config_.abs_minimum_x_vel * boost::units::si::meter_per_second;
   if (
     !controller_state_.end_reached && controller_state_.end_phase_enabled &&
-    fabs(target_end_x_vel) <= fabs(min_vel) + VELOCITY_EPS &&
-    fabs(new_x_vel) <= fabs(min_vel) + VELOCITY_EPS) {
+    abs(target_end_x_vel) <= abs(min_vel) + VELOCITY_EPS &&
+    abs(new_x_vel) <= abs(min_vel) + VELOCITY_EPS) {
     new_x_vel = min_vel;
   }
 
   // When velocity error is too big reset current_x_vel
   if (
-    fabs(odom_twist.linear.x) < fabs(current_target_x_vel_) &&
-    fabs(odom_twist.linear.x - new_x_vel) > config_.max_error_x_vel) {
+    abs(odom_twist.linear.x * boost::units::si::meter_per_second) < abs(current_target_x_vel_) &&
+    abs((odom_twist.linear.x * boost::units::si::meter_per_second) - new_x_vel) >
+      (config_.max_error_x_vel * boost::units::si::meter_per_second)) {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN_THROTTLE(
-      1.0, "Large tracking error. Current_x_vel %f / odometry %f", new_x_vel, odom_twist.linear.x);
+      1.0, "Large tracking error. Current_x_vel %f / odometry %f", new_x_vel.value(),
+      odom_twist.linear.x);
   }
 
   // Force target_end_x_vel at the very end of the path
   // Or when the end velocity is reached.
   // Warning! If target_end_x_vel == 0 and min_vel = 0 then the robot might not reach end pose
   if (
-    (distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS) ||
+    (distance_to_goal_ == 0.0 * boost::units::si::meter && target_end_x_vel >= VELOCITY_EPS) ||
     (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS &&
      new_x_vel <= target_end_x_vel + VELOCITY_EPS)) {
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
     *progress = 1.0;
-    *eda = 0.0;
+    *eda = 0.0 * boost::units::si::second;
     enabled_ = false;
   } else {
     controller_state_.end_reached = false;
     // eda (Estimated duration of arrival) estimation
-    if (fabs(target_x_vel) > VELOCITY_EPS) {
-      const double t_const =
-        (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
-      *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
+    if (abs(target_x_vel) > VELOCITY_EPS) {
+      const auto t_const = (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
+      *eda = fmin(
+        fmax(t_end_phase_current, 0.0 * boost::units::si::second) +
+          fmax(t_const, 0.0 * boost::units::si::second),
+        LONG_DURATION);
     } else {
       *eda = LONG_DURATION;
     }
@@ -695,7 +734,7 @@ geometry_msgs::Twist Controller::update(
 
   //***** Overall control *****//
   // Controller logic && overall control effort
-  control_effort_long_ = new_x_vel;
+  control_effort_long_ = new_x_vel.value();
   control_effort_lat_ = 0.0;
   control_effort_ang_ = 0.0;
 
@@ -752,7 +791,7 @@ geometry_msgs::Twist Controller::update(
   pid_debug->derivative.linear.y = derivative_lat;
   pid_debug->derivative.angular.z = derivative_ang;
 
-  pid_debug->feedforward.linear.x = new_x_vel;
+  pid_debug->feedforward.linear.x = new_x_vel.value();
   pid_debug->feedforward.linear.y = feedforward_lat_;
   pid_debug->feedforward.angular.z = feedforward_ang_;
 
@@ -839,7 +878,7 @@ geometry_msgs::Twist Controller::update(
     // Compute velocities back to base_link and update controller state
     output_steering =
       computeTricycleModelForwardKinematics(steering_cmd.speed, steering_cmd.steering_angle);
-    controller_state_.current_x_vel = output_steering.linear.x;
+    controller_state_.current_x_vel = output_steering.linear.x * boost::units::si::meter_per_second;
     controller_state_.current_yaw_vel = output_steering.angular.z;
 
     pid_debug->steering_angle = steering_cmd.steering_angle;
@@ -863,10 +902,11 @@ geometry_msgs::Twist Controller::update(
 
 geometry_msgs::Twist Controller::update_with_limits(
   const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug)
+  ros::Duration dt, boost::units::quantity<boost::units::si::time> * eda, double * progress,
+  path_tracking_pid::PidDebug * pid_debug)
 {
   // All limits are absolute
-  double max_x_vel = std::abs(config_.target_x_vel);
+  auto max_x_vel = abs(config_.target_x_vel * boost::units::si::meter_per_second);
 
   // Apply external limit
   max_x_vel = std::min(max_x_vel, vel_max_external_);
@@ -875,10 +915,11 @@ geometry_msgs::Twist Controller::update_with_limits(
   max_x_vel = std::min(max_x_vel, vel_max_obstacle_);
 
   // Apply mpc limit (last because less iterations required if max vel is already limited)
-  double vel_max_mpc = std::numeric_limits<double>::infinity();
+  auto vel_max_mpc = std::numeric_limits<double>::infinity() * boost::units::si::meter_per_second;
   if (config_.use_mpc) {
-    vel_max_mpc = std::abs(
-      mpc_based_max_vel(std::copysign(max_x_vel, config_.target_x_vel), current_tf, odom_twist));
+    vel_max_mpc = abs(mpc_based_max_vel(
+      copysign(max_x_vel, config_.target_x_vel * boost::units::si::meter_per_second), current_tf,
+      odom_twist));
     max_x_vel = std::min(max_x_vel, vel_max_mpc);
   }
 
@@ -886,39 +927,43 @@ geometry_msgs::Twist Controller::update_with_limits(
   ROS_DEBUG(
     "max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, "
     "vel_max_mpc=%.3f",
-    max_x_vel, config_.target_x_vel, vel_max_external_, vel_max_obstacle_, vel_max_mpc);
-  if (max_x_vel != config_.target_x_vel) {
+    max_x_vel.value(), config_.target_x_vel, vel_max_external_.value(), vel_max_obstacle_.value(),
+    vel_max_mpc.value());
+  if (max_x_vel != (config_.target_x_vel * boost::units::si::meter_per_second)) {
     if (max_x_vel == vel_max_external_) {
-      ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_);
+      ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_.value());
     } else if (max_x_vel == vel_max_obstacle_) {
-      ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_);
+      ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_.value());
     } else if (max_x_vel == vel_max_mpc) {
-      ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc);
+      ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc.value());
     }
   }
 
   // The end velocity is bound by the same limits to avoid accelerating above the limit in the end phase
-  double max_end_x_vel = std::min(
-    {std::abs(config_.target_end_x_vel), vel_max_external_, vel_max_obstacle_, vel_max_mpc});
-  max_end_x_vel = std::copysign(max_end_x_vel, config_.target_end_x_vel);
+  auto max_end_x_vel = std::min(
+    {abs(config_.target_end_x_vel * boost::units::si::meter_per_second), vel_max_external_,
+     vel_max_obstacle_, vel_max_mpc});
+  max_end_x_vel =
+    copysign(max_end_x_vel, config_.target_end_x_vel * boost::units::si::meter_per_second);
 
   // Update the controller with the new setting
-  max_x_vel = std::copysign(max_x_vel, config_.target_x_vel);
+  max_x_vel = copysign(max_x_vel, config_.target_x_vel * boost::units::si::meter_per_second);
   return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
-double Controller::mpc_based_max_vel(
-  double target_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist)
+boost::units::quantity<boost::units::si::velocity> Controller::mpc_based_max_vel(
+  boost::units::quantity<boost::units::si::velocity> target_x_vel,
+  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist)
 {
   // Temporary save global data
   ControllerState controller_state_saved;
   controller_state_saved = controller_state_;
 
   // Bisection optimisation parameters
-  double target_x_vel_prev = 0.0;  // Previous iteration velocity command
+  auto target_x_vel_prev =
+    0.0 * boost::units::si::meter_per_second;  // Previous iteration velocity command
   int mpc_vel_optimization_iter = 0;
 
   // MPC parameters
@@ -928,7 +973,7 @@ double Controller::mpc_based_max_vel(
   geometry_msgs::Transform predicted_tf = current_tf;
   geometry_msgs::Twist pred_twist = odom_twist;
 
-  double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
+  auto new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
 
   // Loop MPC
   while (mpc_fwd_iter < config_.mpc_max_fwd_iterations &&
@@ -940,7 +985,7 @@ double Controller::mpc_based_max_vel(
     if (
       mpc_fwd_iter == config_.mpc_max_fwd_iterations &&
       fabs(controller_state_.error_lat.errors().at<0>()) <= config_.mpc_max_error_lat &&
-      fabs(new_nominal_x_vel) < abs(target_x_vel)) {
+      abs(new_nominal_x_vel) < abs(target_x_vel)) {
       mpc_vel_optimization_iter += 1;
 
       // When we reach the maximum allowed mpc optimization iterations, do not change velocity anymore
@@ -951,7 +996,7 @@ double Controller::mpc_based_max_vel(
       // Increase speed
       target_x_vel_prev = std::exchange(
         new_nominal_x_vel,
-        copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 +
+        copysign((target_x_vel_prev - new_nominal_x_vel) / 2., new_nominal_x_vel) +
           new_nominal_x_vel);
 
       // Reset variables
@@ -968,7 +1013,7 @@ double Controller::mpc_based_max_vel(
       // Lower speed
       target_x_vel_prev = std::exchange(
         new_nominal_x_vel,
-        -copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 +
+        -copysign(abs(target_x_vel_prev - new_nominal_x_vel) / 2., new_nominal_x_vel) +
           new_nominal_x_vel);
 
       // Reset variables
@@ -979,19 +1024,19 @@ double Controller::mpc_based_max_vel(
       mpc_fwd_iter = 0;
 
       // Warning if new_nominal_x_vel becomes really low
-      if (abs(new_nominal_x_vel) < 0.01) {
+      if (abs(new_nominal_x_vel) < 0.01 * boost::units::si::meter_per_second) {
         ROS_WARN_THROTTLE(5.0, "Lowering velocity did not decrease the lateral error enough.");
       }
     } else if (mpc_fwd_iter != config_.mpc_max_fwd_iterations) {
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
       path_tracking_pid::PidDebug pid_debug_unused;
-      double eda_unused;
-      double progress_unused;
+      auto eda_unused = 0.0 * boost::units::si::second;
+      double progress_unused = 0;
       pred_twist = Controller::update(
-        new_nominal_x_vel, config_.target_end_x_vel, predicted_tf, pred_twist,
-        ros::Duration(config_.mpc_simulation_sample_time), &eda_unused, &progress_unused,
-        &pid_debug_unused);
+        new_nominal_x_vel, config_.target_end_x_vel * boost::units::si::meter_per_second,
+        predicted_tf, pred_twist, ros::Duration(config_.mpc_simulation_sample_time), &eda_unused,
+        &progress_unused, &pid_debug_unused);
 
       // Run plant model
       const double theta = tf2::getYaw(predicted_tf.rotation);
@@ -1005,13 +1050,14 @@ double Controller::mpc_based_max_vel(
     }
   }
   // Apply limits to the velocity
-  double mpc_vel_limit =
-    copysign(1.0, new_nominal_x_vel) * fmax(fabs(new_nominal_x_vel), config_.mpc_min_x_vel);
+  const auto mpc_vel_limit = copysign(
+    std::max(abs(new_nominal_x_vel), config_.mpc_min_x_vel * boost::units::si::meter_per_second),
+    new_nominal_x_vel);
 
   // Revert global variables
   controller_state_ = controller_state_saved;
 
-  return std::abs(mpc_vel_limit);
+  return abs(mpc_vel_limit);
 }
 
 void Controller::printParameters() const
@@ -1093,7 +1139,7 @@ void Controller::setEnabled(bool value)
 
 void Controller::reset()
 {
-  controller_state_.current_x_vel = 0.0;
+  controller_state_.current_x_vel = 0.0 * boost::units::si::meter_per_second;
   controller_state_.current_yaw_vel = 0.0;
   controller_state_.previous_steering_angle = 0.0;
   controller_state_.previous_steering_yaw_vel = 0.0;
@@ -1106,26 +1152,32 @@ void Controller::reset()
   controller_state_.error_deriv_ang.reset();
 }
 
-void Controller::setVelMaxExternal(double value)
+void Controller::setVelMaxExternal(boost::units::quantity<boost::units::si::velocity> value)
 {
-  if (value < 0.0) {
-    ROS_ERROR_THROTTLE(1.0, "External velocity limit (%f) has to be positive", value);
+  if (value < 0.0 * boost::units::si::meter_per_second) {
+    ROS_ERROR_THROTTLE(1.0, "External velocity limit (%f) has to be positive", value.value());
     return;
   }
-  if (value < 0.1) {
+  if (value < 0.1 * boost::units::si::meter_per_second) {
     ROS_WARN_THROTTLE(
-      1.0, "External velocity limit is very small (%f), this could result in standstill", value);
+      1.0, "External velocity limit is very small (%f), this could result in standstill",
+      value.value());
   }
   vel_max_external_ = value;
 }
 
-void Controller::setVelMaxObstacle(double value)
+void Controller::setVelMaxObstacle(boost::units::quantity<boost::units::si::velocity> value)
 {
   ROS_WARN_COND(
-    vel_max_obstacle_ != 0.0 && value == 0.0, "Collision imminent, slamming the brakes");
+    vel_max_obstacle_ != 0.0 * boost::units::si::meter_per_second &&
+      value == 0.0 * boost::units::si::meter_per_second,
+    "Collision imminent, slamming the brakes");
   vel_max_obstacle_ = value;
 }
 
-double Controller::getVelMaxObstacle() const { return vel_max_obstacle_; }
+boost::units::quantity<boost::units::si::velocity> Controller::getVelMaxObstacle() const
+{
+  return vel_max_obstacle_;
+}
 
 }  // namespace path_tracking_pid

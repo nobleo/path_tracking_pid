@@ -9,6 +9,7 @@
 
 #include <array>
 #include <boost/noncopyable.hpp>
+#include <boost/units/systems/si.hpp>
 #include <path_tracking_pid/details/fifo_array.hpp>
 #include <path_tracking_pid/details/second_order_lowpass.hpp>
 #include <vector>
@@ -27,7 +28,8 @@ struct ControllerState
 {
   size_t current_global_plan_index = 0;
   size_t last_visited_pose_index = 0;
-  double current_x_vel = 0.0;
+  boost::units::quantity<boost::units::si::velocity> current_x_vel =
+    0.0 * boost::units::si::meter_per_second;
   double current_yaw_vel = 0.0;
   double previous_steering_angle = 0.0;
   double previous_steering_x_vel = 0.0;
@@ -121,8 +123,10 @@ public:
    * @return pid_debug Variable with information to debug the controller
    */
   geometry_msgs::Twist update(
-    double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-    const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
+    boost::units::quantity<boost::units::si::velocity> target_x_vel,
+    boost::units::quantity<boost::units::si::velocity> target_end_x_vel,
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    ros::Duration dt, boost::units::quantity<boost::units::si::time> * eda, double * progress,
     path_tracking_pid::PidDebug * pid_debug);
 
   /**
@@ -137,7 +141,8 @@ public:
    */
   geometry_msgs::Twist update_with_limits(
     const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug);
+    ros::Duration dt, boost::units::quantity<boost::units::si::time> * eda, double * progress,
+    path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
@@ -145,9 +150,9 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(
-    double target_x_vel, const geometry_msgs::Transform & current_tf,
-    const geometry_msgs::Twist & odom_twist);
+  boost::units::quantity<boost::units::si::velocity> mpc_based_max_vel(
+    boost::units::quantity<boost::units::si::velocity> target_x_vel,
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist);
 
   /**
    * Set dynamic parameters for the PID controller
@@ -181,28 +186,29 @@ public:
   ControllerState getControllerState() const { return controller_state_; }
 
   // Set new vel_max_external value
-  void setVelMaxExternal(double value);
+  void setVelMaxExternal(boost::units::quantity<boost::units::si::velocity> value);
 
   // Set new vel_max_obstacle value
-  void setVelMaxObstacle(double value);
+  void setVelMaxObstacle(boost::units::quantity<boost::units::si::velocity> value);
 
   // Get vel_max_obstacle value
-  double getVelMaxObstacle() const;
+  boost::units::quantity<boost::units::si::velocity> getVelMaxObstacle() const;
 
 private:
   void distToSegmentSquared(
     const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-    tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const;
+    tf2::Transform & pose_projection,
+    boost::units::quantity<boost::units::si::area> & distance_to_p,
+    boost::units::quantity<boost::units::si::length> & distance_to_w) const;
 
   // Overloaded function for callers that don't need the additional results
-  double distToSegmentSquared(
-    const tf2::Transform & pose_p, const tf2::Transform & pose_v,
-    const tf2::Transform & pose_w) const
+  boost::units::quantity<boost::units::si::area> distToSegmentSquared(
+    const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w)
   {
     tf2::Transform dummy_tf;
-    double dummy_double;
-    double result;
-    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_double);
+    auto dummy_dist = boost::units::quantity<boost::units::si::length>{0};
+    auto result = boost::units::quantity<boost::units::si::area>{0};
+    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_dist);
     return result;
   }
 
@@ -218,16 +224,18 @@ private:
   ControllerState controller_state_;
 
   // Global Plan variables
-  std::vector<tf2::Transform> global_plan_tf_;     // Global plan vector
-  std::vector<double> distance_to_goal_vector_;    // Vector with distances to goal
+  std::vector<tf2::Transform> global_plan_tf_;  // Global plan vector
+  std::vector<boost::units::quantity<boost::units::si::length>>
+    distance_to_goal_vector_;                      // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
-  double distance_to_goal_ = NAN;
+  boost::units::quantity<boost::units::si::length> distance_to_goal_ =
+    NAN * boost::units::si::meter;
   tf2::Transform current_goal_;
   tf2::Transform current_pos_on_plan_;
   tf2::Transform current_with_carrot_;
 
   // Auxiliary variables
-  double current_target_x_vel_ = 0.0;
+  boost::units::quantity<boost::units::si::velocity> current_target_x_vel_{0};
   double control_effort_long_ = 0.0;  // output of pid controller
   double control_effort_lat_ = 0.0;   // output of pid controller
   double control_effort_ang_ = 0.0;   // output of pid controller
@@ -247,9 +255,12 @@ private:
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 
   // Velocity limits that can be active external to the pid controller:
-  double vel_max_external_ =
-    INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
-  double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
+  boost::units::quantity<boost::units::si::velocity> vel_max_external_ =
+    INFINITY *
+    boost::units::si::
+      meter_per_second;  // Dynamic external max velocity requirement (e.g. no more power available)
+  boost::units::quantity<boost::units::si::velocity> vel_max_obstacle_ =
+    INFINITY * boost::units::si::meter_per_second;  // Can be zero if lethal obstacles are detected
 };
 
 }  // namespace path_tracking_pid

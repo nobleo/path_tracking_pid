@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "boost/units/cmath.hpp"
 #include "common.hpp"
 
 // register planner as move_base and move_base plugins
@@ -148,11 +149,13 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     pid_controller_.getConfig().init_vel_method != Pid_Odom &&
     pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
     std::abs(
-      latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
+      latest_odom_.twist.twist.linear.x -
+      pid_controller_.getControllerState().current_x_vel.value()) >
       pid_controller_.getConfig().init_vel_max_diff) {
     ROS_ERROR(
       "Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
-      latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
+      latest_odom_.twist.twist.linear.x,
+      pid_controller_.getControllerState().current_x_vel.value());
     return false;
   }
 
@@ -200,7 +203,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     ROS_ERROR_THROTTLE(
       5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
     cmd_vel = geometry_msgs::Twist();
-    cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
+    cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel.value();
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
@@ -222,29 +225,31 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     auto cost = projectedCollisionCost();
 
     if (cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
-      pid_controller_.setVelMaxObstacle(0.0);
+      pid_controller_.setVelMaxObstacle(boost::units::quantity<boost::units::si::velocity>{0});
     } else if (pid_controller_.getConfig().obstacle_speed_reduction) {
       double max_vel = pid_controller_.getConfig().max_x_vel;
       double reduction_factor = static_cast<double>(cost) / costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
       double limit = max_vel * (1 - reduction_factor);
       ROS_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
-      pid_controller_.setVelMaxObstacle(limit);
+      pid_controller_.setVelMaxObstacle(limit * boost::units::si::meter_per_second);
     } else {
-      pid_controller_.setVelMaxObstacle(INFINITY);  // set back to inf
+      pid_controller_.setVelMaxObstacle(INFINITY * boost::units::si::meter_per_second);
     }
   } else {
-    pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
+    pid_controller_.setVelMaxObstacle(INFINITY * boost::units::si::meter_per_second);
   }
 
   path_tracking_pid::PidDebug pid_debug;
-  double eda =
-    1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
+  auto eda =
+    (1. / FLT_EPSILON) *
+    boost::units::si::
+      second;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
   double progress = 0.0;
   cmd_vel = pid_controller_.update_with_limits(
     tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt, &eda, &progress, &pid_debug);
 
   path_tracking_pid::PidFeedback feedback_msg;
-  feedback_msg.eda = ros::Duration(eda);
+  feedback_msg.eda = ros::Duration{eda.value()};
   feedback_msg.progress = progress;
   feedback_pub_.publish(feedback_msg);
 
@@ -352,7 +357,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   visualization_msgs::MarkerArray mkCollision;
 
   // Check how far we should check forward
-  double x_vel = pid_controller_.getControllerState().current_x_vel;
+  double x_vel = pid_controller_.getControllerState().current_x_vel.value();
   double collision_look_ahead_distance =
     x_vel * x_vel / (2 * pid_controller_.getConfig().target_x_decc) +
     pid_controller_.getConfig().collision_look_ahead_length_offset;
@@ -511,7 +516,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
   cmd_vel.header.stamp = ros::Time::now();
   cmd_vel.header.frame_id = base_link_frame_;
 
-  bool moving = std::abs(cmd_vel.twist.linear.x) > VELOCITY_EPS;
+  bool moving = abs(cmd_vel.twist.linear.x * boost::units::si::meter_per_second) > VELOCITY_EPS;
   if (cancel_in_progress_) {
     if (!moving) {
       ROS_INFO(
@@ -568,6 +573,6 @@ void TrackingPidLocalPlanner::curOdomCallback(const nav_msgs::Odometry & odom_ms
 
 void TrackingPidLocalPlanner::velMaxExternalCallback(const std_msgs::Float64 & msg)
 {
-  pid_controller_.setVelMaxExternal(msg.data);
+  pid_controller_.setVelMaxExternal(msg.data * boost::units::si::meter_per_second);
 }
 }  // namespace path_tracking_pid
