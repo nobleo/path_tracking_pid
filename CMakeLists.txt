@@ -106,4 +106,6 @@ install(
 
 if(CATKIN_ENABLE_TESTING)
   add_rostest(test/test_path_tracking_pid.test ARGS rviz:=false reconfigure:=false)
+  catkin_add_gtest(unittests unittest/test_main.cpp unittest/test_fifo_array.cpp)
+  target_link_libraries(unittests ${catkin_LIBRARIES})
 endif()
