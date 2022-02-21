@@ -14,4 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: 'ros-industrial/industrial_ci@master'
-        env: ${{matrix.env}}
+        env:
+          ROS_DISTRO: ${{ matrix.env.ROS_DISTRO }}
+          CMAKE_ARGS: ${{ matrix.env.CMAKE_ARGS }}
+          VERBOSE_TESTS: true
