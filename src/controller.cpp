@@ -176,11 +176,11 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
   const auto last_transform = to_transform(global_plan.back().pose);
   global_plan_tf_.push_back(last_transform);
 
-  if (!track_base_link_enabled_)
+  if (!config_.track_base_link)
   {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
     tf2::Transform carrotTF(tf2::Matrix3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
-                            tf2::Vector3(l_, 0.0, 0.0));
+                            tf2::Vector3(config_.l, 0.0, 0.0));
     global_plan_tf_.push_back(last_transform * carrotTF);
   }
 
@@ -236,7 +236,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
   }
 
   // Set initial velocity
-  switch (local_config_.init_vel_method)
+  switch (config_.init_vel_method)
   {
     case Pid_Zero:
       reset();
@@ -253,7 +253,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
   }
 
   // When velocity error is too big reset current_x_vel
-  if (fabs(odom_twist.linear.x - controller_state_.current_x_vel) > max_error_x_vel_)
+  if (fabs(odom_twist.linear.x - controller_state_.current_x_vel) > config_.max_error_x_vel)
   {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN("Large control error. Current_x_vel %f / odometry %f",
@@ -443,8 +443,8 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   // Compute location of the point to be controlled
   const double theda_rp = tf2::getYaw(current_tf.rotation);
   tf2::Vector3 current_with_carrot_origin;
-  current_with_carrot_origin.setX(current_tf.translation.x + l_ * cos(theda_rp));
-  current_with_carrot_origin.setY(current_tf.translation.y + l_ * sin(theda_rp));
+  current_with_carrot_origin.setX(current_tf.translation.x + config_.l * cos(theda_rp));
+  current_with_carrot_origin.setY(current_tf.translation.y + config_.l * sin(theda_rp));
   current_with_carrot_origin.setZ(0);
 
   current_with_carrot_.setOrigin(current_with_carrot_origin);
@@ -452,15 +452,15 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   current_with_carrot_.setRotation(cur_rot);
 
   size_t path_pose_idx;
-  if (track_base_link_enabled_)
+  if (config_.track_base_link)
   {
     // Find closes robot position to path and then project carrot on goal
     current_pos_on_plan_ = current_goal_ = findPositionOnPlan(current_tf, &controller_state_, path_pose_idx);
     // To track the base link the goal is then transform to the control point goal
     double theda_rp = tf2::getYaw(current_goal_.getRotation());
     tf2::Vector3 newControlOrigin;
-    newControlOrigin.setX(current_goal_.getOrigin().x() + l_ * cos(theda_rp));
-    newControlOrigin.setY(current_goal_.getOrigin().y() + l_ * sin(theda_rp));
+    newControlOrigin.setX(current_goal_.getOrigin().x() + config_.l * cos(theda_rp));
+    newControlOrigin.setY(current_goal_.getOrigin().y() + config_.l * sin(theda_rp));
     newControlOrigin.setZ(0);
     current_goal_.setOrigin(newControlOrigin);
   }
@@ -478,13 +478,13 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   tf2::Transform error = current_with_carrot_.inverseTimes(current_goal_);
 
   //***** Feedback control *****//
-  if (!((Kp_lat_ <= 0. && Ki_lat_ <= 0. && Kd_lat_ <= 0.) ||
-        (Kp_lat_ >= 0. && Ki_lat_ >= 0. && Kd_lat_ >= 0.)))  // All 3 gains should have the same sign
+  if (!((config_.Kp_lat <= 0. && config_.Ki_lat <= 0. && config_.Kd_lat <= 0.) ||
+        (config_.Kp_lat >= 0. && config_.Ki_lat >= 0. && config_.Kd_lat >= 0.)))  // All 3 gains should have the same sign
   {
     ROS_WARN("All three gains (Kp, Ki, Kd) should have the same sign for stability.");
   }
-  if (!((Kp_ang_ <= 0. && Ki_ang_ <= 0. && Kd_ang_ <= 0.) ||
-        (Kp_ang_ >= 0. && Ki_ang_ >= 0. && Kd_ang_ >= 0.)))  // All 3 gains should have the same sign
+  if (!((config_.Kp_ang <= 0. && config_.Ki_ang <= 0. && config_.Kd_ang <= 0.) ||
+        (config_.Kp_ang >= 0. && config_.Ki_ang >= 0. && config_.Kd_ang >= 0.)))  // All 3 gains should have the same sign
   {
     ROS_WARN("All three gains (Kp, Ki, Kd) should have the same sign for stability.");
   }
@@ -526,13 +526,13 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     (controller_state_.error_ang.errors().at<0>() - controller_state_.error_ang.errors().at<1>()) / dt.toSec());
 
   // calculate the control effort
-  const auto proportional_lat = Kp_lat_ * controller_state_.error_lat.filtered_errors().at<0>();
-  const auto integral_lat = Ki_lat_ * controller_state_.error_integral_lat;
-  const auto derivative_lat = Kd_lat_ * controller_state_.error_deriv_lat.filtered_errors().at<0>();
+  const auto proportional_lat = config_.Kp_lat * controller_state_.error_lat.filtered_errors().at<0>();
+  const auto integral_lat = config_.Ki_lat * controller_state_.error_integral_lat;
+  const auto derivative_lat = config_.Kd_lat * controller_state_.error_deriv_lat.filtered_errors().at<0>();
 
-  const auto proportional_ang = Kp_ang_ * controller_state_.error_ang.filtered_errors().at<0>();
-  const auto integral_ang = Ki_ang_ * controller_state_.error_integral_ang;
-  const auto derivative_ang = Kd_ang_ * controller_state_.error_deriv_ang.filtered_errors().at<0>();
+  const auto proportional_ang = config_.Kp_ang * controller_state_.error_ang.filtered_errors().at<0>();
+  const auto integral_ang = config_.Ki_ang * controller_state_.error_integral_ang;
+  const auto derivative_ang = config_.Kd_ang * controller_state_.error_deriv_ang.filtered_errors().at<0>();
 
 
   /***** Compute forward velocity *****/
@@ -549,16 +549,16 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   if ((current_target_x_vel_ > 0.0 && current_x_vel > target_end_x_vel) ||
       (current_target_x_vel_ < 0.0 && current_x_vel < target_end_x_vel))
   {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (-target_x_decc_);
+    t_end_phase_current = (target_end_x_vel - current_x_vel) / (-config_.target_x_decc);
     d_end_phase = current_x_vel * t_end_phase_current
-                - 0.5 * (target_x_decc_) * t_end_phase_current * t_end_phase_current
+                - 0.5 * (config_.target_x_decc) * t_end_phase_current * t_end_phase_current
                 + target_x_vel * 2.0 * dt.toSec();
   }
   else
   {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (target_x_acc_);
+    t_end_phase_current = (target_end_x_vel - current_x_vel) / (config_.target_x_acc);
     d_end_phase = current_x_vel * t_end_phase_current
-                + 0.5 * (target_x_acc_) * t_end_phase_current * t_end_phase_current
+                + 0.5 * (config_.target_x_acc) * t_end_phase_current * t_end_phase_current
                 + target_x_vel * 2.0 * dt.toSec();
   }
   ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
@@ -596,33 +596,33 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   {
     if (current_x_vel > current_target_x_vel_)
     {
-      current_target_acc = -target_x_decc_;
+      current_target_acc = -config_.target_x_decc;
     }
     else
     {
-      current_target_acc = target_x_decc_;
+      current_target_acc = config_.target_x_decc;
     }
   }
   else if (current_target_x_vel_ > 0)         // Positive velocity requested
   {
     if (current_x_vel > current_target_x_vel_)
     {
-      current_target_acc = -target_x_decc_;
+      current_target_acc = -config_.target_x_decc;
     }
     else
     {
-      current_target_acc = target_x_acc_;
+      current_target_acc = config_.target_x_acc;
     }
   }
   else                                              // Negative velocity requested
   {
     if (current_x_vel > current_target_x_vel_)
     {
-      current_target_acc = -target_x_acc_;
+      current_target_acc = -config_.target_x_acc;
     }
     else
     {
-      current_target_acc = target_x_decc_;
+      current_target_acc = config_.target_x_decc;
     }
   }
 
@@ -633,7 +633,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   double new_x_vel = current_x_vel + acc * dt.toSec();
 
   // For low target_end_x_vel we have a minimum velocity to ensure the goal is reached
-  double min_vel = copysign(1.0, l_) * abs_minimum_x_vel_;
+  double min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel;
   if (!controller_state_.end_reached && controller_state_.end_phase_enabled
       && fabs(target_end_x_vel) <= fabs(min_vel) + VELOCITY_EPS
       && fabs(new_x_vel) <= fabs(min_vel) + VELOCITY_EPS)
@@ -643,7 +643,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
 
   // When velocity error is too big reset current_x_vel
   if (fabs(odom_twist.linear.x) < fabs(current_target_x_vel_) &&
-      fabs(odom_twist.linear.x - new_x_vel) > max_error_x_vel_)
+      fabs(odom_twist.linear.x - new_x_vel) > config_.max_error_x_vel)
   {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN_THROTTLE(1.0, "Large tracking error. Current_x_vel %f / odometry %f",
@@ -686,17 +686,17 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   control_effort_lat_ = 0.0;
   control_effort_ang_ = 0.0;
 
-  if (feedback_lat_enabled_)
+  if (config_.feedback_lat)
   {
     control_effort_lat_ = proportional_lat + integral_lat + derivative_lat;
   }
-  if (feedback_ang_enabled_)
+  if (config_.feedback_ang)
   {
     control_effort_ang_ = proportional_ang + integral_ang + derivative_ang;
   }
 
   //***** Feedforward control *****//
-  if (feedforward_lat_enabled_)
+  if (config_.feedforward_lat)
   {
     feedforward_lat_ = 0.0;  // Not implemented
     control_effort_lat_ = control_effort_lat_ + feedforward_lat_;
@@ -706,7 +706,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     feedforward_lat_ = 0.0;
   }
 
-  if (feedforward_ang_enabled_)
+  if (config_.feedforward_ang)
   {
     feedforward_ang_ = turning_radius_inv_vector_[controller_state_.last_visited_pose_index]*control_effort_long_;
     ROS_DEBUG("turning_radius_inv_vector[%lu] = %f",
@@ -759,7 +759,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     output_combined.angular.x = 0;
     output_combined.angular.y = 0;
     output_combined.angular.z = control_effort_ang_;
-    output_combined.angular.z = std::clamp(output_combined.angular.z, -max_yaw_vel_, max_yaw_vel_);
+    output_combined.angular.z = std::clamp(output_combined.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
   }
   else
   {
@@ -768,12 +768,12 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     output_combined.linear.z = 0;
     output_combined.angular.x = 0;
     output_combined.angular.y = 0;
-    output_combined.angular.z = copysign(1.0, l_) * control_effort_lat_ +
+    output_combined.angular.z = copysign(1.0, config_.l) * control_effort_lat_ +
                                 control_effort_ang_;  // Take the sign of l for the lateral control effort
-    output_combined.angular.z = std::clamp(output_combined.angular.z, -max_yaw_vel_, max_yaw_vel_);
+    output_combined.angular.z = std::clamp(output_combined.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
     // For non-holonomic robots apply saturation based on minimum turning radius
     double max_ang_twist_tr;
-    if (minimum_turning_radius_ < RADIUS_EPS)
+    if (config_.min_turning_radius < RADIUS_EPS)
     {
       // Rotation in place is allowed
       // minimum_turning_radius = RADIUS_EPS; // This variable is not used anymore so it does not matter
@@ -782,13 +782,13 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     }
     else
     {
-      max_ang_twist_tr = fabs(output_combined.linear.x / minimum_turning_radius_);
+      max_ang_twist_tr = fabs(output_combined.linear.x / config_.min_turning_radius);
     }
     output_combined.angular.z = std::clamp(output_combined.angular.z, -max_ang_twist_tr, max_ang_twist_tr);
   }
   // Apply max acceleration limit to yaw
   const double yaw_acc = std::clamp((output_combined.angular.z - current_yaw_vel) / dt.toSec(),
-                                    -max_yaw_acc_, max_yaw_acc_);
+                                    -config_.max_yaw_acc, config_.max_yaw_acc);
   const double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
   output_combined.angular.z = new_yaw_vel;
 
@@ -811,19 +811,19 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
     }
     // Apply limits to steering commands
     steering_cmd.steering_angle = std::clamp(steering_cmd.steering_angle,
-                                  -max_steering_angle_, max_steering_angle_);
+                                  -config_.max_steering_angle, config_.max_steering_angle);
     const double steering_yaw_vel = std::clamp((steering_cmd.steering_angle - controller_state_.previous_steering_angle)
-                                          / dt.toSec(), -max_steering_yaw_vel_, max_steering_yaw_vel_);
+                                          / dt.toSec(), -config_.max_steering_yaw_vel, config_.max_steering_yaw_vel);
     const double steering_angle_acc = std::clamp((steering_yaw_vel - controller_state_.previous_steering_yaw_vel)/ dt.toSec(),
-                                  -max_steering_yaw_acc_, max_steering_yaw_acc_);
+                                  -config_.max_steering_yaw_acc, config_.max_steering_yaw_acc);
     steering_cmd.steering_angle_velocity =   controller_state_.previous_steering_yaw_vel
                                           +  (steering_angle_acc * dt.toSec());
     steering_cmd.steering_angle =   controller_state_.previous_steering_angle
                                   + (steering_cmd.steering_angle_velocity * dt.toSec());
 
-    steering_cmd.speed = std::clamp(steering_cmd.speed, -max_steering_x_vel_, max_steering_x_vel_);
+    steering_cmd.speed = std::clamp(steering_cmd.speed, -config_.max_steering_x_vel, config_.max_steering_x_vel);
     steering_cmd.acceleration = std::clamp((steering_cmd.speed - controller_state_.previous_steering_x_vel)/ dt.toSec(),
-                                  -max_steering_x_acc_, max_steering_x_acc_);
+                                  -config_.max_steering_x_acc, config_.max_steering_x_acc);
     steering_cmd.speed =  controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.toSec());
 
     controller_state_.previous_steering_angle = steering_cmd.steering_angle;
@@ -861,7 +861,7 @@ geometry_msgs::Twist Controller::update_with_limits(const geometry_msgs::Transfo
                                                     path_tracking_pid::PidDebug* pid_debug)
 {
   // All limits are absolute
-  double max_x_vel = std::abs(target_x_vel_);
+  double max_x_vel = std::abs(config_.target_x_vel);
 
   // Apply external limit
   max_x_vel = std::min(max_x_vel, vel_max_external_);
@@ -871,16 +871,16 @@ geometry_msgs::Twist Controller::update_with_limits(const geometry_msgs::Transfo
 
   // Apply mpc limit (last because less iterations required if max vel is already limited)
   double vel_max_mpc = std::numeric_limits<double>::infinity();
-  if (local_config_.use_mpc)
+  if (config_.use_mpc)
   {
-    vel_max_mpc = std::abs(mpc_based_max_vel(std::copysign(max_x_vel, target_x_vel_), current_tf, odom_twist));
+    vel_max_mpc = std::abs(mpc_based_max_vel(std::copysign(max_x_vel, config_.target_x_vel), current_tf, odom_twist));
     max_x_vel = std::min(max_x_vel, vel_max_mpc);
   }
 
   // Some logging:
   ROS_DEBUG("max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, vel_max_mpc=%.3f",
-             max_x_vel, target_x_vel_, vel_max_external_, vel_max_obstacle_, vel_max_mpc);
-  if (max_x_vel != target_x_vel_)
+            max_x_vel, config_.target_x_vel, vel_max_external_, vel_max_obstacle_, vel_max_mpc);
+  if (max_x_vel != config_.target_x_vel)
   {
     if (max_x_vel == vel_max_external_)
     {
@@ -897,11 +897,11 @@ geometry_msgs::Twist Controller::update_with_limits(const geometry_msgs::Transfo
   }
 
   // The end velocity is bound by the same limits to avoid accelerating above the limit in the end phase
-  double max_end_x_vel = std::min({std::abs(target_end_x_vel_), vel_max_external_, vel_max_obstacle_, vel_max_mpc});  // NOLINT
-  max_end_x_vel = std::copysign(max_end_x_vel, target_end_x_vel_);
+  double max_end_x_vel = std::min({std::abs(config_.target_end_x_vel), vel_max_external_, vel_max_obstacle_, vel_max_mpc});
+  max_end_x_vel = std::copysign(max_end_x_vel, config_.target_end_x_vel);
 
   // Update the controller with the new setting
-  max_x_vel = std::copysign(max_x_vel, target_x_vel_);
+  max_x_vel = std::copysign(max_x_vel, config_.target_x_vel);
   return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
 }
 
@@ -928,19 +928,19 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
   double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
 
   // Loop MPC
-  while (mpc_fwd_iter < mpc_max_fwd_iter_ && mpc_vel_optimization_iter <= mpc_max_vel_optimization_iter_)
+  while (mpc_fwd_iter < config_.mpc_max_fwd_iterations && mpc_vel_optimization_iter <= config_.mpc_max_vel_optimization_iterations)
   {
     mpc_fwd_iter += 1;
 
     // Check if robot stays within bounds for all iterations, if the new_nominal_x_vel is smaller than
     // max_target_x_vel we can increase it
-    if (mpc_fwd_iter == mpc_max_fwd_iter_ && fabs(controller_state_.error_lat.errors().at<0>()) <= mpc_max_error_lat_ &&
+    if (mpc_fwd_iter == config_.mpc_max_fwd_iterations && fabs(controller_state_.error_lat.errors().at<0>())  <= config_.mpc_max_error_lat &&
         fabs(new_nominal_x_vel) < abs(target_x_vel))
     {
       mpc_vel_optimization_iter += 1;
 
       // When we reach the maximum allowed mpc optimization iterations, do not change velocity anymore
-      if (mpc_vel_optimization_iter > mpc_max_vel_optimization_iter_)
+      if (mpc_vel_optimization_iter > config_.mpc_max_vel_optimization_iterations)
       {
         break;
       }
@@ -958,7 +958,7 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
       mpc_fwd_iter = 0;
     }
     // If the robot gets out of bounds earlier we decrease the velocity
-    else if (abs(controller_state_.error_lat.errors().at<0>()) >= mpc_max_error_lat_)
+    else if (abs(controller_state_.error_lat.errors().at<0>()) >= config_.mpc_max_error_lat)
     {
       mpc_vel_optimization_iter += 1;
 
@@ -980,29 +980,29 @@ double Controller::mpc_based_max_vel(double target_x_vel, const geometry_msgs::T
         ROS_WARN_THROTTLE(5.0, "Lowering velocity did not decrease the lateral error enough.");
       }
     }
-    else if (mpc_fwd_iter != mpc_max_fwd_iter_)
+    else if (mpc_fwd_iter != config_.mpc_max_fwd_iterations)
     {
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
       path_tracking_pid::PidDebug pid_debug_unused;
       double eda_unused;
       double progress_unused;
-      pred_twist = Controller::update(new_nominal_x_vel, target_end_x_vel_, predicted_tf, pred_twist,
-                                      ros::Duration(mpc_simulation_sample_time_),
+      pred_twist = Controller::update(new_nominal_x_vel, config_.target_end_x_vel, predicted_tf, pred_twist,
+                                      ros::Duration(config_.mpc_simulation_sample_time),
                                       &eda_unused, &progress_unused, &pid_debug_unused);
 
       // Run plant model
       const double theta = tf2::getYaw(predicted_tf.rotation);
-      predicted_tf.translation.x += pred_twist.linear.x * cos(theta) * mpc_simulation_sample_time_;
-      predicted_tf.translation.y += pred_twist.linear.x * sin(theta) * mpc_simulation_sample_time_;
+      predicted_tf.translation.x += pred_twist.linear.x * cos(theta) * config_.mpc_simulation_sample_time;
+      predicted_tf.translation.y += pred_twist.linear.x * sin(theta) * config_.mpc_simulation_sample_time;
       tf2::Quaternion q;
-      q.setRPY(0, 0, theta + pred_twist.angular.z * mpc_simulation_sample_time_);
+      q.setRPY(0, 0, theta + pred_twist.angular.z * config_.mpc_simulation_sample_time);
       predicted_tf.rotation = tf2::toMsg(q);
     }
   }
   // Apply limits to the velocity
   double mpc_vel_limit = copysign(1.0, new_nominal_x_vel) *
-                      fmax(fabs(new_nominal_x_vel), mpc_min_x_vel_);
+                      fmax(fabs(new_nominal_x_vel), config_.mpc_min_x_vel);
 
   // Revert global variables
   controller_state_ = controller_state_saved;
@@ -1015,17 +1015,17 @@ void Controller::printParameters() const
   ROS_INFO("CONTROLLER PARAMETERS");
   ROS_INFO("-----------------------------------------");
   ROS_INFO("Controller enabled: %i", enabled_);
-  ROS_INFO("Controller DEBUG enabled: %i", debug_enabled_);
-  ROS_INFO("Distance L: %f", l_);
-  ROS_INFO("Track base_link enabled?: %i", track_base_link_enabled_);
+  ROS_INFO("Controller DEBUG enabled: %i", config_.controller_debug_enabled);
+  ROS_INFO("Distance L: %f", config_.l);
+  ROS_INFO("Track base_link enabled?: %i", config_.track_base_link);
 
-  ROS_INFO("Target forward velocities (xv: %f, xv_end,: %f)", target_x_vel_, target_end_x_vel_);
-  ROS_INFO("Target forward (de)accelerations (xacc: %f, xdecc,: %f)", target_x_acc_, target_x_decc_);
-  ROS_INFO("Maximum allowed forward velocity error: %f", max_error_x_vel_);
-  ROS_INFO("Feedback (lat, ang): ( %i, %i)", feedback_lat_enabled_, feedback_ang_enabled_);
-  ROS_INFO("Feedforward (lat, ang): (%i, %i)", feedforward_lat_enabled_, feedforward_ang_enabled_);
-  ROS_INFO("Lateral gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_lat_, Ki_lat_, Kd_lat_);
-  ROS_INFO("Angular gains: (Kp: %f, Ki, %f, Kd, %f)", Kp_ang_, Ki_ang_, Kd_ang_);
+  ROS_INFO("Target forward velocities (xv: %f, xv_end,: %f)", config_.target_x_vel, config_.target_end_x_vel);
+  ROS_INFO("Target forward (de)accelerations (xacc: %f, xdecc,: %f)", config_.target_x_acc, config_.target_x_decc);
+  ROS_INFO("Maximum allowed forward velocity error: %f", config_.max_error_x_vel);
+  ROS_INFO("Feedback (lat, ang): ( %i, %i)", config_.feedback_lat, config_.feedback_ang);
+  ROS_INFO("Feedforward (lat, ang): (%i, %i)", config_.feedforward_lat, config_.feedforward_ang);
+  ROS_INFO("Lateral gains: (Kp: %f, Ki, %f, Kd, %f)", config_.Kp_lat, config_.Ki_lat, config_.Kd_lat);
+  ROS_INFO("Angular gains: (Kp: %f, Ki, %f, Kd, %f)", config_.Kp_ang, config_.Ki_ang, config_.Kd_ang);
 
   ROS_INFO("Robot type (holonomic): (%i)", holonomic_robot_enable_);
 
@@ -1038,83 +1038,38 @@ void Controller::printParameters() const
 void Controller::configure(path_tracking_pid::PidConfig& config)
 {
   // Erase all queues when config changes
-
   controller_state_.error_lat.reset();
   controller_state_.error_deriv_lat.reset();
 
   controller_state_.error_ang.reset();
   controller_state_.error_deriv_ang.reset();
 
-  Kp_lat_ = config.Kp_lat;
-  Ki_lat_ = config.Ki_lat;
-  Kd_lat_ = config.Kd_lat;
-  Kp_ang_ = config.Kp_ang;
-  Ki_ang_ = config.Ki_ang;
-  Kd_ang_ = config.Kd_ang;
-
-
-  track_base_link_enabled_ = config.track_base_link;
-  ROS_DEBUG("Track base_link? Then global path poses are needed! '%d'", (int)track_base_link_enabled_);
-
-  l_ = config.l;
-  target_x_vel_ = config.target_x_vel;
-  l_ = copysign(1.0, target_x_vel_) * fabs(l_);
+  config.l = copysign(config.l, config.target_x_vel);
   if (controller_state_.end_phase_enabled)
   {
-    ROS_WARN_COND(abs(config.target_end_x_vel - target_end_x_vel_) > 1e-3, "Won't change end velocity in end phase");
-    ROS_WARN_COND(abs(config.target_x_acc - target_x_acc_) > 1e-3, "Won't change accelerations in end phase");
-    ROS_WARN_COND(abs(config.target_x_decc - target_x_decc_) > 1e-3, "Won't change accelerations in end phase");
-    config.target_end_x_vel = target_end_x_vel_;
-    config.target_x_acc = target_x_acc_;
-    config.target_x_decc = target_x_decc_;
+    ROS_WARN_COND(abs(config.target_end_x_vel - config_.target_end_x_vel) > 1e-3, "Won't change end velocity in end phase");
+    ROS_WARN_COND(abs(config.target_x_acc - config_.target_x_acc) > 1e-3, "Won't change accelerations in end phase");
+    ROS_WARN_COND(abs(config.target_x_decc - config_.target_x_decc) > 1e-3, "Won't change accelerations in end phase");
+    config.target_end_x_vel = config_.target_end_x_vel;
+    config.target_x_acc = config_.target_x_acc;
+    config.target_x_decc = config_.target_x_decc;
   }
-  else
-  {
-    target_end_x_vel_ = config.target_end_x_vel;
-    target_x_acc_ = config.target_x_acc;
-    target_x_decc_ = config.target_x_decc;
-  }
-  abs_minimum_x_vel_ = config.abs_minimum_x_vel;
-  max_yaw_vel_ = config.max_yaw_vel;
-  max_yaw_acc_ = config.max_yaw_acc;
 
-  max_error_x_vel_ = config.max_error_x_vel;
-
-  minimum_turning_radius_ = config.min_turning_radius;
-
-  debug_enabled_ = config.controller_debug_enabled;
-  feedforward_lat_enabled_ = config.feedforward_lat;
-  feedforward_ang_enabled_ = config.feedforward_ang;
-  feedback_lat_enabled_ = config.feedback_lat;
-  feedback_ang_enabled_ = config.feedback_ang;
-
-  // MPC
   config.groups.mpc_group.state = config.use_mpc;  // Hide config options if disabled
-  mpc_max_fwd_iter_ = config.mpc_max_fwd_iterations;
-  mpc_max_vel_optimization_iter_ = config.mpc_max_vel_optimization_iterations;
-  mpc_simulation_sample_time_ = config.mpc_simulation_sample_time;
-  mpc_max_error_lat_ = config.mpc_max_error_lat;
-  mpc_min_x_vel_ = config.mpc_min_x_vel;
-  mpc_min_x_vel_ = fmin(mpc_min_x_vel_, fabs(target_x_vel_));
+  config.mpc_min_x_vel = fmin(config.mpc_min_x_vel, fabs(config.target_x_vel));
 
-  // Obstacle speed reduction
   config.groups.collision_group.state = config.anti_collision;  // Hide config options if disabled
 
-  // Tricycle model
-  max_steering_angle_ = config.max_steering_angle;
-  max_steering_x_vel_ = config.max_steering_x_vel;
-  max_steering_x_acc_ = config.max_steering_x_acc;
-  max_steering_yaw_vel_ = config.max_steering_yaw_vel;
-  max_steering_yaw_acc_ = config.max_steering_yaw_acc;
+  config_ = config;
 
-  local_config_ = config;
+  ROS_DEBUG("Track base_link? Then global path poses are needed! '%d'", (int)config_.track_base_link);
 
   // printParameters();
 }
 
 path_tracking_pid::PidConfig Controller::getConfig()
 {
-  return local_config_;
+  return config_;
 }
 
 void Controller::setEnabled(bool value)
