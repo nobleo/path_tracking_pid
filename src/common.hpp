@@ -4,7 +4,6 @@
 
 namespace path_tracking_pid
 {
-
 inline constexpr double VELOCITY_EPS = 1e-3;  // Neglegible velocity
 
 // Converts an enumeration to its underlying type.

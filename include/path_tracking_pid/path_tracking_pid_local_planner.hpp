@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <atomic>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
@@ -18,22 +17,23 @@
 #include "nav_msgs/Odometry.h"
 #include "nav_msgs/Path.h"
 #include "path_tracking_pid/PidConfig.h"
+#include "path_tracking_pid/visualization.hpp"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float64.h"
 #include "tf2_ros/buffer.h"
-#include "path_tracking_pid/visualization.hpp"
-
 
 BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::Point, double, cs::cartesian, x, y)
 
 namespace path_tracking_pid
 {
-class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner, public mbf_costmap_core::CostmapController, private boost::noncopyable
+class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner,
+                                public mbf_costmap_core::CostmapController,
+                                private boost::noncopyable
 {
 private:
   typedef boost::geometry::model::ring<geometry_msgs::Point> polygon_t;
 
-  static inline polygon_t union_(const polygon_t& polygon1, const polygon_t& polygon2)
+  static inline polygon_t union_(const polygon_t & polygon1, const polygon_t & polygon2)
   {
     std::vector<polygon_t> output_vec;
     boost::geometry::union_(polygon1, polygon2, output_vec);
@@ -47,14 +47,15 @@ public:
     * @param tf a pointer to TransformListener in TF Buffer
     * @param costmap Costmap indicating free/occupied space
     */
-  void initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap) override;
+  void initialize(
+    std::string name, tf2_ros::Buffer * tf, costmap_2d::Costmap2DROS * costmap) override;
 
   /**
     * @brief Set the plan we should be following
     * @param global_plan Plan to follow as closely as we can
     * @return whether the plan was successfully updated or not
     */
-  bool setPlan(const std::vector<geometry_msgs::PoseStamped>& global_plan) override;
+  bool setPlan(const std::vector<geometry_msgs::PoseStamped> & global_plan) override;
 
   /**
    * @brief Calculates the velocity command based on the current robot pose given by pose. See the interface in move
@@ -62,7 +63,7 @@ public:
    * @param cmd_vel Output the velocity command
    * @return true if succeded.
    */
-  bool computeVelocityCommands(geometry_msgs::Twist& cmd_vel) override;  // NOLINT
+  bool computeVelocityCommands(geometry_msgs::Twist & cmd_vel) override;  // NOLINT
 
   /**
    * @brief Calculates the velocity command based on the current robot pose given by pose. The velocity
@@ -73,8 +74,9 @@ public:
    * @param message
    * @return a status code defined in the move base flex ExePath action.
    */
-  uint32_t computeVelocityCommands(const geometry_msgs::PoseStamped& pose, const geometry_msgs::TwistStamped& velocity,
-                                   geometry_msgs::TwistStamped& cmd_vel, std::string& message) override;  // NOLINT
+  uint32_t computeVelocityCommands(
+    const geometry_msgs::PoseStamped & pose, const geometry_msgs::TwistStamped & velocity,
+    geometry_msgs::TwistStamped & cmd_vel, std::string & message) override;  // NOLINT
 
   /**
    * @brief Returns true, if the goal is reached. Currently does not respect the parameters give
@@ -99,24 +101,20 @@ public:
   /** Enumeration for custom SUCCESS feedback codes. See default ones:
    * https://github.com/magazino/move_base_flex/blob/master/mbf_msgs/action/ExePath.action
   */
-  enum class ComputeVelocityCommandsResult
-  {
-    SUCCESS = 0,
-    GRACEFULLY_CANCELLING = 1
-  };
+  enum class ComputeVelocityCommandsResult { SUCCESS = 0, GRACEFULLY_CANCELLING = 1 };
 
 private:
   /**
    * Accept a new configuration for the PID controller
    * @param config the new configuration
    */
-  void reconfigure_pid(path_tracking_pid::PidConfig& config);
+  void reconfigure_pid(path_tracking_pid::PidConfig & config);
 
   void pauseCallback(std_msgs::Bool pause);
 
-  void curOdomCallback(const nav_msgs::Odometry& odom_msg);
+  void curOdomCallback(const nav_msgs::Odometry & odom_msg);
 
-  void velMaxExternalCallback(const std_msgs::Float64& msg);
+  void velMaxExternalCallback(const std_msgs::Float64 & msg);
 
   uint8_t projectedCollisionCost();
 
@@ -129,7 +127,7 @@ private:
   nav_msgs::Path received_path_;
 
   // Obstacle collision detection
-  costmap_2d::Costmap2DROS* costmap_ = nullptr;
+  costmap_2d::Costmap2DROS * costmap_ = nullptr;
 
   // Cancel flags (multi threaded, so atomic bools)
   std::atomic<bool> active_goal_{false};
@@ -140,7 +138,7 @@ private:
   boost::recursive_mutex config_mutex_;
   std::unique_ptr<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>> pid_server_;
 
-  tf2_ros::Buffer* tf_ = nullptr;
+  tf2_ros::Buffer * tf_ = nullptr;
   geometry_msgs::TransformStamped tfCurPoseStamped_;
 
   ros::Publisher debug_pub_;  // Debugging of controller internal parameters

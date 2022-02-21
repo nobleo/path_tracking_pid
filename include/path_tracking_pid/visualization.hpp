@@ -19,10 +19,10 @@ public:
 
 private:
   void publishSphere(
-    const std_msgs::Header & header, const std::string& ns, int id, const tf2::Transform & pose,
+    const std_msgs::Header & header, const std::string & ns, int id, const tf2::Transform & pose,
     const std_msgs::ColorRGBA & color);
   void publishSphere(
-    const std_msgs::Header & header, const std::string& ns, int id, geometry_msgs::Pose pose,
+    const std_msgs::Header & header, const std::string & ns, int id, geometry_msgs::Pose pose,
     const std_msgs::ColorRGBA & color);
 
   ros::Publisher marker_pub_;
