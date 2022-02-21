@@ -38,6 +38,14 @@ bool have_same_sign(T val1, T val2)
   return std::signbit(val1) == std::signbit(val2);
 }
 
+// Converts a pose to the corresponding transform.
+tf2::Transform to_transform(const geometry_msgs::Pose & pose)
+{
+  tf2::Transform result;
+  tf2::fromMsg(pose, result);
+  return result;
+}
+
 } // namespace anonymous
 
 void Controller::setHolonomic(bool holonomic)
@@ -125,9 +133,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
 
   /* Minimal sanity check */
   global_plan_tf_.clear();
-  tf2::Transform transform;
-  tf2::fromMsg(global_plan[0].pose, transform);
-  global_plan_tf_.push_back(transform);
+  global_plan_tf_.push_back(to_transform(global_plan[0].pose));
   // For now do not allow repeated points or in-place rotation
   // To allow that the way the progress is checked and the interpolation is done needs to be changed
   // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
@@ -143,8 +149,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
     const double c_squared = distSquared(prev_pose, next_pose);
     if (c_squared > (a_squared + b_squared))
     {
-      tf2::fromMsg(pose, transform);
-      global_plan_tf_.push_back(transform);
+      global_plan_tf_.push_back(to_transform(pose));
     }
     else
     {
@@ -152,8 +157,7 @@ void Controller::setPlan(const geometry_msgs::Transform& current_tf, const geome
     }
   }
   // Add last pose as we didn't evaluate that one
-  tf2::Transform last_transform;
-  tf2::fromMsg(global_plan.back().pose, last_transform);
+  const auto last_transform = to_transform(global_plan.back().pose);
   global_plan_tf_.push_back(last_transform);
 
   if (!track_base_link_enabled_)
