@@ -49,8 +49,7 @@ tf2::Transform to_transform(const geometry_msgs::Pose & pose)
 // Returns the square distance between two points
 double distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
-  return std::pow(a.getOrigin().x() - b.getOrigin().x(), 2) +
-         std::pow(a.getOrigin().y() - b.getOrigin().y(), 2);
+  return a.getOrigin().distance2(b.getOrigin());
 }
 
 // Return the square distance between two points.
