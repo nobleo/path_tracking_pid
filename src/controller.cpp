@@ -31,10 +31,11 @@ constexpr double ang_lower_limit = -100.0;
 constexpr double windup_limit = 1000.0;
 
 
-// Typesafe sign implementation with signum:
-// https://stackoverflow.com/a/4609795
-template <typename T> int sign(T val) {
-    return (T(0) < val) - (val < T(0));
+// Indicates if both values have the same sign.
+template <typename T>
+bool have_same_sign(T val1, T val2)
+{
+  return std::signbit(val1) == std::signbit(val2);
 }
 
 } // namespace anonymous
@@ -569,8 +570,7 @@ geometry_msgs::Twist Controller::update(double target_x_vel,
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
   // This is to avoid skipping paths that start with opposite velocity.
-  if (distance_to_goal_ <= fabs(d_end_phase)
-      && sign(target_x_vel) == sign(angle_to_goal))
+  if ((distance_to_goal_ <= fabs(d_end_phase)) && have_same_sign(target_x_vel, angle_to_goal))
   {
     // This state will be remebered to avoid jittering on target_x_vel
     controller_state_.end_phase_enabled = true;
