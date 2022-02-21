@@ -91,23 +91,22 @@ public:
     const geometry_msgs::Transform & tf_base_to_steered_wheel,
     const geometry_msgs::Twist & steering_odom_twist,
     const std::vector<geometry_msgs::PoseStamped> & global_plan);
+
+  // Result of findPositionOnPlan().
+  struct FindPositionResult
+  {
+    tf2::Transform position;
+    std::size_t path_pose_index = 0;
+  };
+
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
    * @param controller_state_ptr  The current state of the controller that gets updated by this function
-   * @return tf of found position on plan
-   * @return index of current path-pose if requested
+   * @return tf of found position on plan and the index of current path-pose
    */
-  tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr,
-    size_t & path_pose_idx);
-  // Overloaded function definition for users that don't require the segment index
-  tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr)
-  {
-    size_t path_pose_idx;
-    return findPositionOnPlan(current_tf, controller_state_ptr, path_pose_idx);
-  }
+  FindPositionResult findPositionOnPlan(
+    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr);
 
   /**
    * Run one iteration of a PID controller

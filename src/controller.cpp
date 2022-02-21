@@ -319,9 +319,8 @@ void Controller::distToSegmentSquared(
   }
 }
 
-tf2::Transform Controller::findPositionOnPlan(
-  const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr,
-  size_t & path_pose_idx)
+Controller::FindPositionResult Controller::findPositionOnPlan(
+  const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr)
 {
   tf2::Transform current_tf2;
   tf2::convert(current_tf, current_tf2);
@@ -376,8 +375,8 @@ tf2::Transform Controller::findPositionOnPlan(
     global_plan_tf_.size() - 1);
   // To finalize, compute the indexes of the start and end points of
   // the closest line segment to the current carrot
-  tf2::Transform current_goal_local;
-  current_goal_local = global_plan_tf_[controller_state_ptr->current_global_plan_index];
+  FindPositionResult result;
+  result.position = global_plan_tf_[controller_state_ptr->current_global_plan_index];
 
   tf2::Transform pose_projection_ahead;
   tf2::Transform pose_projection_behind;
@@ -389,19 +388,19 @@ tf2::Transform Controller::findPositionOnPlan(
     distToSegmentSquared(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], pose_projection_ahead,
       distance2_to_line_ahead, distance_to_end_line_ahead);
-    current_goal_local = pose_projection_ahead;
+    result.position = pose_projection_ahead;
     distance_to_goal_ = distance_to_goal_vector_[1] + distance_to_end_line_ahead;
     controller_state_ptr->last_visited_pose_index = 0;
-    path_pose_idx = controller_state_ptr->current_global_plan_index;
+    result.path_pose_index = controller_state_ptr->current_global_plan_index;
   } else if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
     distToSegmentSquared(
       current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
       global_plan_tf_[controller_state_ptr->current_global_plan_index], pose_projection_behind,
       distance2_to_line_behind, distance_to_end_line_behind);
-    current_goal_local = pose_projection_behind;
+    result.position = pose_projection_behind;
     distance_to_goal_ = distance_to_end_line_behind;
     controller_state_ptr->last_visited_pose_index = global_plan_tf_.size() - 2;
-    path_pose_idx = controller_state_ptr->current_global_plan_index - 1;
+    result.path_pose_index = controller_state_ptr->current_global_plan_index - 1;
   } else {
     distToSegmentSquared(
       current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index],
@@ -413,23 +412,23 @@ tf2::Transform Controller::findPositionOnPlan(
       distance2_to_line_behind, distance_to_end_line_behind);
 
     if (distance2_to_line_ahead < distance2_to_line_behind) {
-      current_goal_local = pose_projection_ahead;
+      result.position = pose_projection_ahead;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
         distance_to_end_line_ahead;
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index;
     } else {
-      current_goal_local = pose_projection_behind;
+      result.position = pose_projection_behind;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
         distance_to_end_line_behind;
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index - 1;
     }
-    path_pose_idx = controller_state_ptr->current_global_plan_index;
+    result.path_pose_index = controller_state_ptr->current_global_plan_index;
   }
-  return current_goal_local;
+  return result;
 }
 
 geometry_msgs::Twist Controller::update(
@@ -452,11 +451,22 @@ geometry_msgs::Twist Controller::update(
     current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
   current_with_carrot_.setRotation(cur_rot);
 
-  size_t path_pose_idx;
+  const auto current_tf_for_find_position = [&current_tf, track_base_link = config_.track_base_link,
+                                             current_with_carrot = current_with_carrot_]() {
+    if (track_base_link) {
+      return current_tf;
+    }
+    geometry_msgs::Transform current_with_carrot_g;
+    tf2::convert(current_with_carrot, current_with_carrot_g);
+    return current_with_carrot_g;
+  }();
+
+  const auto find_position_result =
+    findPositionOnPlan(current_tf_for_find_position, &controller_state_);
+  const auto path_pose_idx = find_position_result.path_pose_index;
+  current_pos_on_plan_ = current_goal_ = find_position_result.position;
+
   if (config_.track_base_link) {
-    // Find closes robot position to path and then project carrot on goal
-    current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_tf, &controller_state_, path_pose_idx);
     // To track the base link the goal is then transform to the control point goal
     double theda_rp = tf2::getYaw(current_goal_.getRotation());
     tf2::Vector3 newControlOrigin;
@@ -464,12 +474,6 @@ geometry_msgs::Twist Controller::update(
     newControlOrigin.setY(current_goal_.getOrigin().y() + config_.l * sin(theda_rp));
     newControlOrigin.setZ(0);
     current_goal_.setOrigin(newControlOrigin);
-  } else {
-    // find position of current position with projected carrot
-    geometry_msgs::Transform current_with_carrot_g;
-    tf2::convert(current_with_carrot_, current_with_carrot_g);
-    current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_with_carrot_g, &controller_state_, path_pose_idx);
   }
 
   *progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
