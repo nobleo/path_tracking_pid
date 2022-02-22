@@ -63,6 +63,34 @@ bool is_pose_angle_obtuse(
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
 
+// Filters (and converts) the given plan. The first and last poses are always accepted (if they
+// exist). Intermediate poses are only accepted if the angle (with respect to the previous and next
+// poses) is obtuse. All accepted poses are converted to transforms.
+std::vector<tf2::Transform> filter_plan(const std::vector<geometry_msgs::PoseStamped> & plan)
+{
+  const auto plan_size = plan.size();
+  auto result = std::vector<tf2::Transform>{};
+
+  if (plan_size > 0) {
+    result.push_back(to_transform(plan.front().pose));
+  }
+
+  for (int pose_idx = 1; pose_idx < static_cast<int>(plan_size) - 1; ++pose_idx) {
+    const auto prev_pose = plan[pose_idx - 1].pose;
+    const auto pose = plan[pose_idx].pose;
+    const auto next_pose = plan[pose_idx + 1].pose;
+    if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
+      result.push_back(to_transform(pose));
+    }
+  }
+
+  if (plan_size > 1) {
+    result.push_back(to_transform(plan.back().pose));
+  }
+
+  return result;
+}
+
 }  // namespace
 
 void Controller::setHolonomic(bool holonomic)
@@ -151,34 +179,19 @@ void Controller::setPlan(
   tf2::Transform current_tf2;
   tf2::convert(current_tf, current_tf2);
 
-  /* Minimal sanity check */
-  global_plan_tf_.clear();
-  global_plan_tf_.push_back(to_transform(global_plan[0].pose));
-  // For now do not allow repeated points or in-place rotation
-  // To allow that the way the progress is checked and the interpolation is done needs to be changed
-  // Also check if points suddenly go in the opposite direction, this could lead to deadlocks
-  for (int pose_idx = 1; pose_idx < static_cast<int>(global_plan.size()) - 1; ++pose_idx) {
-    const auto prev_pose = global_plan[pose_idx - 1].pose;
-    const auto pose = global_plan[pose_idx].pose;
-    const auto next_pose = global_plan[pose_idx + 1].pose;
-    if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
-      global_plan_tf_.push_back(to_transform(pose));
-    } else {
-      ROS_WARN(
-        "Pose %i of path is not used since it is not in the expected direction of the path!",
-        pose_idx);
-    }
+  global_plan_tf_ = filter_plan(global_plan);
+  if (global_plan_tf_.size() != global_plan.size()) {
+    ROS_WARN(
+      "Not all poses of path are used since not all poses were in the expected direction of the "
+      "path!");
   }
-  // Add last pose as we didn't evaluate that one
-  const auto last_transform = to_transform(global_plan.back().pose);
-  global_plan_tf_.push_back(last_transform);
 
   if (!config_.track_base_link) {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
     tf2::Transform carrotTF(
       tf2::Matrix3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
       tf2::Vector3(config_.l, 0.0, 0.0));
-    global_plan_tf_.push_back(last_transform * carrotTF);
+    global_plan_tf_.push_back(global_plan_tf_.back() * carrotTF);
   }
 
   // Whenever a new path is recieved, computed the closest pose to
