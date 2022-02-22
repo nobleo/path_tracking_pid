@@ -222,18 +222,18 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     auto cost = projectedCollisionCost();
 
     if (cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
-      pid_controller_.setVelMaxObstacle(0.0);
+      pid_controller_.setVelMaxObstacle(0.0 * units::meter_per_second);
     } else if (pid_controller_.getConfig().obstacle_speed_reduction) {
       double max_vel = pid_controller_.getConfig().max_x_vel;
       double reduction_factor = static_cast<double>(cost) / costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
       double limit = max_vel * (1 - reduction_factor);
       ROS_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
-      pid_controller_.setVelMaxObstacle(limit);
+      pid_controller_.setVelMaxObstacle(limit * units::meter_per_second);
     } else {
-      pid_controller_.setVelMaxObstacle(INFINITY);  // set back to inf
+      pid_controller_.setVelMaxObstacle(INFINITY * units::meter_per_second);
     }
   } else {
-    pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
+    pid_controller_.setVelMaxObstacle(INFINITY * units::meter_per_second);
   }
 
   path_tracking_pid::PidDebug pid_debug;
@@ -524,7 +524,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
     return to_underlying(ComputeVelocityCommandsResult::GRACEFULLY_CANCELLING);
   }
 
-  if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS) {
+  if (!moving && pid_controller_.getVelMaxObstacle().value() < VELOCITY_EPS) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::BLOCKED_PATH;
   }
@@ -568,6 +568,6 @@ void TrackingPidLocalPlanner::curOdomCallback(const nav_msgs::Odometry & odom_ms
 
 void TrackingPidLocalPlanner::velMaxExternalCallback(const std_msgs::Float64 & msg)
 {
-  pid_controller_.setVelMaxExternal(msg.data);
+  pid_controller_.setVelMaxExternal(msg.data * units::meter_per_second);
 }
 }  // namespace path_tracking_pid

@@ -182,13 +182,13 @@ public:
   ControllerState getControllerState() const { return controller_state_; }
 
   // Set new vel_max_external value
-  void setVelMaxExternal(double value);
+  void setVelMaxExternal(units::velocity_t value);
 
   // Set new vel_max_obstacle value
-  void setVelMaxObstacle(double value);
+  void setVelMaxObstacle(units::velocity_t value);
 
   // Get vel_max_obstacle value
-  double getVelMaxObstacle() const;
+  units::velocity_t getVelMaxObstacle() const;
 
 private:
   void distToSegmentSquared(
@@ -248,10 +248,11 @@ private:
   std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_{};
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 
-  // Velocity limits that can be active external to the pid controller:
-  double vel_max_external_ =
-    INFINITY;  // Dynamic external max velocity requirement (e.g. no more power available)
-  double vel_max_obstacle_ = INFINITY;  // Can be zero if lethal obstacles are detected
+  // Dynamic external max velocity requirement (e.g. no more power available). Can be active
+  // external to the pid controller.
+  units::velocity_t vel_max_external_ = INFINITY * units::meter_per_second;
+  // Can be zero if lethal obstacles are detected. Can be active external to the pid controller.
+  units::velocity_t vel_max_obstacle_ = INFINITY * units::meter_per_second;
 };
 
 }  // namespace path_tracking_pid

@@ -10,3 +10,6 @@ Checks: 'boost-*,
          portability-*,
          readability-*,-readability-magic-numbers'
 FormatStyle: file
+CheckOptions:
+    -   key:    performance-unnecessary-value-param.AllowedTypes
+        value:  'distance_t;distance_squared_t;duration_t;velocity_t;acceleration_t'

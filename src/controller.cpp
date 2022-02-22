@@ -848,7 +848,7 @@ geometry_msgs::Twist Controller::update_with_limits(
   ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug)
 {
   // All limits are absolute
-  double max_x_vel = std::abs(config_.target_x_vel);
+  auto max_x_vel = abs(config_.target_x_vel * units::meter_per_second);
 
   // Apply external limit
   max_x_vel = std::min(max_x_vel, vel_max_external_);
@@ -859,34 +859,37 @@ geometry_msgs::Twist Controller::update_with_limits(
   // Apply mpc limit (last because less iterations required if max vel is already limited)
   double vel_max_mpc = std::numeric_limits<double>::infinity();
   if (config_.use_mpc) {
-    vel_max_mpc = std::abs(
-      mpc_based_max_vel(std::copysign(max_x_vel, config_.target_x_vel), current_tf, odom_twist));
-    max_x_vel = std::min(max_x_vel, vel_max_mpc);
+    vel_max_mpc = std::abs(mpc_based_max_vel(
+      std::copysign(max_x_vel.value(), config_.target_x_vel), current_tf, odom_twist));
+    max_x_vel = std::min(max_x_vel, vel_max_mpc * units::meter_per_second);
   }
 
   // Some logging:
   ROS_DEBUG(
     "max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, "
     "vel_max_mpc=%.3f",
-    max_x_vel, config_.target_x_vel, vel_max_external_, vel_max_obstacle_, vel_max_mpc);
-  if (max_x_vel != config_.target_x_vel) {
+    max_x_vel.value(), config_.target_x_vel, vel_max_external_.value(), vel_max_obstacle_.value(),
+    vel_max_mpc);
+  if (max_x_vel != (config_.target_x_vel * units::meter_per_second)) {
     if (max_x_vel == vel_max_external_) {
-      ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_);
+      ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_.value());
     } else if (max_x_vel == vel_max_obstacle_) {
-      ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_);
-    } else if (max_x_vel == vel_max_mpc) {
+      ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_.value());
+    } else if (max_x_vel == (vel_max_mpc * units::meter_per_second)) {
       ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc);
     }
   }
 
   // The end velocity is bound by the same limits to avoid accelerating above the limit in the end phase
-  double max_end_x_vel = std::min(
-    {std::abs(config_.target_end_x_vel), vel_max_external_, vel_max_obstacle_, vel_max_mpc});
-  max_end_x_vel = std::copysign(max_end_x_vel, config_.target_end_x_vel);
+  auto max_end_x_vel = std::min(
+    {abs(config_.target_end_x_vel * units::meter_per_second), vel_max_external_, vel_max_obstacle_,
+     vel_max_mpc * units::meter_per_second});
+  max_end_x_vel = copysign(max_end_x_vel, config_.target_end_x_vel * units::meter_per_second);
 
   // Update the controller with the new setting
-  max_x_vel = std::copysign(max_x_vel, config_.target_x_vel);
-  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
+  max_x_vel = copysign(max_x_vel, config_.target_x_vel * units::meter_per_second);
+  return update(
+    max_x_vel.value(), max_end_x_vel.value(), current_tf, odom_twist, dt, eda, progress, pid_debug);
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
@@ -1088,26 +1091,29 @@ void Controller::reset()
   controller_state_.error_deriv_ang.reset();
 }
 
-void Controller::setVelMaxExternal(double value)
+void Controller::setVelMaxExternal(units::velocity_t value)
 {
-  if (value < 0.0) {
-    ROS_ERROR_THROTTLE(1.0, "External velocity limit (%f) has to be positive", value);
+  if (value < (0.0 * units::meter_per_second)) {
+    ROS_ERROR_THROTTLE(1.0, "External velocity limit (%f) has to be positive", value.value());
     return;
   }
-  if (value < 0.1) {
+  if (value < (0.1 * units::meter_per_second)) {
     ROS_WARN_THROTTLE(
-      1.0, "External velocity limit is very small (%f), this could result in standstill", value);
+      1.0, "External velocity limit is very small (%f), this could result in standstill",
+      value.value());
   }
   vel_max_external_ = value;
 }
 
-void Controller::setVelMaxObstacle(double value)
+void Controller::setVelMaxObstacle(units::velocity_t value)
 {
   ROS_WARN_COND(
-    vel_max_obstacle_ != 0.0 && value == 0.0, "Collision imminent, slamming the brakes");
+    (vel_max_obstacle_ != (0.0 * units::meter_per_second)) &&
+      (value == (0.0 * units::meter_per_second)),
+    "Collision imminent, slamming the brakes");
   vel_max_obstacle_ = value;
 }
 
-double Controller::getVelMaxObstacle() const { return vel_max_obstacle_; }
+units::velocity_t Controller::getVelMaxObstacle() const { return vel_max_obstacle_; }
 
 }  // namespace path_tracking_pid
