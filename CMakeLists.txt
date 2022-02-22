@@ -78,6 +78,7 @@ include_directories(include)
 # Roslint cpp
 set(ROSLINT_CPP_OPTS "--filter=-legal/copyright")
 roslint_cpp()
+roslint_add_test()
 
 install(
   TARGETS
