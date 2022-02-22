@@ -10,6 +10,7 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <path_tracking_pid/path_tracking_pid_local_planner.hpp>

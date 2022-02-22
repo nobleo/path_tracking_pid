@@ -5,6 +5,7 @@
 #include <angles/angles.h>
 #include <tf2/utils.h>
 
+#include <algorithm>
 #include <limits>
 #include <path_tracking_pid/controller.hpp>
 #include <vector>
