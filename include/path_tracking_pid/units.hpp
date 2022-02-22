@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/units/cmath.hpp>
 #include <boost/units/systems/si.hpp>
 
 namespace path_tracking_pid::units
@@ -27,10 +28,10 @@ using acceleration_t = boost::units::quantity<boost::units::si::acceleration, do
 // auto v1 = 23.0 * square_meter;  // type of v1 is distance_squared_t
 // auto v2 = 5 * meter_per_second; // type of v1 is boost::units::quantity<boost::units::si::velocity, int>
 // ```
-using boost::units::si::meter;
-using boost::units::si::meter_per_second;
-using boost::units::si::meter_per_second_squared;
-using boost::units::si::second;
-using boost::units::si::square_meter;
+inline const auto meter = boost::units::si::meter;
+inline const auto meter_per_second = boost::units::si::meter_per_second;
+inline const auto meter_per_second_squared = boost::units::si::meter_per_second_squared;
+inline const auto second = boost::units::si::second;
+inline const auto square_meter = boost::units::si::square_meter;
 
 }  // namespace path_tracking_pid::units
