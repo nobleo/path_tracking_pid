@@ -15,8 +15,8 @@ namespace path_tracking_pid
 {
 namespace
 {
-constexpr double RADIUS_EPS = 0.001;        // Smallest relevant radius [m]
-constexpr double LONG_DURATION = 31556926;  // A year (ros::Duration cannot be inf)
+constexpr double RADIUS_EPS = 0.001;                    // Smallest relevant radius [m]
+const auto LONG_DURATION = 31556926.0 * units::second;  // A year (ros::Duration cannot be inf)
 
 // Upper and lower saturation limits
 constexpr double lat_upper_limit = 100.0;
@@ -594,7 +594,7 @@ geometry_msgs::Twist Controller::update(
     controller_state_.end_phase_enabled = true;
   }
 
-  if (controller_state_.end_phase_enabled && fabs(target_x_vel) > VELOCITY_EPS) {
+  if (controller_state_.end_phase_enabled && fabs(target_x_vel) > VELOCITY_EPS.value()) {
     current_target_x_vel_ = target_end_x_vel;
   } else {
     controller_state_.end_phase_enabled = false;
@@ -602,8 +602,8 @@ geometry_msgs::Twist Controller::update(
   }
 
   // Determine if we need to accelerate, decelerate or maintain speed
-  double current_target_acc = 0;                    // Assume maintaining speed
-  if (fabs(current_target_x_vel_) <= VELOCITY_EPS)  // Zero velocity requested
+  double current_target_acc = 0;                            // Assume maintaining speed
+  if (fabs(current_target_x_vel_) <= VELOCITY_EPS.value())  // Zero velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
       current_target_acc = -config_.target_x_decc;
@@ -636,8 +636,8 @@ geometry_msgs::Twist Controller::update(
   double min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel;
   if (
     !controller_state_.end_reached && controller_state_.end_phase_enabled &&
-    fabs(target_end_x_vel) <= fabs(min_vel) + VELOCITY_EPS &&
-    fabs(new_x_vel) <= fabs(min_vel) + VELOCITY_EPS) {
+    fabs(target_end_x_vel) <= fabs(min_vel) + VELOCITY_EPS.value() &&
+    fabs(new_x_vel) <= fabs(min_vel) + VELOCITY_EPS.value()) {
     new_x_vel = min_vel;
   }
 
@@ -654,9 +654,9 @@ geometry_msgs::Twist Controller::update(
   // Or when the end velocity is reached.
   // Warning! If target_end_x_vel == 0 and min_vel = 0 then the robot might not reach end pose
   if (
-    (distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS) ||
-    (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS &&
-     new_x_vel <= target_end_x_vel + VELOCITY_EPS)) {
+    (distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS.value()) ||
+    (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS.value() &&
+     new_x_vel <= target_end_x_vel + VELOCITY_EPS.value())) {
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
     *progress = 1.0;
@@ -665,13 +665,13 @@ geometry_msgs::Twist Controller::update(
   } else {
     controller_state_.end_reached = false;
     // eda (Estimated duration of arrival) estimation
-    if (fabs(target_x_vel) > VELOCITY_EPS) {
+    if (fabs(target_x_vel) > VELOCITY_EPS.value()) {
       const double t_const =
         (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
-      *eda =
-        fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION) * units::second;
+      *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION.value()) *
+             units::second;
     } else {
-      *eda = LONG_DURATION * units::second;
+      *eda = LONG_DURATION;
     }
   }
   /******* end calculation of forward velocity ********/

@@ -28,7 +28,7 @@ namespace path_tracking_pid
 namespace
 {
 constexpr double MAP_PARALLEL_THRESH = 0.2;
-constexpr double DT_MAX = 1.5;
+const auto DT_MAX = ros::Duration{1.5};
 
 }  // namespace
 
@@ -204,7 +204,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
-  if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX)) {
+  if ((dt < ros::Duration(0)) || (dt > DT_MAX)) {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
     return false;
   }
@@ -513,7 +513,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
   cmd_vel.header.stamp = ros::Time::now();
   cmd_vel.header.frame_id = base_link_frame_;
 
-  bool moving = std::abs(cmd_vel.twist.linear.x) > VELOCITY_EPS;
+  bool moving = abs(cmd_vel.twist.linear.x * units::meter_per_second) > VELOCITY_EPS;
   if (cancel_in_progress_) {
     if (!moving) {
       ROS_INFO(
@@ -526,7 +526,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
     return to_underlying(ComputeVelocityCommandsResult::GRACEFULLY_CANCELLING);
   }
 
-  if (!moving && pid_controller_.getVelMaxObstacle().value() < VELOCITY_EPS) {
+  if (!moving && (pid_controller_.getVelMaxObstacle() < VELOCITY_EPS)) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::BLOCKED_PATH;
   }
