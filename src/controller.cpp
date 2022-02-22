@@ -18,7 +18,7 @@ namespace
 {
 
 constexpr double RADIUS_EPS = 0.001;  // Smallest relevant radius [m]
-constexpr auto LONG_DURATION =
+const auto LONG_DURATION =
   31556926.0 * boost::units::si::second;  // A year (ros::Duration cannot be inf)
 
 // Upper and lower saturation limits

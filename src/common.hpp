@@ -6,7 +6,7 @@
 namespace path_tracking_pid
 {
 
-inline constexpr auto VELOCITY_EPS = 1e-3 * boost::units::si::meter_per_second;  // Neglegible velocity
+inline const auto VELOCITY_EPS = 1e-3 * boost::units::si::meter_per_second;  // Neglegible velocity
 
 // Converts an enumeration to its underlying type.
 template <typename enum_type>
