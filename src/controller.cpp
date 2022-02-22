@@ -44,15 +44,16 @@ tf2::Transform to_transform(const geometry_msgs::Pose & pose)
 }
 
 // Returns the square distance between two points
-double distSquared(const tf2::Transform & a, const tf2::Transform & b)
+units::distance_squared_t distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
-  return a.getOrigin().distance2(b.getOrigin());
+  return a.getOrigin().distance2(b.getOrigin()) * units::square_meter;
 }
 
 // Return the square distance between two points.
-double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
+units::distance_squared_t distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
 {
-  return std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2);
+  return (std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2)) *
+         units::square_meter;
 }
 
 // Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
@@ -286,17 +287,17 @@ void Controller::distToSegmentSquared(
   tf2::Transform & pose_projection, units::distance_squared_t & distance_to_p,
   units::distance_t & distance_to_w) const
 {
-  const double l2 = distSquared(pose_v, pose_w);
-  if (l2 == 0) {
+  const auto l2 = distSquared(pose_v, pose_w);
+  if (l2 == (0.0 * units::square_meter)) {
     pose_projection = pose_w;
     distance_to_w = 0.0 * units::meter;
-    distance_to_p = distSquared(pose_p, pose_w) * units::square_meter;
+    distance_to_p = distSquared(pose_p, pose_w);
   } else {
     double t = ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
                   (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
                 (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
                   (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
-               l2;
+               l2.value();
     t = fmax(0.0, fmin(1.0, t));
     pose_projection.setOrigin(tf2::Vector3(
       pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
@@ -316,8 +317,8 @@ void Controller::distToSegmentSquared(
     }
 
     pose_projection.setRotation(pose_quaternion);
-    distance_to_w = sqrt(distSquared(pose_projection, pose_w)) * units::meter;
-    distance_to_p = distSquared(pose_p, pose_projection) * units::square_meter;
+    distance_to_w = sqrt(distSquared(pose_projection, pose_w));
+    distance_to_p = distSquared(pose_p, pose_projection);
   }
 }
 
