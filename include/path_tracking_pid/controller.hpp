@@ -28,7 +28,7 @@ struct ControllerState
 {
   size_t current_global_plan_index = 0;
   size_t last_visited_pose_index = 0;
-  double current_x_vel = 0.0;
+  units::velocity_t current_x_vel = 0.0 * units::meter_per_second;
   double current_yaw_vel = 0.0;
   double previous_steering_angle = 0.0;
   double previous_steering_x_vel = 0.0;
@@ -122,9 +122,10 @@ public:
    * @return pid_debug Variable with information to debug the controller
    */
   geometry_msgs::Twist update(
-    double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-    const geometry_msgs::Twist & odom_twist, units::duration_t dt, units::duration_t * eda,
-    double * progress, path_tracking_pid::PidDebug * pid_debug);
+    units::velocity_t target_x_vel, units::velocity_t target_end_x_vel,
+    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    units::duration_t dt, units::duration_t * eda, double * progress,
+    path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
@@ -221,16 +222,16 @@ private:
   ControllerState controller_state_;
 
   // Global Plan variables
-  std::vector<tf2::Transform> global_plan_tf_;     // Global plan vector
-  std::vector<double> distance_to_goal_vector_;    // Vector with distances to goal
+  std::vector<tf2::Transform> global_plan_tf_;              // Global plan vector
+  std::vector<units::distance_t> distance_to_goal_vector_;  // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
-  double distance_to_goal_ = NAN;
+  units::distance_t distance_to_goal_ = NAN * units::meter;
   tf2::Transform current_goal_;
   tf2::Transform current_pos_on_plan_;
   tf2::Transform current_with_carrot_;
 
   // Auxiliary variables
-  double current_target_x_vel_ = 0.0;
+  units::velocity_t current_target_x_vel_ = 0.0 * units::meter_per_second;
   double control_effort_long_ = 0.0;  // output of pid controller
   double control_effort_lat_ = 0.0;   // output of pid controller
   double control_effort_ang_ = 0.0;   // output of pid controller

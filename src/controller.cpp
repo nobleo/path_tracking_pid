@@ -29,10 +29,11 @@ constexpr double ang_lower_limit = -100.0;
 constexpr double windup_limit = 1000.0;
 
 // Indicates if both values have the same sign.
-template <typename T>
-bool have_same_sign(T val1, T val2)
+template <typename T1, typename T2>
+bool have_same_sign(T1 val1, T2 val2)
 {
-  return std::signbit(val1) == std::signbit(val2);
+  using std::signbit;
+  return signbit(val1) == signbit(val2);
 }
 
 // Converts a pose to the corresponding transform.
@@ -202,10 +203,10 @@ void Controller::setPlan(
   // find closest current position to global plan
   double minimum_distance_to_path = 1e3;
   double dist_to_segment;
-  double iterative_dist_to_goal = 0.0;
+  units::distance_t iterative_dist_to_goal = 0.0 * units::meter;
   distance_to_goal_vector_.clear();
   distance_to_goal_vector_.resize(global_plan_tf_.size());
-  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0;
+  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0 * units::meter;
   turning_radius_inv_vector_.clear();
   turning_radius_inv_vector_.resize(global_plan_tf_.size());
   turning_radius_inv_vector_[global_plan_tf_.size() - 1] = 0.0;
@@ -228,7 +229,7 @@ void Controller::setPlan(
     deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
     const double dpX = deltaPlan.getOrigin().x();
     const double dpY = deltaPlan.getOrigin().y();
-    iterative_dist_to_goal += hypot(dpX, dpY);
+    iterative_dist_to_goal += hypot(dpX, dpY) * units::meter;
     distance_to_goal_vector_[idx_path] = iterative_dist_to_goal;
     // compute turning radius based on trigonometric analysis
     // radius such that next pose is connected from current pose with a semi-circle
@@ -250,7 +251,7 @@ void Controller::setPlan(
       break;
     case Pid_Odom:
       reset();
-      controller_state_.current_x_vel = odom_twist.linear.x;
+      controller_state_.current_x_vel = odom_twist.linear.x * units::meter_per_second;
       controller_state_.current_yaw_vel = odom_twist.angular.z;
       ROS_INFO(
         "Resuming on odom velocity x: %f, yaw: %f", odom_twist.linear.x, odom_twist.angular.z);
@@ -261,11 +262,13 @@ void Controller::setPlan(
   }
 
   // When velocity error is too big reset current_x_vel
-  if (fabs(odom_twist.linear.x - controller_state_.current_x_vel) > config_.max_error_x_vel) {
+  if (
+    fabs((odom_twist.linear.x * units::meter_per_second) - controller_state_.current_x_vel) >
+    (config_.max_error_x_vel * units::meter_per_second)) {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN(
-      "Large control error. Current_x_vel %f / odometry %f", controller_state_.current_x_vel,
-      odom_twist.linear.x);
+      "Large control error. Current_x_vel %f / odometry %f",
+      controller_state_.current_x_vel.value(), odom_twist.linear.x);
   }
   controller_state_.end_phase_enabled = false;
   controller_state_.end_reached = false;
@@ -393,7 +396,7 @@ tf2::Transform Controller::findPositionOnPlan(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], pose_projection_ahead,
       distance2_to_line_ahead, distance_to_end_line_ahead);
     current_goal_local = pose_projection_ahead;
-    distance_to_goal_ = distance_to_goal_vector_[1] + distance_to_end_line_ahead.value();
+    distance_to_goal_ = distance_to_goal_vector_[1] + distance_to_end_line_ahead;
     controller_state_ptr->last_visited_pose_index = 0;
     path_pose_idx = controller_state_ptr->current_global_plan_index;
   } else if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
@@ -402,7 +405,7 @@ tf2::Transform Controller::findPositionOnPlan(
       global_plan_tf_[controller_state_ptr->current_global_plan_index], pose_projection_behind,
       distance2_to_line_behind, distance_to_end_line_behind);
     current_goal_local = pose_projection_behind;
-    distance_to_goal_ = distance_to_end_line_behind.value();
+    distance_to_goal_ = distance_to_end_line_behind;
     controller_state_ptr->last_visited_pose_index = global_plan_tf_.size() - 2;
     path_pose_idx = controller_state_ptr->current_global_plan_index - 1;
   } else {
@@ -419,14 +422,14 @@ tf2::Transform Controller::findPositionOnPlan(
       current_goal_local = pose_projection_ahead;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
-        distance_to_end_line_ahead.value();
+        distance_to_end_line_ahead;
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index;
     } else {
       current_goal_local = pose_projection_behind;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
-        distance_to_end_line_behind.value();
+        distance_to_end_line_behind;
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index - 1;
     }
@@ -436,11 +439,12 @@ tf2::Transform Controller::findPositionOnPlan(
 }
 
 geometry_msgs::Twist Controller::update(
-  double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist, units::duration_t dt, units::duration_t * eda,
-  double * progress, path_tracking_pid::PidDebug * pid_debug)
+  units::velocity_t target_x_vel, units::velocity_t target_end_x_vel,
+  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  units::duration_t dt, units::duration_t * eda, double * progress,
+  path_tracking_pid::PidDebug * pid_debug)
 {
-  const double current_x_vel = controller_state_.current_x_vel;
+  const auto current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute location of the point to be controlled
@@ -554,8 +558,8 @@ geometry_msgs::Twist Controller::update(
 
   /***** Compute forward velocity *****/
   // Apply acceleration limits and end velocity
-  double t_end_phase_current;
-  double d_end_phase;
+  units::duration_t t_end_phase_current;
+  units::distance_t d_end_phase;
 
   // Compute time to reach end velocity from current velocity
   // Compute estimate overall distance during end_phase
@@ -564,21 +568,27 @@ geometry_msgs::Twist Controller::update(
   // The sample time plays an important role on how good these estimates are.
   // Thus We add a distance to the end phase distance estimation depending on the sample time
   if (
-    (current_target_x_vel_ > 0.0 && current_x_vel > target_end_x_vel) ||
-    (current_target_x_vel_ < 0.0 && current_x_vel < target_end_x_vel)) {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (-config_.target_x_decc);
+    ((current_target_x_vel_ > (0.0 * units::meter_per_second)) &&
+     (current_x_vel > target_end_x_vel)) ||
+    ((current_target_x_vel_ < (0.0 * units::meter_per_second)) &&
+     (current_x_vel < target_end_x_vel))) {
+    t_end_phase_current = (target_end_x_vel - current_x_vel) /
+                          (-config_.target_x_decc * units::meter_per_second_squared);
     d_end_phase = current_x_vel * t_end_phase_current -
-                  0.5 * (config_.target_x_decc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.value();
+                  0.5 * (config_.target_x_decc * units::meter_per_second_squared) *
+                    t_end_phase_current * t_end_phase_current +
+                  target_x_vel * 2.0 * dt;
   } else {
-    t_end_phase_current = (target_end_x_vel - current_x_vel) / (config_.target_x_acc);
+    t_end_phase_current =
+      (target_end_x_vel - current_x_vel) / (config_.target_x_acc * units::meter_per_second_squared);
     d_end_phase = current_x_vel * t_end_phase_current +
-                  0.5 * (config_.target_x_acc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.value();
+                  0.5 * (config_.target_x_acc * units::meter_per_second_squared) *
+                    t_end_phase_current * t_end_phase_current +
+                  target_x_vel * 2.0 * dt;
   }
-  ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
-  ROS_DEBUG("d_end_phase: %f", d_end_phase);
-  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
+  ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current.value());
+  ROS_DEBUG("d_end_phase: %f", d_end_phase.value());
+  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_.value());
 
   // Get 'angle' towards current_goal
   tf2::Transform robot_pose;
@@ -594,7 +604,7 @@ geometry_msgs::Twist Controller::update(
     controller_state_.end_phase_enabled = true;
   }
 
-  if (controller_state_.end_phase_enabled && fabs(target_x_vel) > VELOCITY_EPS.value()) {
+  if (controller_state_.end_phase_enabled && (fabs(target_x_vel) > VELOCITY_EPS)) {
     current_target_x_vel_ = target_end_x_vel;
   } else {
     controller_state_.end_phase_enabled = false;
@@ -602,61 +612,64 @@ geometry_msgs::Twist Controller::update(
   }
 
   // Determine if we need to accelerate, decelerate or maintain speed
-  double current_target_acc = 0;                            // Assume maintaining speed
-  if (fabs(current_target_x_vel_) <= VELOCITY_EPS.value())  // Zero velocity requested
+  auto current_target_acc = 0.0 * units::meter_per_second_squared;  // Assume maintaining speed
+  if (fabs(current_target_x_vel_) <= VELOCITY_EPS)                  // Zero velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_decc;
+      current_target_acc = -config_.target_x_decc * units::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_decc;
+      current_target_acc = config_.target_x_decc * units::meter_per_second_squared;
     }
-  } else if (current_target_x_vel_ > 0)  // Positive velocity requested
+  } else if (
+    current_target_x_vel_ > (0.0 * units::meter_per_second))  // Positive velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_decc;
+      current_target_acc = -config_.target_x_decc * units::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_acc;
+      current_target_acc = config_.target_x_acc * units::meter_per_second_squared;
     }
   } else  // Negative velocity requested
   {
     if (current_x_vel > current_target_x_vel_) {
-      current_target_acc = -config_.target_x_acc;
+      current_target_acc = -config_.target_x_acc * units::meter_per_second_squared;
     } else {
-      current_target_acc = config_.target_x_decc;
+      current_target_acc = config_.target_x_decc * units::meter_per_second_squared;
     }
   }
 
-  const double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.value();
-  const double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
+  const auto acc_desired = (current_target_x_vel_ - current_x_vel) / dt;
+  const auto acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
   const auto acc = copysign(acc_abs, current_target_acc);
 
-  double new_x_vel = current_x_vel + acc * dt.value();
+  auto new_x_vel = current_x_vel + acc * dt;
 
   // For low target_end_x_vel we have a minimum velocity to ensure the goal is reached
-  double min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel;
+  auto min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel * units::meter_per_second;
   if (
     !controller_state_.end_reached && controller_state_.end_phase_enabled &&
-    fabs(target_end_x_vel) <= fabs(min_vel) + VELOCITY_EPS.value() &&
-    fabs(new_x_vel) <= fabs(min_vel) + VELOCITY_EPS.value()) {
+    (fabs(target_end_x_vel) <= (fabs(min_vel) + VELOCITY_EPS)) &&
+    (fabs(new_x_vel) <= (fabs(min_vel) + VELOCITY_EPS))) {
     new_x_vel = min_vel;
   }
 
   // When velocity error is too big reset current_x_vel
   if (
-    fabs(odom_twist.linear.x) < fabs(current_target_x_vel_) &&
-    fabs(odom_twist.linear.x - new_x_vel) > config_.max_error_x_vel) {
+    (fabs(odom_twist.linear.x * units::meter_per_second) < fabs(current_target_x_vel_)) &&
+    (fabs(odom_twist.linear.x * units::meter_per_second - new_x_vel) >
+     (config_.max_error_x_vel * units::meter_per_second))) {
     // TODO(clopez/mcfurry/nobleo): Give feedback to higher level software here
     ROS_WARN_THROTTLE(
-      1.0, "Large tracking error. Current_x_vel %f / odometry %f", new_x_vel, odom_twist.linear.x);
+      1.0, "Large tracking error. Current_x_vel %f / odometry %f", new_x_vel.value(),
+      odom_twist.linear.x);
   }
 
   // Force target_end_x_vel at the very end of the path
   // Or when the end velocity is reached.
   // Warning! If target_end_x_vel == 0 and min_vel = 0 then the robot might not reach end pose
   if (
-    (distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS.value()) ||
-    (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS.value() &&
-     new_x_vel <= target_end_x_vel + VELOCITY_EPS.value())) {
+    ((distance_to_goal_ == (0.0 * units::meter)) && (target_end_x_vel >= VELOCITY_EPS)) ||
+    (controller_state_.end_phase_enabled && (new_x_vel >= (target_end_x_vel - VELOCITY_EPS)) &&
+     (new_x_vel <= (target_end_x_vel + VELOCITY_EPS)))) {
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
     *progress = 1.0;
@@ -665,11 +678,12 @@ geometry_msgs::Twist Controller::update(
   } else {
     controller_state_.end_reached = false;
     // eda (Estimated duration of arrival) estimation
-    if (fabs(target_x_vel) > VELOCITY_EPS.value()) {
-      const double t_const =
-        (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
-      *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION.value()) *
-             units::second;
+    if (fabs(target_x_vel) > VELOCITY_EPS) {
+      const auto t_const =
+        (units::copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
+      *eda = fmin(
+        fmax(t_end_phase_current, 0.0 * units::second) + fmax(t_const, 0.0 * units::second),
+        LONG_DURATION);
     } else {
       *eda = LONG_DURATION;
     }
@@ -678,7 +692,7 @@ geometry_msgs::Twist Controller::update(
 
   //***** Overall control *****//
   // Controller logic && overall control effort
-  control_effort_long_ = new_x_vel;
+  control_effort_long_ = new_x_vel.value();
   control_effort_lat_ = 0.0;
   control_effort_ang_ = 0.0;
 
@@ -735,7 +749,7 @@ geometry_msgs::Twist Controller::update(
   pid_debug->derivative.linear.y = derivative_lat;
   pid_debug->derivative.angular.z = derivative_ang;
 
-  pid_debug->feedforward.linear.x = new_x_vel;
+  pid_debug->feedforward.linear.x = new_x_vel.value();
   pid_debug->feedforward.linear.y = feedforward_lat_;
   pid_debug->feedforward.angular.z = feedforward_ang_;
 
@@ -822,7 +836,7 @@ geometry_msgs::Twist Controller::update(
     // Compute velocities back to base_link and update controller state
     output_steering =
       computeTricycleModelForwardKinematics(steering_cmd.speed, steering_cmd.steering_angle);
-    controller_state_.current_x_vel = output_steering.linear.x;
+    controller_state_.current_x_vel = output_steering.linear.x * units::meter_per_second;
     controller_state_.current_yaw_vel = output_steering.angular.z;
 
     pid_debug->steering_angle = steering_cmd.steering_angle;
@@ -890,8 +904,7 @@ geometry_msgs::Twist Controller::update_with_limits(
 
   // Update the controller with the new setting
   max_x_vel = copysign(max_x_vel, config_.target_x_vel * units::meter_per_second);
-  return update(
-    max_x_vel.value(), max_end_x_vel.value(), current_tf, odom_twist, dt, eda, progress, pid_debug);
+  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
@@ -976,9 +989,9 @@ units::velocity_t Controller::mpc_based_max_vel(
       units::duration_t eda_unused;
       double progress_unused;
       pred_twist = Controller::update(
-        new_nominal_x_vel.value(), config_.target_end_x_vel, predicted_tf, pred_twist,
-        config_.mpc_simulation_sample_time * units::second, &eda_unused, &progress_unused,
-        &pid_debug_unused);
+        new_nominal_x_vel, config_.target_end_x_vel * units::meter_per_second, predicted_tf,
+        pred_twist, config_.mpc_simulation_sample_time * units::second, &eda_unused,
+        &progress_unused, &pid_debug_unused);
 
       // Run plant model
       const double theta = tf2::getYaw(predicted_tf.rotation);
@@ -1081,7 +1094,7 @@ void Controller::setEnabled(bool value)
 
 void Controller::reset()
 {
-  controller_state_.current_x_vel = 0.0;
+  controller_state_.current_x_vel = 0.0 * units::meter_per_second;
   controller_state_.current_yaw_vel = 0.0;
   controller_state_.previous_steering_angle = 0.0;
   controller_state_.previous_steering_yaw_vel = 0.0;

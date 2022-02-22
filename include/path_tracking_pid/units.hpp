@@ -45,4 +45,12 @@ inline ros::Duration to_ros_duration(duration_t duration)
   return ros::Duration{duration.value()};
 }
 
+// Overload of copysign() for quantities of different types.
+template <typename U1, typename V1, typename U2, typename V2>
+boost::units::quantity<U1, V1> copysign(
+  boost::units::quantity<U1, V1> q1, boost::units::quantity<U2, V2> q2)
+{
+  return boost::units::quantity<U1, V1>::from_value(std::copysign(q1.value(), q2.value()));
+}
+
 }  // namespace path_tracking_pid::units

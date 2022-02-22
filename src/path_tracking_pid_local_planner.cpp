@@ -148,11 +148,13 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     pid_controller_.getConfig().init_vel_method != Pid_Odom &&
     pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
     std::abs(
-      latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
+      latest_odom_.twist.twist.linear.x -
+      pid_controller_.getControllerState().current_x_vel.value()) >
       pid_controller_.getConfig().init_vel_max_diff) {
     ROS_ERROR(
       "Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
-      latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
+      latest_odom_.twist.twist.linear.x,
+      pid_controller_.getControllerState().current_x_vel.value());
     return false;
   }
 
@@ -200,7 +202,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     ROS_ERROR_THROTTLE(
       5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
     cmd_vel = geometry_msgs::Twist();
-    cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
+    cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel.value();
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
@@ -354,7 +356,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   visualization_msgs::MarkerArray mkCollision;
 
   // Check how far we should check forward
-  double x_vel = pid_controller_.getControllerState().current_x_vel;
+  double x_vel = pid_controller_.getControllerState().current_x_vel.value();
   double collision_look_ahead_distance =
     x_vel * x_vel / (2 * pid_controller_.getConfig().target_x_decc) +
     pid_controller_.getConfig().collision_look_ahead_length_offset;
