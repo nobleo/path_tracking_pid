@@ -20,8 +20,8 @@ struct TricycleSteeringCmdVel
 {
   double steering_angle = 0.0;
   double steering_angle_velocity = 0.0;
-  double speed = 0.0;
-  double acceleration = 0.0;
+  units::velocity_t speed = 0.0 * units::meter_per_second;
+  units::acceleration_t acceleration = 0.0 * units::meter_per_second_squared;
 };
 
 struct ControllerState
@@ -31,7 +31,7 @@ struct ControllerState
   units::velocity_t current_x_vel = 0.0 * units::meter_per_second;
   double current_yaw_vel = 0.0;
   double previous_steering_angle = 0.0;
-  double previous_steering_x_vel = 0.0;
+  units::velocity_t previous_steering_x_vel = 0.0 * units::meter_per_second;
   double previous_steering_yaw_vel = 0.0;
   bool end_phase_enabled = false;
   bool end_reached = false;
@@ -210,7 +210,8 @@ private:
     return result;
   }
 
-  geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
+  geometry_msgs::Twist computeTricycleModelForwardKinematics(
+    units::velocity_t x_vel, double steering_angle);
   TricycleSteeringCmdVel computeTricycleModelInverseKinematics(
     const geometry_msgs::Twist & cmd_vel);
   /**

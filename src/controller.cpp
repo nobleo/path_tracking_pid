@@ -142,11 +142,11 @@ void Controller::setTricycleModel(
 }
 
 geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(
-  double x_vel, double steering_angle)
+  units::velocity_t x_vel, double steering_angle)
 {
   geometry_msgs::Twist estimated_base_twist;
-  const double x_alpha = x_vel * cos(steering_angle);
-  const double y_alpha = x_vel * sin(steering_angle);
+  const double x_alpha = x_vel.value() * cos(steering_angle);
+  const double y_alpha = x_vel.value() * sin(steering_angle);
 
   estimated_base_twist.linear.x =
     forward_kinematics_matrix_[0][0] * x_alpha + forward_kinematics_matrix_[0][1] * y_alpha;
@@ -166,7 +166,7 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(
                          inverse_kinematics_matrix_[1][1] * cmd_vel.angular.z;
 
   steering_cmd_vel.steering_angle = atan2(y_alpha, x_alpha);
-  steering_cmd_vel.speed = hypot(x_alpha, y_alpha);
+  steering_cmd_vel.speed = hypot(x_alpha, y_alpha) * units::meter_per_second;
 
   return steering_cmd_vel;
 }
@@ -799,7 +799,8 @@ geometry_msgs::Twist Controller::update(
   if (use_tricycle_model_) {
     geometry_msgs::Twist output_steering;
     TricycleSteeringCmdVel steering_cmd = computeTricycleModelInverseKinematics(output_combined);
-    if (output_combined.linear.x < 0.0 && steering_cmd.speed > 0.0) {
+    if (
+      (output_combined.linear.x < 0.0) && (steering_cmd.speed > (0.0 * units::meter_per_second))) {
       steering_cmd.speed = -steering_cmd.speed;
       if (steering_cmd.steering_angle > 0) {
         steering_cmd.steering_angle = steering_cmd.steering_angle - M_PI;
@@ -821,13 +822,15 @@ geometry_msgs::Twist Controller::update(
     steering_cmd.steering_angle = controller_state_.previous_steering_angle +
                                   (steering_cmd.steering_angle_velocity * dt.value());
 
-    steering_cmd.speed =
-      std::clamp(steering_cmd.speed, -config_.max_steering_x_vel, config_.max_steering_x_vel);
+    steering_cmd.speed = std::clamp(
+      steering_cmd.speed, -config_.max_steering_x_vel * units::meter_per_second,
+      config_.max_steering_x_vel * units::meter_per_second);
     steering_cmd.acceleration = std::clamp(
-      (steering_cmd.speed - controller_state_.previous_steering_x_vel) / dt.value(),
-      -config_.max_steering_x_acc, config_.max_steering_x_acc);
+      (steering_cmd.speed - controller_state_.previous_steering_x_vel) / dt,
+      -config_.max_steering_x_acc * units::meter_per_second_squared,
+      config_.max_steering_x_acc * units::meter_per_second_squared);
     steering_cmd.speed =
-      controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.value());
+      controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt);
 
     controller_state_.previous_steering_angle = steering_cmd.steering_angle;
     controller_state_.previous_steering_yaw_vel = steering_cmd.steering_angle_velocity;
@@ -841,7 +844,7 @@ geometry_msgs::Twist Controller::update(
 
     pid_debug->steering_angle = steering_cmd.steering_angle;
     pid_debug->steering_yaw_vel = steering_cmd.steering_angle_velocity;
-    pid_debug->steering_x_vel = steering_cmd.speed;
+    pid_debug->steering_x_vel = steering_cmd.speed.value();
 
     output_combined = output_steering;
   }
@@ -1098,7 +1101,7 @@ void Controller::reset()
   controller_state_.current_yaw_vel = 0.0;
   controller_state_.previous_steering_angle = 0.0;
   controller_state_.previous_steering_yaw_vel = 0.0;
-  controller_state_.previous_steering_x_vel = 0.0;
+  controller_state_.previous_steering_x_vel = 0.0 * units::meter_per_second;
   controller_state_.error_integral_lat = 0.0;
   controller_state_.error_integral_ang = 0.0;
   controller_state_.error_lat.reset();
