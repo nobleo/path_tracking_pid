@@ -857,11 +857,11 @@ geometry_msgs::Twist Controller::update_with_limits(
   max_x_vel = std::min(max_x_vel, vel_max_obstacle_);
 
   // Apply mpc limit (last because less iterations required if max vel is already limited)
-  double vel_max_mpc = std::numeric_limits<double>::infinity();
+  auto vel_max_mpc = std::numeric_limits<double>::infinity() * units::meter_per_second;
   if (config_.use_mpc) {
-    vel_max_mpc = std::abs(mpc_based_max_vel(
-      std::copysign(max_x_vel.value(), config_.target_x_vel), current_tf, odom_twist));
-    max_x_vel = std::min(max_x_vel, vel_max_mpc * units::meter_per_second);
+    vel_max_mpc = abs(mpc_based_max_vel(
+      copysign(max_x_vel, config_.target_x_vel * units::meter_per_second), current_tf, odom_twist));
+    max_x_vel = std::min(max_x_vel, vel_max_mpc);
   }
 
   // Some logging:
@@ -869,21 +869,21 @@ geometry_msgs::Twist Controller::update_with_limits(
     "max_x_vel=%.3f, target_x_vel=%.3f, vel_max_external=%.3f, vel_max_obstacle=%.3f, "
     "vel_max_mpc=%.3f",
     max_x_vel.value(), config_.target_x_vel, vel_max_external_.value(), vel_max_obstacle_.value(),
-    vel_max_mpc);
+    vel_max_mpc.value());
   if (max_x_vel != (config_.target_x_vel * units::meter_per_second)) {
     if (max_x_vel == vel_max_external_) {
       ROS_WARN_THROTTLE(5.0, "External velocity limit active %.2fm/s", vel_max_external_.value());
     } else if (max_x_vel == vel_max_obstacle_) {
       ROS_WARN_THROTTLE(5.0, "Obstacle velocity limit active %.2fm/s", vel_max_obstacle_.value());
-    } else if (max_x_vel == (vel_max_mpc * units::meter_per_second)) {
-      ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc);
+    } else if (max_x_vel == vel_max_mpc) {
+      ROS_WARN_THROTTLE(5.0, "MPC velocity limit active %.2fm/s", vel_max_mpc.value());
     }
   }
 
   // The end velocity is bound by the same limits to avoid accelerating above the limit in the end phase
   auto max_end_x_vel = std::min(
     {abs(config_.target_end_x_vel * units::meter_per_second), vel_max_external_, vel_max_obstacle_,
-     vel_max_mpc * units::meter_per_second});
+     vel_max_mpc});
   max_end_x_vel = copysign(max_end_x_vel, config_.target_end_x_vel * units::meter_per_second);
 
   // Update the controller with the new setting
@@ -894,8 +894,8 @@ geometry_msgs::Twist Controller::update_with_limits(
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
-double Controller::mpc_based_max_vel(
-  double target_x_vel, const geometry_msgs::Transform & current_tf,
+units::velocity_t Controller::mpc_based_max_vel(
+  units::velocity_t target_x_vel, const geometry_msgs::Transform & current_tf,
   const geometry_msgs::Twist & odom_twist)
 {
   // Temporary save global data
@@ -903,7 +903,7 @@ double Controller::mpc_based_max_vel(
   controller_state_saved = controller_state_;
 
   // Bisection optimisation parameters
-  double target_x_vel_prev = 0.0;  // Previous iteration velocity command
+  auto target_x_vel_prev = 0.0 * units::meter_per_second;  // Previous iteration velocity command
   int mpc_vel_optimization_iter = 0;
 
   // MPC parameters
@@ -913,7 +913,7 @@ double Controller::mpc_based_max_vel(
   geometry_msgs::Transform predicted_tf = current_tf;
   geometry_msgs::Twist pred_twist = odom_twist;
 
-  double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
+  auto new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
 
   // Loop MPC
   while (mpc_fwd_iter < config_.mpc_max_fwd_iterations &&
@@ -935,9 +935,9 @@ double Controller::mpc_based_max_vel(
 
       // Increase speed
       target_x_vel_prev = std::exchange(
-        new_nominal_x_vel,
-        copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 +
-          new_nominal_x_vel);
+        new_nominal_x_vel, copysign(1.0, new_nominal_x_vel.value()) *
+                               abs(target_x_vel_prev - new_nominal_x_vel) / 2.0 +
+                             new_nominal_x_vel);
 
       // Reset variables
       controller_state_ = controller_state_saved;
@@ -952,9 +952,9 @@ double Controller::mpc_based_max_vel(
 
       // Lower speed
       target_x_vel_prev = std::exchange(
-        new_nominal_x_vel,
-        -copysign(1.0, new_nominal_x_vel) * abs(target_x_vel_prev - new_nominal_x_vel) / 2 +
-          new_nominal_x_vel);
+        new_nominal_x_vel, -copysign(1.0, new_nominal_x_vel.value()) *
+                               abs(target_x_vel_prev - new_nominal_x_vel) / 2.0 +
+                             new_nominal_x_vel);
 
       // Reset variables
       controller_state_ = controller_state_saved;
@@ -964,7 +964,7 @@ double Controller::mpc_based_max_vel(
       mpc_fwd_iter = 0;
 
       // Warning if new_nominal_x_vel becomes really low
-      if (abs(new_nominal_x_vel) < 0.01) {
+      if (abs(new_nominal_x_vel) < (0.01 * units::meter_per_second)) {
         ROS_WARN_THROTTLE(5.0, "Lowering velocity did not decrease the lateral error enough.");
       }
     } else if (mpc_fwd_iter != config_.mpc_max_fwd_iterations) {
@@ -974,7 +974,7 @@ double Controller::mpc_based_max_vel(
       double eda_unused;
       double progress_unused;
       pred_twist = Controller::update(
-        new_nominal_x_vel, config_.target_end_x_vel, predicted_tf, pred_twist,
+        new_nominal_x_vel.value(), config_.target_end_x_vel, predicted_tf, pred_twist,
         ros::Duration(config_.mpc_simulation_sample_time), &eda_unused, &progress_unused,
         &pid_debug_unused);
 
@@ -990,13 +990,14 @@ double Controller::mpc_based_max_vel(
     }
   }
   // Apply limits to the velocity
-  double mpc_vel_limit =
-    copysign(1.0, new_nominal_x_vel) * fmax(fabs(new_nominal_x_vel), config_.mpc_min_x_vel);
+  const auto mpc_vel_limit =
+    copysign(1.0, new_nominal_x_vel.value()) *
+    fmax(fabs(new_nominal_x_vel), config_.mpc_min_x_vel * units::meter_per_second);
 
   // Revert global variables
   controller_state_ = controller_state_saved;
 
-  return std::abs(mpc_vel_limit);
+  return abs(mpc_vel_limit);
 }
 
 void Controller::printParameters() const

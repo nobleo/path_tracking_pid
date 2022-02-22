@@ -146,8 +146,8 @@ public:
    * @param odom_twist Robot odometry
    * @return Velocity command
    */
-  double mpc_based_max_vel(
-    double target_x_vel, const geometry_msgs::Transform & current_tf,
+  units::velocity_t mpc_based_max_vel(
+    units::velocity_t target_x_vel, const geometry_msgs::Transform & current_tf,
     const geometry_msgs::Twist & odom_twist);
 
   /**
