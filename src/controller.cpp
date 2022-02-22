@@ -437,8 +437,8 @@ tf2::Transform Controller::findPositionOnPlan(
 
 geometry_msgs::Twist Controller::update(
   double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
-  path_tracking_pid::PidDebug * pid_debug)
+  const geometry_msgs::Twist & odom_twist, units::duration_t dt, units::duration_t * eda,
+  double * progress, path_tracking_pid::PidDebug * pid_debug)
 {
   const double current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
@@ -522,8 +522,8 @@ geometry_msgs::Twist Controller::update(
   controller_state_.tracking_error_ang = controller_state_.error_ang.errors().at<0>();
 
   // integrate the error
-  controller_state_.error_integral_lat += controller_state_.error_lat.errors().at<0>() * dt.toSec();
-  controller_state_.error_integral_ang += controller_state_.error_ang.errors().at<0>() * dt.toSec();
+  controller_state_.error_integral_lat += controller_state_.error_lat.errors().at<0>() * dt.value();
+  controller_state_.error_integral_ang += controller_state_.error_ang.errors().at<0>() * dt.value();
 
   // Apply windup limit to limit the size of the integral term
   controller_state_.error_integral_lat =
@@ -534,10 +534,10 @@ geometry_msgs::Twist Controller::update(
   // Take derivative of error, first the raw unfiltered data:
   controller_state_.error_deriv_lat.push(
     (controller_state_.error_lat.errors().at<0>() - controller_state_.error_lat.errors().at<1>()) /
-    dt.toSec());
+    dt.value());
   controller_state_.error_deriv_ang.push(
     (controller_state_.error_ang.errors().at<0>() - controller_state_.error_ang.errors().at<1>()) /
-    dt.toSec());
+    dt.value());
 
   // calculate the control effort
   const auto proportional_lat =
@@ -569,12 +569,12 @@ geometry_msgs::Twist Controller::update(
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (-config_.target_x_decc);
     d_end_phase = current_x_vel * t_end_phase_current -
                   0.5 * (config_.target_x_decc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  target_x_vel * 2.0 * dt.value();
   } else {
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (config_.target_x_acc);
     d_end_phase = current_x_vel * t_end_phase_current +
                   0.5 * (config_.target_x_acc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  target_x_vel * 2.0 * dt.value();
   }
   ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
   ROS_DEBUG("d_end_phase: %f", d_end_phase);
@@ -626,11 +626,11 @@ geometry_msgs::Twist Controller::update(
     }
   }
 
-  const double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.toSec();
+  const double acc_desired = (current_target_x_vel_ - current_x_vel) / dt.value();
   const double acc_abs = fmin(fabs(acc_desired), fabs(current_target_acc));
   const auto acc = copysign(acc_abs, current_target_acc);
 
-  double new_x_vel = current_x_vel + acc * dt.toSec();
+  double new_x_vel = current_x_vel + acc * dt.value();
 
   // For low target_end_x_vel we have a minimum velocity to ensure the goal is reached
   double min_vel = copysign(1.0, config_.l) * config_.abs_minimum_x_vel;
@@ -660,7 +660,7 @@ geometry_msgs::Twist Controller::update(
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
     *progress = 1.0;
-    *eda = 0.0;
+    *eda = 0.0 * units::second;
     enabled_ = false;
   } else {
     controller_state_.end_reached = false;
@@ -668,9 +668,10 @@ geometry_msgs::Twist Controller::update(
     if (fabs(target_x_vel) > VELOCITY_EPS) {
       const double t_const =
         (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
-      *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
+      *eda =
+        fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION) * units::second;
     } else {
-      *eda = LONG_DURATION;
+      *eda = LONG_DURATION * units::second;
     }
   }
   /******* end calculation of forward velocity ********/
@@ -775,9 +776,9 @@ geometry_msgs::Twist Controller::update(
   }
   // Apply max acceleration limit to yaw
   const double yaw_acc = std::clamp(
-    (output_combined.angular.z - current_yaw_vel) / dt.toSec(), -config_.max_yaw_acc,
+    (output_combined.angular.z - current_yaw_vel) / dt.value(), -config_.max_yaw_acc,
     config_.max_yaw_acc);
-  const double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
+  const double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.value());
   output_combined.angular.z = new_yaw_vel;
 
   // Transform velocity commands at base_link to steer when using tricycle model
@@ -796,23 +797,23 @@ geometry_msgs::Twist Controller::update(
     steering_cmd.steering_angle = std::clamp(
       steering_cmd.steering_angle, -config_.max_steering_angle, config_.max_steering_angle);
     const double steering_yaw_vel = std::clamp(
-      (steering_cmd.steering_angle - controller_state_.previous_steering_angle) / dt.toSec(),
+      (steering_cmd.steering_angle - controller_state_.previous_steering_angle) / dt.value(),
       -config_.max_steering_yaw_vel, config_.max_steering_yaw_vel);
     const double steering_angle_acc = std::clamp(
-      (steering_yaw_vel - controller_state_.previous_steering_yaw_vel) / dt.toSec(),
+      (steering_yaw_vel - controller_state_.previous_steering_yaw_vel) / dt.value(),
       -config_.max_steering_yaw_acc, config_.max_steering_yaw_acc);
     steering_cmd.steering_angle_velocity =
-      controller_state_.previous_steering_yaw_vel + (steering_angle_acc * dt.toSec());
+      controller_state_.previous_steering_yaw_vel + (steering_angle_acc * dt.value());
     steering_cmd.steering_angle = controller_state_.previous_steering_angle +
-                                  (steering_cmd.steering_angle_velocity * dt.toSec());
+                                  (steering_cmd.steering_angle_velocity * dt.value());
 
     steering_cmd.speed =
       std::clamp(steering_cmd.speed, -config_.max_steering_x_vel, config_.max_steering_x_vel);
     steering_cmd.acceleration = std::clamp(
-      (steering_cmd.speed - controller_state_.previous_steering_x_vel) / dt.toSec(),
+      (steering_cmd.speed - controller_state_.previous_steering_x_vel) / dt.value(),
       -config_.max_steering_x_acc, config_.max_steering_x_acc);
     steering_cmd.speed =
-      controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.toSec());
+      controller_state_.previous_steering_x_vel + (steering_cmd.acceleration * dt.value());
 
     controller_state_.previous_steering_angle = steering_cmd.steering_angle;
     controller_state_.previous_steering_yaw_vel = steering_cmd.steering_angle_velocity;
@@ -845,7 +846,8 @@ geometry_msgs::Twist Controller::update(
 
 geometry_msgs::Twist Controller::update_with_limits(
   const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug)
+  units::duration_t dt, units::duration_t * eda, double * progress,
+  path_tracking_pid::PidDebug * pid_debug)
 {
   // All limits are absolute
   auto max_x_vel = abs(config_.target_x_vel * units::meter_per_second);
@@ -971,11 +973,11 @@ units::velocity_t Controller::mpc_based_max_vel(
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
       path_tracking_pid::PidDebug pid_debug_unused;
-      double eda_unused;
+      units::duration_t eda_unused;
       double progress_unused;
       pred_twist = Controller::update(
         new_nominal_x_vel.value(), config_.target_end_x_vel, predicted_tf, pred_twist,
-        ros::Duration(config_.mpc_simulation_sample_time), &eda_unused, &progress_unused,
+        config_.mpc_simulation_sample_time * units::second, &eda_unused, &progress_unused,
         &pid_debug_unused);
 
       // Run plant model

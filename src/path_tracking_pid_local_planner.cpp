@@ -237,14 +237,16 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   }
 
   path_tracking_pid::PidDebug pid_debug;
-  double eda =
-    1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
+  auto eda =
+    (1.0 / FLT_EPSILON) *
+    units::second;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
   double progress = 0.0;
   cmd_vel = pid_controller_.update_with_limits(
-    tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt, &eda, &progress, &pid_debug);
+    tfCurPoseStamped_.transform, latest_odom_.twist.twist, units::to_duration(dt), &eda, &progress,
+    &pid_debug);
 
   path_tracking_pid::PidFeedback feedback_msg;
-  feedback_msg.eda = ros::Duration(eda);
+  feedback_msg.eda = units::to_ros_duration(eda);
   feedback_msg.progress = progress;
   feedback_pub_.publish(feedback_msg);
 

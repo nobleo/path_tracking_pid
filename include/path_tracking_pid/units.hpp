@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ros/duration.h>
+
 #include <boost/units/cmath.hpp>
 #include <boost/units/systems/si.hpp>
 
@@ -33,5 +35,14 @@ inline const auto meter_per_second = boost::units::si::meter_per_second;
 inline const auto meter_per_second_squared = boost::units::si::meter_per_second_squared;
 inline const auto second = boost::units::si::second;
 inline const auto square_meter = boost::units::si::square_meter;
+
+// Convert the given ROS duration to a duration.
+inline duration_t to_duration(ros::Duration duration) { return duration.toSec() * second; }
+
+// Convert the given duration to a ROS duration.
+inline ros::Duration to_ros_duration(duration_t duration)
+{
+  return ros::Duration{duration.value()};
+}
 
 }  // namespace path_tracking_pid::units

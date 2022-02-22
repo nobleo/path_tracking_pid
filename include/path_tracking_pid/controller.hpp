@@ -123,8 +123,8 @@ public:
    */
   geometry_msgs::Twist update(
     double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-    const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
-    path_tracking_pid::PidDebug * pid_debug);
+    const geometry_msgs::Twist & odom_twist, units::duration_t dt, units::duration_t * eda,
+    double * progress, path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
@@ -138,7 +138,8 @@ public:
    */
   geometry_msgs::Twist update_with_limits(
     const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug);
+    units::duration_t dt, units::duration_t * eda, double * progress,
+    path_tracking_pid::PidDebug * pid_debug);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
