@@ -76,8 +76,9 @@ include_directories(include)
 # Configure roslint for nodes
 
 # Roslint cpp
-set(ROSLINT_CPP_OPTS "--filter=-legal/copyright")
+set(ROSLINT_CPP_OPTS "--filter=-legal/copyright,-whitespace/braces")
 roslint_cpp()
+roslint_add_test()
 
 install(
   TARGETS
