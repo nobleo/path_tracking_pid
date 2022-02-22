@@ -214,7 +214,8 @@ void Controller::setPlan(
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
     dist_to_segment =
-      distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1]);
+      distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
+        .value();
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
     if (dist_to_segment < minimum_distance_to_path) {
@@ -282,13 +283,14 @@ void Controller::setPlan(
 
 void Controller::distToSegmentSquared(
   const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-  tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const
+  tf2::Transform & pose_projection, units::distance_squared_t & distance_to_p,
+  units::distance_t & distance_to_w) const
 {
   const double l2 = distSquared(pose_v, pose_w);
   if (l2 == 0) {
     pose_projection = pose_w;
-    distance_to_w = 0.0;
-    distance_to_p = distSquared(pose_p, pose_w);
+    distance_to_w = 0.0 * units::meter;
+    distance_to_p = distSquared(pose_p, pose_w) * units::square_meter;
   } else {
     double t = ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
                   (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
@@ -314,8 +316,8 @@ void Controller::distToSegmentSquared(
     }
 
     pose_projection.setRotation(pose_quaternion);
-    distance_to_w = sqrt(distSquared(pose_projection, pose_w));
-    distance_to_p = distSquared(pose_p, pose_projection);
+    distance_to_w = sqrt(distSquared(pose_projection, pose_w)) * units::meter;
+    distance_to_p = distSquared(pose_p, pose_projection) * units::square_meter;
   }
 }
 
@@ -381,16 +383,16 @@ tf2::Transform Controller::findPositionOnPlan(
 
   tf2::Transform pose_projection_ahead;
   tf2::Transform pose_projection_behind;
-  double distance2_to_line_ahead;
-  double distance2_to_line_behind;
-  double distance_to_end_line_ahead;
-  double distance_to_end_line_behind;
+  units::distance_squared_t distance2_to_line_ahead;
+  units::distance_squared_t distance2_to_line_behind;
+  units::distance_t distance_to_end_line_ahead;
+  units::distance_t distance_to_end_line_behind;
   if (controller_state_ptr->current_global_plan_index == 0) {
     distToSegmentSquared(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], pose_projection_ahead,
       distance2_to_line_ahead, distance_to_end_line_ahead);
     current_goal_local = pose_projection_ahead;
-    distance_to_goal_ = distance_to_goal_vector_[1] + distance_to_end_line_ahead;
+    distance_to_goal_ = distance_to_goal_vector_[1] + distance_to_end_line_ahead.value();
     controller_state_ptr->last_visited_pose_index = 0;
     path_pose_idx = controller_state_ptr->current_global_plan_index;
   } else if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
@@ -399,7 +401,7 @@ tf2::Transform Controller::findPositionOnPlan(
       global_plan_tf_[controller_state_ptr->current_global_plan_index], pose_projection_behind,
       distance2_to_line_behind, distance_to_end_line_behind);
     current_goal_local = pose_projection_behind;
-    distance_to_goal_ = distance_to_end_line_behind;
+    distance_to_goal_ = distance_to_end_line_behind.value();
     controller_state_ptr->last_visited_pose_index = global_plan_tf_.size() - 2;
     path_pose_idx = controller_state_ptr->current_global_plan_index - 1;
   } else {
@@ -416,14 +418,14 @@ tf2::Transform Controller::findPositionOnPlan(
       current_goal_local = pose_projection_ahead;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
-        distance_to_end_line_ahead;
+        distance_to_end_line_ahead.value();
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index;
     } else {
       current_goal_local = pose_projection_behind;
       distance_to_goal_ =
         distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
-        distance_to_end_line_behind;
+        distance_to_end_line_behind.value();
       controller_state_ptr->last_visited_pose_index =
         controller_state_ptr->current_global_plan_index - 1;
     }

@@ -11,6 +11,7 @@
 #include <boost/noncopyable.hpp>
 #include <path_tracking_pid/details/fifo_array.hpp>
 #include <path_tracking_pid/details/second_order_lowpass.hpp>
+#include <path_tracking_pid/units.hpp>
 #include <vector>
 
 namespace path_tracking_pid
@@ -192,17 +193,18 @@ public:
 private:
   void distToSegmentSquared(
     const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-    tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const;
+    tf2::Transform & pose_projection, units::distance_squared_t & distance_to_p,
+    units::distance_t & distance_to_w) const;
 
   // Overloaded function for callers that don't need the additional results
-  double distToSegmentSquared(
+  units::distance_squared_t distToSegmentSquared(
     const tf2::Transform & pose_p, const tf2::Transform & pose_v,
     const tf2::Transform & pose_w) const
   {
     tf2::Transform dummy_tf;
-    double dummy_double;
-    double result;
-    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_double);
+    units::distance_t dummy_distance;
+    units::distance_squared_t result;
+    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_distance);
     return result;
   }
 
