@@ -201,20 +201,11 @@ void Controller::setPlan(
 
   // find closest current position to global plan
   double minimum_distance_to_path = 1e3;
-  double dist_to_segment;
-  double iterative_dist_to_goal = 0.0;
-  distance_to_goal_vector_.clear();
-  distance_to_goal_vector_.resize(global_plan_tf_.size());
-  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0;
-  turning_radius_inv_vector_.clear();
-  turning_radius_inv_vector_.resize(global_plan_tf_.size());
-  turning_radius_inv_vector_[global_plan_tf_.size() - 1] = 0.0;
-  tf2::Transform deltaPlan;
   // We define segment0 to be the segment connecting pose0 and pose1.
   // Hence, when picking the starting path's pose, we mean to start at the segment connecting that and the next pose.
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
-    dist_to_segment =
+    const auto dist_to_segment =
       distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
         .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
@@ -223,15 +214,30 @@ void Controller::setPlan(
       minimum_distance_to_path = dist_to_segment;
       controller_state_.current_global_plan_index = idx_path;
     }
+  }
 
+  double iterative_dist_to_goal = 0.0;
+  distance_to_goal_vector_.clear();
+  distance_to_goal_vector_.resize(global_plan_tf_.size());
+  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0;
+  for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Create distance and turning radius vectors once for usage later */
-    deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
+    const auto deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
     const double dpX = deltaPlan.getOrigin().x();
     const double dpY = deltaPlan.getOrigin().y();
     iterative_dist_to_goal += hypot(dpX, dpY);
     distance_to_goal_vector_[idx_path] = iterative_dist_to_goal;
+  }
+
+  turning_radius_inv_vector_.clear();
+  turning_radius_inv_vector_.resize(global_plan_tf_.size());
+  turning_radius_inv_vector_[global_plan_tf_.size() - 1] = 0.0;
+  for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     // compute turning radius based on trigonometric analysis
     // radius such that next pose is connected from current pose with a semi-circle
+    const auto deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
+    const double dpX = deltaPlan.getOrigin().x();
+    const double dpY = deltaPlan.getOrigin().y();
     const double dpXY2 = dpY * dpY + dpX * dpX;
     if (dpXY2 < FLT_EPSILON) {
       turning_radius_inv_vector_[idx_path] = std::numeric_limits<double>::infinity();
