@@ -433,11 +433,12 @@ tf2::Transform Controller::findPositionOnPlan(
   return current_goal_local;
 }
 
-geometry_msgs::Twist Controller::update(
+Controller::UpdateResult Controller::update(
   double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
-  path_tracking_pid::PidDebug * pid_debug)
+  const geometry_msgs::Twist & odom_twist, ros::Duration dt)
 {
+  UpdateResult result;
+
   const double current_x_vel = controller_state_.current_x_vel;
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
@@ -473,7 +474,7 @@ geometry_msgs::Twist Controller::update(
       findPositionOnPlan(current_with_carrot_g, &controller_state_, path_pose_idx);
   }
 
-  *progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
+  result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
 
   // Compute errorPose between controlPose and currentGoalPose
   tf2::Transform error = current_with_carrot_.inverseTimes(current_goal_);
@@ -657,8 +658,8 @@ geometry_msgs::Twist Controller::update(
      new_x_vel <= target_end_x_vel + VELOCITY_EPS)) {
     controller_state_.end_reached = true;
     controller_state_.end_phase_enabled = false;
-    *progress = 1.0;
-    *eda = 0.0;
+    result.progress = 1.0;
+    result.eda = 0.0;
     enabled_ = false;
   } else {
     controller_state_.end_reached = false;
@@ -666,9 +667,9 @@ geometry_msgs::Twist Controller::update(
     if (fabs(target_x_vel) > VELOCITY_EPS) {
       const double t_const =
         (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
-      *eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
+      result.eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
     } else {
-      *eda = LONG_DURATION;
+      result.eda = LONG_DURATION;
     }
   }
   /******* end calculation of forward velocity ********/
@@ -712,52 +713,51 @@ geometry_msgs::Twist Controller::update(
 
   // Populate debug output
   // Error topic containing the 'control' error on which the PID acts
-  pid_debug->control_error.linear.x = 0.0;
-  pid_debug->control_error.linear.y = controller_state_.error_lat.errors().at<0>();
-  pid_debug->control_error.angular.z = controller_state_.error_ang.errors().at<0>();
+  result.pid_debug.control_error.linear.x = 0.0;
+  result.pid_debug.control_error.linear.y = controller_state_.error_lat.errors().at<0>();
+  result.pid_debug.control_error.angular.z = controller_state_.error_ang.errors().at<0>();
   // Error topic containing the 'tracking' error, i.e. the real error between path and tracked link
-  pid_debug->tracking_error.linear.x = 0.0;
-  pid_debug->tracking_error.linear.y = controller_state_.tracking_error_lat;
-  pid_debug->tracking_error.angular.z = controller_state_.tracking_error_ang;
+  result.pid_debug.tracking_error.linear.x = 0.0;
+  result.pid_debug.tracking_error.linear.y = controller_state_.tracking_error_lat;
+  result.pid_debug.tracking_error.angular.z = controller_state_.tracking_error_ang;
 
-  pid_debug->proportional.linear.x = 0.0;
-  pid_debug->proportional.linear.y = proportional_lat;
-  pid_debug->proportional.angular.z = proportional_ang;
+  result.pid_debug.proportional.linear.x = 0.0;
+  result.pid_debug.proportional.linear.y = proportional_lat;
+  result.pid_debug.proportional.angular.z = proportional_ang;
 
-  pid_debug->integral.linear.x = 0.0;
-  pid_debug->integral.linear.y = integral_lat;
-  pid_debug->integral.angular.z = integral_ang;
+  result.pid_debug.integral.linear.x = 0.0;
+  result.pid_debug.integral.linear.y = integral_lat;
+  result.pid_debug.integral.angular.z = integral_ang;
 
-  pid_debug->derivative.linear.x = 0.0;
-  pid_debug->derivative.linear.y = derivative_lat;
-  pid_debug->derivative.angular.z = derivative_ang;
+  result.pid_debug.derivative.linear.x = 0.0;
+  result.pid_debug.derivative.linear.y = derivative_lat;
+  result.pid_debug.derivative.angular.z = derivative_ang;
 
-  pid_debug->feedforward.linear.x = new_x_vel;
-  pid_debug->feedforward.linear.y = feedforward_lat_;
-  pid_debug->feedforward.angular.z = feedforward_ang_;
+  result.pid_debug.feedforward.linear.x = new_x_vel;
+  result.pid_debug.feedforward.linear.y = feedforward_lat_;
+  result.pid_debug.feedforward.angular.z = feedforward_ang_;
 
-  geometry_msgs::Twist output_combined;
   // Generate twist message
   if (holonomic_robot_enable_) {
-    output_combined.linear.x = control_effort_long_;
-    output_combined.linear.y = control_effort_lat_;
-    output_combined.linear.z = 0;
-    output_combined.angular.x = 0;
-    output_combined.angular.y = 0;
-    output_combined.angular.z = control_effort_ang_;
-    output_combined.angular.z =
-      std::clamp(output_combined.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
+    result.velocity_command.linear.x = control_effort_long_;
+    result.velocity_command.linear.y = control_effort_lat_;
+    result.velocity_command.linear.z = 0;
+    result.velocity_command.angular.x = 0;
+    result.velocity_command.angular.y = 0;
+    result.velocity_command.angular.z = control_effort_ang_;
+    result.velocity_command.angular.z =
+      std::clamp(result.velocity_command.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
   } else {
-    output_combined.linear.x = control_effort_long_;
-    output_combined.linear.y = 0;
-    output_combined.linear.z = 0;
-    output_combined.angular.x = 0;
-    output_combined.angular.y = 0;
-    output_combined.angular.z =
+    result.velocity_command.linear.x = control_effort_long_;
+    result.velocity_command.linear.y = 0;
+    result.velocity_command.linear.z = 0;
+    result.velocity_command.angular.x = 0;
+    result.velocity_command.angular.y = 0;
+    result.velocity_command.angular.z =
       copysign(1.0, config_.l) * control_effort_lat_ +
       control_effort_ang_;  // Take the sign of l for the lateral control effort
-    output_combined.angular.z =
-      std::clamp(output_combined.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
+    result.velocity_command.angular.z =
+      std::clamp(result.velocity_command.angular.z, -config_.max_yaw_vel, config_.max_yaw_vel);
     // For non-holonomic robots apply saturation based on minimum turning radius
     double max_ang_twist_tr;
     if (config_.min_turning_radius < RADIUS_EPS) {
@@ -766,23 +766,24 @@ geometry_msgs::Twist Controller::update(
       // do not restrict angular velocity. Thus use the biggets number possible
       max_ang_twist_tr = std::numeric_limits<double>::infinity();
     } else {
-      max_ang_twist_tr = fabs(output_combined.linear.x / config_.min_turning_radius);
+      max_ang_twist_tr = fabs(result.velocity_command.linear.x / config_.min_turning_radius);
     }
-    output_combined.angular.z =
-      std::clamp(output_combined.angular.z, -max_ang_twist_tr, max_ang_twist_tr);
+    result.velocity_command.angular.z =
+      std::clamp(result.velocity_command.angular.z, -max_ang_twist_tr, max_ang_twist_tr);
   }
   // Apply max acceleration limit to yaw
   const double yaw_acc = std::clamp(
-    (output_combined.angular.z - current_yaw_vel) / dt.toSec(), -config_.max_yaw_acc,
+    (result.velocity_command.angular.z - current_yaw_vel) / dt.toSec(), -config_.max_yaw_acc,
     config_.max_yaw_acc);
   const double new_yaw_vel = current_yaw_vel + (yaw_acc * dt.toSec());
-  output_combined.angular.z = new_yaw_vel;
+  result.velocity_command.angular.z = new_yaw_vel;
 
   // Transform velocity commands at base_link to steer when using tricycle model
   if (use_tricycle_model_) {
     geometry_msgs::Twist output_steering;
-    TricycleSteeringCmdVel steering_cmd = computeTricycleModelInverseKinematics(output_combined);
-    if (output_combined.linear.x < 0.0 && steering_cmd.speed > 0.0) {
+    TricycleSteeringCmdVel steering_cmd =
+      computeTricycleModelInverseKinematics(result.velocity_command);
+    if (result.velocity_command.linear.x < 0.0 && steering_cmd.speed > 0.0) {
       steering_cmd.speed = -steering_cmd.speed;
       if (steering_cmd.steering_angle > 0) {
         steering_cmd.steering_angle = steering_cmd.steering_angle - M_PI;
@@ -822,11 +823,11 @@ geometry_msgs::Twist Controller::update(
     controller_state_.current_x_vel = output_steering.linear.x;
     controller_state_.current_yaw_vel = output_steering.angular.z;
 
-    pid_debug->steering_angle = steering_cmd.steering_angle;
-    pid_debug->steering_yaw_vel = steering_cmd.steering_angle_velocity;
-    pid_debug->steering_x_vel = steering_cmd.speed;
+    result.pid_debug.steering_angle = steering_cmd.steering_angle;
+    result.pid_debug.steering_yaw_vel = steering_cmd.steering_angle_velocity;
+    result.pid_debug.steering_x_vel = steering_cmd.speed;
 
-    output_combined = output_steering;
+    result.velocity_command = output_steering;
   }
 
   // Publish control effort if controller enabled
@@ -838,12 +839,13 @@ geometry_msgs::Twist Controller::update(
 
   controller_state_.current_x_vel = new_x_vel;
   controller_state_.current_yaw_vel = new_yaw_vel;
-  return output_combined;
+
+  return result;
 }
 
-geometry_msgs::Twist Controller::update_with_limits(
+Controller::UpdateResult Controller::update_with_limits(
   const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug)
+  ros::Duration dt)
 {
   // All limits are absolute
   double max_x_vel = std::abs(config_.target_x_vel);
@@ -884,7 +886,7 @@ geometry_msgs::Twist Controller::update_with_limits(
 
   // Update the controller with the new setting
   max_x_vel = std::copysign(max_x_vel, config_.target_x_vel);
-  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt, eda, progress, pid_debug);
+  return update(max_x_vel, max_end_x_vel, current_tf, odom_twist, dt);
 }
 
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
@@ -965,13 +967,10 @@ double Controller::mpc_based_max_vel(
     } else if (mpc_fwd_iter != config_.mpc_max_fwd_iterations) {
       // Run controller
       // Output: pred_twist.[linear.x, linear.y, linear.z, angular.x, angular.y, angular.z]
-      path_tracking_pid::PidDebug pid_debug_unused;
-      double eda_unused;
-      double progress_unused;
       pred_twist = Controller::update(
-        new_nominal_x_vel, config_.target_end_x_vel, predicted_tf, pred_twist,
-        ros::Duration(config_.mpc_simulation_sample_time), &eda_unused, &progress_unused,
-        &pid_debug_unused);
+                     new_nominal_x_vel, config_.target_end_x_vel, predicted_tf, pred_twist,
+                     ros::Duration(config_.mpc_simulation_sample_time))
+                     .velocity_command;
 
       // Run plant model
       const double theta = tf2::getYaw(predicted_tf.rotation);
