@@ -388,52 +388,54 @@ tf2::Transform Controller::findPositionOnPlan(
     global_plan_tf_.size() - 1);
   // To finalize, compute the indexes of the start and end points of
   // the closest line segment to the current carrot
-  tf2::Transform current_goal_local;
-  current_goal_local = global_plan_tf_[controller_state_ptr->current_global_plan_index];
 
   if (controller_state_ptr->current_global_plan_index == 0) {
     const auto dist_result =
       distToSegmentSquared(current_tf2, global_plan_tf_[0], global_plan_tf_[1]);
 
-    current_goal_local = dist_result.pose_projection;
     distance_to_goal_ = distance_to_goal_vector_[1] + dist_result.distance_to_w;
     controller_state_ptr->last_visited_pose_index = 0;
     path_pose_idx = controller_state_ptr->current_global_plan_index;
-  } else if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
+
+    return dist_result.pose_projection;
+  }
+
+  if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
     const auto dist_result = distToSegmentSquared(
       current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
       global_plan_tf_[controller_state_ptr->current_global_plan_index]);
 
-    current_goal_local = dist_result.pose_projection;
     distance_to_goal_ = dist_result.distance_to_w;
     controller_state_ptr->last_visited_pose_index = global_plan_tf_.size() - 2;
     path_pose_idx = controller_state_ptr->current_global_plan_index - 1;
-  } else {
-    const auto dist_result_ahead = distToSegmentSquared(
-      current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index],
-      global_plan_tf_[controller_state_ptr->current_global_plan_index + 1]);
-    const auto dist_result_behind = distToSegmentSquared(
-      current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
-      global_plan_tf_[controller_state_ptr->current_global_plan_index]);
 
-    if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
-      current_goal_local = dist_result_ahead.pose_projection;
-      distance_to_goal_ =
-        distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
-        dist_result_ahead.distance_to_w;
-      controller_state_ptr->last_visited_pose_index =
-        controller_state_ptr->current_global_plan_index;
-    } else {
-      current_goal_local = dist_result_behind.pose_projection;
-      distance_to_goal_ =
-        distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
-        dist_result_behind.distance_to_w;
-      controller_state_ptr->last_visited_pose_index =
-        controller_state_ptr->current_global_plan_index - 1;
-    }
-    path_pose_idx = controller_state_ptr->current_global_plan_index;
+    return dist_result.pose_projection;
   }
-  return current_goal_local;
+
+  const auto dist_result_ahead = distToSegmentSquared(
+    current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index],
+    global_plan_tf_[controller_state_ptr->current_global_plan_index + 1]);
+  const auto dist_result_behind = distToSegmentSquared(
+    current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
+    global_plan_tf_[controller_state_ptr->current_global_plan_index]);
+
+  if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
+    distance_to_goal_ =
+      distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
+      dist_result_ahead.distance_to_w;
+    controller_state_ptr->last_visited_pose_index = controller_state_ptr->current_global_plan_index;
+    path_pose_idx = controller_state_ptr->current_global_plan_index;
+
+    return dist_result_ahead.pose_projection;
+  }
+
+  distance_to_goal_ = distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
+                      dist_result_behind.distance_to_w;
+  controller_state_ptr->last_visited_pose_index =
+    controller_state_ptr->current_global_plan_index - 1;
+  path_pose_idx = controller_state_ptr->current_global_plan_index;
+
+  return dist_result_behind.pose_projection;
 }
 
 Controller::UpdateResult Controller::update(
