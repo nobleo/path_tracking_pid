@@ -288,11 +288,9 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
 }
 
 tf2::Transform Controller::findPositionOnPlan(
-  const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
-  size_t & path_pose_idx)
+  const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx)
 {
-  tf2::Transform current_tf2;
-  tf2::convert(current_tf, current_tf2);
+  auto current_tf2 = current_tf;
   // 'Project' current_tf by removing z-component
   tf2::Vector3 originProj = current_tf2.getOrigin();
   originProj.setZ(0.0);
@@ -416,7 +414,7 @@ Controller::UpdateResult Controller::update(
   if (config_.track_base_link) {
     // Find closes robot position to path and then project carrot on goal
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_tf, controller_state_, path_pose_idx);
+      findPositionOnPlan(tf2_convert<tf2::Transform>(current_tf), controller_state_, path_pose_idx);
     // To track the base link the goal is then transform to the control point goal
     double theda_rp = tf2::getYaw(current_goal_.getRotation());
     tf2::Vector3 newControlOrigin;
@@ -426,10 +424,8 @@ Controller::UpdateResult Controller::update(
     current_goal_.setOrigin(newControlOrigin);
   } else {
     // find position of current position with projected carrot
-    geometry_msgs::Transform current_with_carrot_g;
-    tf2::convert(current_with_carrot_, current_with_carrot_g);
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_with_carrot_g, controller_state_, path_pose_idx);
+      findPositionOnPlan(current_with_carrot_, controller_state_, path_pose_idx);
   }
 
   result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];

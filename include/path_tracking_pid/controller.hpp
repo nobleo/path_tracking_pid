@@ -99,11 +99,10 @@ public:
    * @return index of current path-pose if requested
    */
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
-    size_t & path_pose_idx);
+    const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState & controller_state)
+    const tf2::Transform & current_tf, ControllerState & controller_state)
   {
     size_t path_pose_idx;
     return findPositionOnPlan(current_tf, controller_state, path_pose_idx);
