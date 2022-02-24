@@ -1,6 +1,7 @@
 #include "calculations.hpp"
 
 #include <algorithm>
+#include <vector>
 
 namespace path_tracking_pid
 {
