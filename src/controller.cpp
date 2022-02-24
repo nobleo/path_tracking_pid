@@ -285,41 +285,40 @@ void Controller::setPlan(
 Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
   const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w) const
 {
-  DistToSegmentSquaredResult result;
-
   const double l2 = distSquared(pose_v, pose_w);
   if (l2 == 0) {
+    DistToSegmentSquaredResult result;
+
     result.pose_projection = pose_w;
     result.distance_to_w = 0.0;
     result.distance2_to_p = distSquared(pose_p, pose_w);
-  } else {
-    double t = ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
-                  (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
-                (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
-                  (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
-               l2;
-    t = fmax(0.0, fmin(1.0, t));
-    result.pose_projection.setOrigin(tf2::Vector3(
-      pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
-      pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
-    double yaw_projection = tf2::getYaw(pose_v.getRotation());  // get yaw of the first vector + t *
-      // (tf2::getYaw(pose_w.getRotation()) -
-      // tf2::getYaw(pose_v.getRotation()));
-    tf2::Quaternion pose_quaternion;
-    if (estimate_pose_angle_enabled_) {
-      pose_quaternion.setRPY(
-        0.0, 0.0,
-        atan2(
-          pose_w.getOrigin().y() - pose_v.getOrigin().y(),
-          pose_w.getOrigin().x() - pose_v.getOrigin().x()));
-    } else {
-      pose_quaternion.setRPY(0.0, 0.0, yaw_projection);
-    }
 
-    result.pose_projection.setRotation(pose_quaternion);
-    result.distance_to_w = sqrt(distSquared(result.pose_projection, pose_w));
-    result.distance2_to_p = distSquared(pose_p, result.pose_projection);
+    return result;
   }
+
+  DistToSegmentSquaredResult result;
+
+  const double t = std::clamp(
+    ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
+       (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
+     (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
+       (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
+      l2,
+    0.0, 1.0);
+  result.pose_projection.setOrigin(tf2::Vector3(
+    pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
+    pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
+
+  const auto yaw = estimate_pose_angle_enabled_ ? atan2(
+                                                    pose_w.getOrigin().y() - pose_v.getOrigin().y(),
+                                                    pose_w.getOrigin().x() - pose_v.getOrigin().x())
+                                                : tf2::getYaw(pose_v.getRotation());
+  tf2::Quaternion pose_quaternion;
+  pose_quaternion.setRPY(0.0, 0.0, yaw);
+  result.pose_projection.setRotation(pose_quaternion);
+
+  result.distance_to_w = sqrt(distSquared(result.pose_projection, pose_w));
+  result.distance2_to_p = distSquared(pose_p, result.pose_projection);
 
   return result;
 }
