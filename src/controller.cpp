@@ -324,7 +324,7 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
 }
 
 tf2::Transform Controller::findPositionOnPlan(
-  const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr,
+  const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
   size_t & path_pose_idx)
 {
   tf2::Transform current_tf2;
@@ -346,7 +346,7 @@ tf2::Transform Controller::findPositionOnPlan(
   // Hence, when idx_path==i we are currently tracking the section connection pose i and pose i+1
 
   // First look in current position and in front
-  for (auto idx_path = controller_state_ptr->current_global_plan_index;
+  for (auto idx_path = controller_state.current_global_plan_index;
        idx_path < global_plan_tf_.size(); idx_path++) {
     error = current_tf2.inverseTimes(global_plan_tf_[idx_path]);
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
@@ -355,14 +355,14 @@ tf2::Transform Controller::findPositionOnPlan(
 
     if (distance_to_path <= minimum_distance_to_path) {
       minimum_distance_to_path = distance_to_path;
-      controller_state_ptr->current_global_plan_index = idx_path;
+      controller_state.current_global_plan_index = idx_path;
     } else {
       break;
     }
   }
 
   // Then look backwards
-  for (auto idx_path = controller_state_ptr->current_global_plan_index; idx_path > 0; --idx_path) {
+  for (auto idx_path = controller_state.current_global_plan_index; idx_path > 0; --idx_path) {
     error = current_tf2.inverseTimes(global_plan_tf_[idx_path - 1]);
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
@@ -370,62 +370,59 @@ tf2::Transform Controller::findPositionOnPlan(
 
     if (distance_to_path < minimum_distance_to_path) {
       minimum_distance_to_path = distance_to_path;
-      controller_state_ptr->current_global_plan_index = idx_path - 1;
+      controller_state.current_global_plan_index = idx_path - 1;
     } else {
       break;
     }
   }
   ROS_DEBUG(
-    "progress: %lu of %lu", controller_state_ptr->current_global_plan_index,
-    global_plan_tf_.size() - 1);
+    "progress: %lu of %lu", controller_state.current_global_plan_index, global_plan_tf_.size() - 1);
   // To finalize, compute the indexes of the start and end points of
   // the closest line segment to the current carrot
 
-  if (controller_state_ptr->current_global_plan_index == 0) {
+  if (controller_state.current_global_plan_index == 0) {
     const auto dist_result =
       distToSegmentSquared(current_tf2, global_plan_tf_[0], global_plan_tf_[1]);
 
     distance_to_goal_ = distance_to_goal_vector_[1] + dist_result.distance_to_w;
-    controller_state_ptr->last_visited_pose_index = 0;
-    path_pose_idx = controller_state_ptr->current_global_plan_index;
+    controller_state.last_visited_pose_index = 0;
+    path_pose_idx = controller_state.current_global_plan_index;
 
     return dist_result.pose_projection;
   }
 
-  if (controller_state_ptr->current_global_plan_index == global_plan_tf_.size() - 1) {
+  if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
     const auto dist_result = distToSegmentSquared(
-      current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
-      global_plan_tf_[controller_state_ptr->current_global_plan_index]);
+      current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
+      global_plan_tf_[controller_state.current_global_plan_index]);
 
     distance_to_goal_ = dist_result.distance_to_w;
-    controller_state_ptr->last_visited_pose_index = global_plan_tf_.size() - 2;
-    path_pose_idx = controller_state_ptr->current_global_plan_index - 1;
+    controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
+    path_pose_idx = controller_state.current_global_plan_index - 1;
 
     return dist_result.pose_projection;
   }
 
   const auto dist_result_ahead = distToSegmentSquared(
-    current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index],
-    global_plan_tf_[controller_state_ptr->current_global_plan_index + 1]);
+    current_tf2, global_plan_tf_[controller_state.current_global_plan_index],
+    global_plan_tf_[controller_state.current_global_plan_index + 1]);
   const auto dist_result_behind = distToSegmentSquared(
-    current_tf2, global_plan_tf_[controller_state_ptr->current_global_plan_index - 1],
-    global_plan_tf_[controller_state_ptr->current_global_plan_index]);
+    current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
+    global_plan_tf_[controller_state.current_global_plan_index]);
 
   if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
-    distance_to_goal_ =
-      distance_to_goal_vector_[controller_state_ptr->current_global_plan_index + 1] +
-      dist_result_ahead.distance_to_w;
-    controller_state_ptr->last_visited_pose_index = controller_state_ptr->current_global_plan_index;
-    path_pose_idx = controller_state_ptr->current_global_plan_index;
+    distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
+                        dist_result_ahead.distance_to_w;
+    controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
+    path_pose_idx = controller_state.current_global_plan_index;
 
     return dist_result_ahead.pose_projection;
   }
 
-  distance_to_goal_ = distance_to_goal_vector_[controller_state_ptr->current_global_plan_index] +
+  distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index] +
                       dist_result_behind.distance_to_w;
-  controller_state_ptr->last_visited_pose_index =
-    controller_state_ptr->current_global_plan_index - 1;
-  path_pose_idx = controller_state_ptr->current_global_plan_index;
+  controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
+  path_pose_idx = controller_state.current_global_plan_index;
 
   return dist_result_behind.pose_projection;
 }
@@ -455,7 +452,7 @@ Controller::UpdateResult Controller::update(
   if (config_.track_base_link) {
     // Find closes robot position to path and then project carrot on goal
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_tf, &controller_state_, path_pose_idx);
+      findPositionOnPlan(current_tf, controller_state_, path_pose_idx);
     // To track the base link the goal is then transform to the control point goal
     double theda_rp = tf2::getYaw(current_goal_.getRotation());
     tf2::Vector3 newControlOrigin;
@@ -468,7 +465,7 @@ Controller::UpdateResult Controller::update(
     geometry_msgs::Transform current_with_carrot_g;
     tf2::convert(current_with_carrot_, current_with_carrot_g);
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_with_carrot_g, &controller_state_, path_pose_idx);
+      findPositionOnPlan(current_with_carrot_g, controller_state_, path_pose_idx);
   }
 
   result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];

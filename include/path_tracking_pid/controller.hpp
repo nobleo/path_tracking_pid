@@ -94,19 +94,19 @@ public:
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
-   * @param controller_state_ptr  The current state of the controller that gets updated by this function
+   * @param controller_state  The current state of the controller that gets updated by this function
    * @return tf of found position on plan
    * @return index of current path-pose if requested
    */
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr,
+    const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
     size_t & path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState * controller_state_ptr)
+    const geometry_msgs::Transform & current_tf, ControllerState & controller_state)
   {
     size_t path_pose_idx;
-    return findPositionOnPlan(current_tf, controller_state_ptr, path_pose_idx);
+    return findPositionOnPlan(current_tf, controller_state, path_pose_idx);
   }
 
   // Result of update() and update_with_limits().
