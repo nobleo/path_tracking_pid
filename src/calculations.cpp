@@ -1,6 +1,7 @@
 #include "calculations.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <vector>
 
