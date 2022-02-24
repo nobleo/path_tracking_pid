@@ -390,7 +390,7 @@ tf2::Transform Controller::findPositionOnPlan(
 }
 
 Controller::UpdateResult Controller::update(
-  double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
+  double target_x_vel, double target_end_x_vel, const tf2::Transform & current_tf,
   const geometry_msgs::Twist & odom_twist, ros::Duration dt)
 {
   UpdateResult result;
@@ -399,22 +399,20 @@ Controller::UpdateResult Controller::update(
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute location of the point to be controlled
-  const double theda_rp = tf2::getYaw(current_tf.rotation);
+  const double theda_rp = tf2::getYaw(current_tf.getRotation());
   tf2::Vector3 current_with_carrot_origin;
-  current_with_carrot_origin.setX(current_tf.translation.x + config_.l * cos(theda_rp));
-  current_with_carrot_origin.setY(current_tf.translation.y + config_.l * sin(theda_rp));
+  current_with_carrot_origin.setX(current_tf.getOrigin().x() + config_.l * cos(theda_rp));
+  current_with_carrot_origin.setY(current_tf.getOrigin().y() + config_.l * sin(theda_rp));
   current_with_carrot_origin.setZ(0);
 
   current_with_carrot_.setOrigin(current_with_carrot_origin);
-  tf2::Quaternion cur_rot(
-    current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
-  current_with_carrot_.setRotation(cur_rot);
+  current_with_carrot_.setRotation(current_tf.getRotation());
 
   size_t path_pose_idx;
   if (config_.track_base_link) {
     // Find closes robot position to path and then project carrot on goal
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(tf2_convert<tf2::Transform>(current_tf), controller_state_, path_pose_idx);
+      findPositionOnPlan(current_tf, controller_state_, path_pose_idx);
     // To track the base link the goal is then transform to the control point goal
     double theda_rp = tf2::getYaw(current_goal_.getRotation());
     tf2::Vector3 newControlOrigin;
@@ -466,9 +464,7 @@ Controller::UpdateResult Controller::update(
                  global_plan_tf_[path_pose_idx].getOrigin().y(),
                  global_plan_tf_[path_pose_idx].getOrigin().z()));
 
-  tf2::Vector3 current_tracking_err =
-    -(path_segmen_tf.inverse() *
-      tf2::Vector3(current_tf.translation.x, current_tf.translation.y, current_tf.translation.z));
+  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * current_tf.getOrigin());
 
   // trackin_error here represents the error between tracked link and position on plan
   controller_state_.tracking_error_lat = current_tracking_err.y();
@@ -798,8 +794,7 @@ Controller::UpdateResult Controller::update(
 }
 
 Controller::UpdateResult Controller::update_with_limits(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  ros::Duration dt)
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist, ros::Duration dt)
 {
   // All limits are absolute
   double max_x_vel = std::abs(config_.target_x_vel);
@@ -846,8 +841,7 @@ Controller::UpdateResult Controller::update_with_limits(
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
 double Controller::mpc_based_max_vel(
-  double target_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist)
+  double target_x_vel, const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist)
 {
   // Temporary save global data
   ControllerState controller_state_saved;
@@ -861,7 +855,7 @@ double Controller::mpc_based_max_vel(
   int mpc_fwd_iter = 0;  // Reset MPC iterations
 
   // Create predicted position vector
-  geometry_msgs::Transform predicted_tf = current_tf;
+  auto predicted_tf = current_tf;
   geometry_msgs::Twist pred_twist = odom_twist;
 
   double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
@@ -927,14 +921,16 @@ double Controller::mpc_based_max_vel(
                      .velocity_command;
 
       // Run plant model
-      const double theta = tf2::getYaw(predicted_tf.rotation);
-      predicted_tf.translation.x +=
-        pred_twist.linear.x * cos(theta) * config_.mpc_simulation_sample_time;
-      predicted_tf.translation.y +=
-        pred_twist.linear.x * sin(theta) * config_.mpc_simulation_sample_time;
+      const double theta = tf2::getYaw(predicted_tf.getRotation());
+      predicted_tf.getOrigin().setX(
+        predicted_tf.getOrigin().getX() +
+        pred_twist.linear.x * cos(theta) * config_.mpc_simulation_sample_time);
+      predicted_tf.getOrigin().setY(
+        predicted_tf.getOrigin().getY() +
+        pred_twist.linear.x * sin(theta) * config_.mpc_simulation_sample_time);
       tf2::Quaternion q;
       q.setRPY(0, 0, theta + pred_twist.angular.z * config_.mpc_simulation_sample_time);
-      predicted_tf.rotation = tf2::toMsg(q);
+      predicted_tf.setRotation(q);
     }
   }
   // Apply limits to the velocity
