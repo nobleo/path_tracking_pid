@@ -36,14 +36,6 @@ bool have_same_sign(T val1, T val2)
   return std::signbit(val1) == std::signbit(val2);
 }
 
-// Floating-point aware version of std::clamp(). fclamp() is to std::clamp() what std::fmin() and
-// std::fmax() are to std::min() and std::max().
-template <typename T>
-T fclamp(T value, T low, T high)
-{
-  return std::fmax(low, std::fmin(value, high));
-}
-
 // Converts a pose to the corresponding transform.
 tf2::Transform to_transform(const geometry_msgs::Pose & pose)
 {
@@ -306,7 +298,7 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
 
   DistToSegmentSquaredResult result;
 
-  const double t = fclamp(
+  const double t = std::clamp(
     ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
        (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
      (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
