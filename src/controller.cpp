@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <limits>
-#include <numeric>
 #include <path_tracking_pid/controller.hpp>
 #include <vector>
 
@@ -220,19 +219,7 @@ void Controller::setPlan(
 
   const auto deltas = deltas_of_plan(global_plan_tf_);
 
-  // Repopulate distance vector.
-  distance_to_goal_vector_.clear();
-  distance_to_goal_vector_.reserve(deltas.size() + 1);
-  std::transform(
-    deltas.cbegin(), deltas.cend(), std::back_inserter(distance_to_goal_vector_),
-    [](const auto & d) {
-      const auto & origin = d.getOrigin();
-      return hypot(origin.x(), origin.y());
-    });
-  distance_to_goal_vector_.push_back(0.0);
-  std::partial_sum(
-    distance_to_goal_vector_.crbegin(), distance_to_goal_vector_.crend(),
-    distance_to_goal_vector_.rbegin());
+  distance_to_goal_vector_ = distances_to_goal(deltas);
 
   // Repopulate turning radius vector.
   turning_radius_inv_vector_.clear();
