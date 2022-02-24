@@ -192,21 +192,27 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  void distToSegmentSquared(
-    const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-    tf2::Transform & pose_projection, double & distance_to_p, double & distance_to_w) const;
-
-  // Overloaded function for callers that don't need the additional results
-  double distToSegmentSquared(
-    const tf2::Transform & pose_p, const tf2::Transform & pose_v,
-    const tf2::Transform & pose_w) const
+  // Result of distToSegmentSquared().
+  struct DistToSegmentSquaredResult
   {
-    tf2::Transform dummy_tf;
-    double dummy_double;
-    double result;
-    distToSegmentSquared(pose_p, pose_v, pose_w, dummy_tf, result, dummy_double);
-    return result;
-  }
+    tf2::Transform pose_projection;
+    double distance2_to_p = 0;  // Square distance in meter squared.
+    double distance_to_w = 0;   // Distance in meter.
+  };
+
+  /**
+   * @brief Closest point between a line segment and a point
+   * Calculate the closest point between the line segment bounded by PV and the point W.
+   * 
+   * @param[in] pose_p Start of the line segment
+   * @param[in] pose_v End of the line segment
+   * @param[in] pose_w The point
+   * @return The pose projection of the closest point with the distance (squared) to pose_p and
+   *         the distance to pose_w.
+   */
+  DistToSegmentSquaredResult distToSegmentSquared(
+    const tf2::Transform & pose_p, const tf2::Transform & pose_v,
+    const tf2::Transform & pose_w) const;
 
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
   TricycleSteeringCmdVel computeTricycleModelInverseKinematics(
