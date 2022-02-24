@@ -66,7 +66,7 @@ public:
    * @param estimate_pose_angle The transformation from base to steered wheel
    */
   void setTricycleModel(
-    bool tricycle_model_enabled, const geometry_msgs::Transform & tf_base_to_steered_wheel);
+    bool tricycle_model_enabled, const tf2::Transform & tf_base_to_steered_wheel);
 
   /**
    * Set plan
@@ -250,7 +250,7 @@ private:
 
   // tricycle model
   bool use_tricycle_model_ = false;
-  geometry_msgs::Transform tf_base_to_steered_wheel_;
+  tf2::Transform tf_base_to_steered_wheel_;
   std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_{};
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 

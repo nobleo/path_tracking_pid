@@ -173,7 +173,8 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     }
 
     pid_controller_.setTricycleModel(
-      use_tricycle_model_, tf_base_to_steered_wheel_stamped_.transform);
+      use_tricycle_model_,
+      tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform));
 
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
