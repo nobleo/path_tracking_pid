@@ -109,35 +109,37 @@ public:
     return findPositionOnPlan(current_tf, controller_state_ptr, path_pose_idx);
   }
 
+  // Result of update() and update_with_limits().
+  struct UpdateResult
+  {
+    geometry_msgs::Twist velocity_command;  // Velocity command
+    double eda = 0;                         // Estimated duration of arrival
+    double progress = 0;                    // Progress along the path [0,1]
+    PidDebug pid_debug;                     // Information to debug the controller
+  };
+
   /**
    * Run one iteration of a PID controller
    * @param target_x_vel robot will try to reach target x velocity within (de)acceleration limits
    * @param current Where is the robot now?
    * @param odom_twist Robot odometry
    * @param dt Duration since last update
-   * @return Velocity command
-   * @return eda Estimated Duration of Arrival
-   * @return progress Progress along the path [0,1]
-   * @return pid_debug Variable with information to debug the controller
+   * @return Update result
    */
-  geometry_msgs::Twist update(
+  UpdateResult update(
     double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
-    const geometry_msgs::Twist & odom_twist, ros::Duration dt, double * eda, double * progress,
-    path_tracking_pid::PidDebug * pid_debug);
+    const geometry_msgs::Twist & odom_twist, ros::Duration dt);
 
   /**
    * Run one iteration of a PID controller with velocity limits applied
    * @param current Where is the robot now?
    * @param odom_twist Robot odometry
    * @param dt Duration since last update
-   * @return Velocity command
-   * @return eda Estimated Duration of Arrival
-   * @return progress Progress along the path [0,1]
-   * @return pid_debug Variable with information to debug the controller
+   * @return Update result
    */
-  geometry_msgs::Twist update_with_limits(
+  UpdateResult update_with_limits(
     const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    ros::Duration dt, double * eda, double * progress, path_tracking_pid::PidDebug * pid_debug);
+    ros::Duration dt);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds

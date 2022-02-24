@@ -237,16 +237,13 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   }
 
-  path_tracking_pid::PidDebug pid_debug;
-  double eda =
-    1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
-  double progress = 0.0;
-  cmd_vel = pid_controller_.update_with_limits(
-    tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt, &eda, &progress, &pid_debug);
+  const auto update_result =
+    pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt);
+  cmd_vel = update_result.velocity_command;
 
   path_tracking_pid::PidFeedback feedback_msg;
-  feedback_msg.eda = ros::Duration(eda);
-  feedback_msg.progress = progress;
+  feedback_msg.eda = ros::Duration(update_result.eda);
+  feedback_msg.progress = update_result.progress;
   feedback_pub_.publish(feedback_msg);
 
   if (cancel_requested_) {
@@ -264,7 +261,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   }
 
   if (controller_debug_enabled_) {
-    debug_pub_.publish(pid_debug);
+    debug_pub_.publish(update_result.pid_debug);
 
     // publish rviz visualization
     std_msgs::Header header;
