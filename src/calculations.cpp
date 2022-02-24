@@ -40,4 +40,25 @@ std::vector<double> distances_to_goal(const std::vector<tf2::Transform> & deltas
   return result;
 }
 
+std::vector<double> inverse_turning_radiuses(const std::vector<tf2::Transform> & deltas)
+{
+  auto result = std::vector<double>{};
+
+  result.reserve(deltas.size() + 1);
+  std::transform(
+    deltas.cbegin(), deltas.cend(), std::back_inserter(result), [](const tf2::Transform & d) {
+      const auto & origin = d.getOrigin();
+      const auto dpX = origin.x();
+      const auto dpY = origin.y();
+      const auto dpXY2 = std::pow(dpX, 2) + std::pow(dpY, 2);
+      if (dpXY2 < FLT_EPSILON) {
+        return std::numeric_limits<double>::infinity();
+      }
+      return (2 * dpY) / dpXY2;
+    });
+  result.push_back(0.0);
+
+  return result;
+}
+
 }  // namespace path_tracking_pid
