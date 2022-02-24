@@ -289,8 +289,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     std_msgs::Header header;
     header.stamp = now;
     header.frame_id = map_frame_;
-    tf2::Transform tfCurPose;
-    tf2::fromMsg(tfCurPoseStamped_.transform, tfCurPose);
+    const auto tfCurPose = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
     visualization_->publishAxlePoint(header, tfCurPose);
     visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
     visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
@@ -388,11 +387,10 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Use a controller state to forward project the position on the path
   auto projected_controller_state = pid_controller_.getControllerState();
-  geometry_msgs::Transform current_tf = tfCurPoseStamped_.transform;
 
   // Step until lookahead is reached, for every step project the pose back to the path
   std::vector<tf2::Transform> projected_steps_tf;
-  auto projected_step_tf = tf2_convert<tf2::Transform>(current_tf);
+  auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
   projected_step_tf =
     pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state);
