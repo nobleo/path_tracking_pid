@@ -55,12 +55,6 @@ void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig & con
 {
   pid_controller_.configure(config);
   controller_debug_enabled_ = config.controller_debug_enabled;
-
-  if (controller_debug_enabled_ && !global_plan_.empty()) {
-    received_path_.header = global_plan_.at(0).header;
-    received_path_.poses = global_plan_;
-    path_pub_.publish(received_path_);
-  }
 }
 
 void TrackingPidLocalPlanner::initialize(
@@ -115,11 +109,11 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     return false;
   }
 
-  std::string path_frame = global_plan.at(0).header.frame_id;
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
-  ROS_DEBUG("Plan is defined in frame '%s'", path_frame.c_str());
+  auto global_plan_copy = global_plan;
 
-  global_plan_ = global_plan;
+  std::string path_frame = global_plan_copy.at(0).header.frame_id;
+  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan_copy.size());
+  ROS_DEBUG("Plan is defined in frame '%s'", path_frame.c_str());
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
   if (map_frame_ != path_frame) {
@@ -138,7 +132,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
         "Path is given in %s frame which is severly mis-aligned with our map-frame: %s",
         path_frame.c_str(), map_frame_.c_str());
     }
-    for (auto & pose_stamped : global_plan_) {
+    for (auto & pose_stamped : global_plan_copy) {
       tf2::doTransform(pose_stamped.pose, pose_stamped.pose, tf_transform);
       pose_stamped.header.frame_id = map_frame_;
       // 'Project' plan by removing z-component
@@ -147,8 +141,8 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   }
 
   if (controller_debug_enabled_) {
-    received_path_.header = global_plan_.at(0).header;
-    received_path_.poses = global_plan_;
+    received_path_.header = global_plan_copy.at(0).header;
+    received_path_.poses = global_plan_copy;
     path_pub_.publish(received_path_);
   }
 
@@ -199,11 +193,11 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     pid_controller_.setPlan(
       tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
       tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform), steering_odom_twist,
-      convert_plan(global_plan_));
+      convert_plan(global_plan_copy));
   } else {
     pid_controller_.setPlan(
       tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
-      convert_plan(global_plan_));
+      convert_plan(global_plan_copy));
   }
 
   pid_controller_.setEnabled(true);

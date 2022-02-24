@@ -123,7 +123,6 @@ private:
   ros::Duration prev_dt_;
   path_tracking_pid::Controller pid_controller_;
 
-  std::vector<geometry_msgs::PoseStamped> global_plan_;
   nav_msgs::Path received_path_;
 
   // Obstacle collision detection
