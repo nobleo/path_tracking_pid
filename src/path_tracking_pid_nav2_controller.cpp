@@ -9,41 +9,12 @@ using nav2_util::geometry_utils::euclidean_distance;
 using namespace nav2_costmap_2d;  // NOLINT
 // --------- new ----------- 0
 using std::placeholders::_1;
+using rcl_interfaces::msg::ParameterType;
 // --------- new ----------- 1
 
 
 namespace path_tracking_pid
 {
-
-void PathTrackingPid::cleanup()
-{
-  collision_marker_pub_.reset();
-  marker_poses_pub_.reset();
-  marker_goals_pub_.reset();
-  path_pub_.reset();
-  debug_pub_.reset();
-  feedback_pub_.reset();
-}
-
-void PathTrackingPid::activate()
-{
-  collision_marker_pub_ ->on_activate();
-  marker_poses_pub_     ->on_activate();
-  marker_goals_pub_     ->on_activate();
-  path_pub_             ->on_activate();
-  debug_pub_            ->on_activate();
-  feedback_pub_         ->on_activate();
-}
-
-void PathTrackingPid::deactivate()
-{
-  collision_marker_pub_ ->on_deactivate();
-  marker_poses_pub_     ->on_deactivate();
-  marker_goals_pub_     ->on_deactivate();
-  path_pub_             ->on_deactivate();
-  debug_pub_            ->on_deactivate();
-  feedback_pub_         ->on_deactivate();
-}
 
 void PathTrackingPid::configure(
   const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
@@ -51,6 +22,7 @@ void PathTrackingPid::configure(
   const std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros)
 {
   auto node = parent.lock();
+  node_2 = parent;
   if (!node) {
     throw nav2_core::PlannerException("Unable to lock node!");
   }
@@ -252,11 +224,50 @@ void PathTrackingPid::configure(
   // --------------------------- new --------------------------- 1
 }
 
+void PathTrackingPid::cleanup()
+{
+  collision_marker_pub_.reset();
+  marker_poses_pub_.reset();
+  marker_goals_pub_.reset();
+  path_pub_.reset();
+  debug_pub_.reset();
+  feedback_pub_.reset();
+}
+
+void PathTrackingPid::activate()
+{
+  collision_marker_pub_ ->on_activate();
+  marker_poses_pub_     ->on_activate();
+  marker_goals_pub_     ->on_activate();
+  path_pub_             ->on_activate();
+  debug_pub_            ->on_activate();
+  feedback_pub_         ->on_activate();
+
+  // Add callback for dynamic parameters
+  auto node = node_2.lock();
+  dyn_params_handler_ = node->add_on_set_parameters_callback(
+    std::bind(
+      &PathTrackingPid::dynamicParametersCallback,
+      this, std::placeholders::_1));
+}
+
+void PathTrackingPid::deactivate()
+{
+  collision_marker_pub_ ->on_deactivate();
+  marker_poses_pub_     ->on_deactivate();
+  marker_goals_pub_     ->on_deactivate();
+  path_pub_             ->on_deactivate();
+  debug_pub_            ->on_deactivate();
+  feedback_pub_         ->on_deactivate();
+  dyn_params_handler_.reset();
+}
+
 geometry_msgs::msg::TwistStamped PathTrackingPid::computeVelocityCommands(
   const geometry_msgs::msg::PoseStamped & pose,
   const geometry_msgs::msg::Twist & speed,
   nav2_core::GoalChecker * goal_checker)
 {
+  std::lock_guard<std::mutex> lock_reinit(mutex_);
   RCLCPP_DEBUG(node_->get_logger(), "METHOD CHECK: start of computeVelMethodMAIN"); //DEBUG
 
   // Explicitely made useless to avoid compilation error
@@ -845,6 +856,31 @@ void PathTrackingPid::curOdomCallback(const nav_msgs::msg::Odometry& odom_msg)
 // {
 //   pid_controller_.setVelMaxExternal(msg.data);
 // }
+
+rcl_interfaces::msg::SetParametersResult
+PathTrackingPid::dynamicParametersCallback(
+  std::vector<rclcpp::Parameter> parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  std::lock_guard<std::mutex> lock_reinit(mutex_);
+
+  for (auto parameter : parameters) {
+    const auto & type = parameter.get_type();
+    const auto & name = parameter.get_name();
+
+    if (type == ParameterType::PARAMETER_DOUBLE) {
+      if (name == plugin_name_ + ".target_x_vel") {
+        config_.target_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".target_end_x_vel") {
+        config_.target_end_x_vel = parameter.as_double();
+      }
+    }
+  }
+
+  pid_controller_.configure(config_);
+  result.successful = true;
+  return result;
+}
 
 }  // namespace path_tracking_pid
 

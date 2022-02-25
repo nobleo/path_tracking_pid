@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <mutex>
 
 #include "./controller.hpp"
 #include "nav2_core/controller.hpp"
@@ -209,6 +210,7 @@ private:
   std::string base_link_frame_;
 
   nav2_util::LifecycleNode::SharedPtr node_;
+  rclcpp_lifecycle::LifecycleNode::WeakPtr node_2;
 
   bool initialized_ = false;
 
@@ -245,16 +247,21 @@ private:
   // ----------------------- new --------------------- 1
 
 protected:
-  // ----------------------- new --------------------- 0
-
-  // ----------------------- new --------------------- 1
-
+  /**
+   * @brief Callback executed when a parameter change is detected
+   * @param event ParameterEvent message
+   */
+  rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
   std::shared_ptr<tf2_ros::Buffer> tf_;
   std::string plugin_name_;
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros_;
   nav2_costmap_2d::Costmap2D * costmap_;
   rclcpp::Logger logger_ {rclcpp::get_logger("PathTrackingPid")};
+
+  // Dynamic parameters handler
+  std::mutex mutex_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 };
 
 }  // namespace path_tracking_pid
