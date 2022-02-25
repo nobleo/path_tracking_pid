@@ -64,8 +64,9 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}_local_planner.cpp
   src/controller.cpp
   src/calculations.cpp
-  src/visualization.cpp
+  src/details/derivative.cpp
   src/details/second_order_lowpass.cpp
+  src/visualization.cpp
 )
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
@@ -108,8 +109,11 @@ install(
 if(CATKIN_ENABLE_TESTING)
   add_rostest(test/test_path_tracking_pid.test ARGS rviz:=false reconfigure:=false)
   catkin_add_gtest(unittests
-    test/unittests/test_main.cpp
+    test/unittests/test_calculations.cpp
+    test/unittests/test_derivative.cpp
     test/unittests/test_fifo_array.cpp
-    test/unittests/test_calculations.cpp)
+    test/unittests/test_main.cpp
+    test/unittests/test_second_order_lowpass.cpp
+  )
   target_link_libraries(unittests ${catkin_LIBRARIES} ${PROJECT_NAME})
 endif()

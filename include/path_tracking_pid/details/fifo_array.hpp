@@ -24,6 +24,9 @@ public:
   // Read-only access to the element at the given index.
   constexpr const value_type & operator[](std::size_t index) const { return data_[index]; }
 
+  // Read-write access to the element at the given index.
+  value_type & operator[](std::size_t index) { return data_[index]; }
+
   // Read-only access to the element at the given index (with compile-time range check).
   template <std::size_t index>
   constexpr const value_type & at() const

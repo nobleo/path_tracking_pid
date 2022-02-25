@@ -1,29 +1,55 @@
 #pragma once
 
+#include <limits>
 #include <path_tracking_pid/details/fifo_array.hpp>
 
 namespace path_tracking_pid::details
 {
-// Error tracker for the last 3 error and filtered error values.
+/**
+ * @brief Discrete time second order lowpass filter
+ */
 class SecondOrderLowpass
 {
-public:
-  // Pushes the given value to the errors FIFO buffer. A corresponding filtered error value is calculated and pushed
-  // to the filtered errors FIFO buffer.
-  void push(double value);
+  constexpr static auto NaN = std::numeric_limits<double>::quiet_NaN();
 
-  // Resets both errors and filtered errors FIFO buffers.
+public:
+  /**
+   * @brief Construct a SecondOrderLowpass instance with NaNs
+   */
+  SecondOrderLowpass() = default;
+
+  /**
+   * @brief Construct a SecondOrderLowpass instance
+   * @param cutoff frequency in Hz, 0 disables the filter
+   * @param damping frequency in Hz
+   */
+  SecondOrderLowpass(double cutoff, double damping);
+
+  /**
+   * @brief Change the parameters of the filter
+   * @param cutoff frequency in Hz, 0 disables the filter
+   * @param damping frequency in Hz
+   */
+  void configure(double cutoff, double damping);
+
+  /**
+   * @brief Filter one sample of a signal
+   * @param u Signal to be filtered
+   * @param step_size Time step from previous sample
+   * @return Lowpass-filtered signal
+   */
+  double filter(double u, double step_size);
+
+  /**
+   * @brief Reset the signal buffers
+   */
   void reset();
 
-  // Read-only access to the errors FIFO buffer.
-  const FifoArray<double, 3> & errors() const;
-
-  // Read-only access to the filtered errors FIFO buffer.
-  const FifoArray<double, 3> & filtered_errors() const;
-
 private:
-  FifoArray<double, 3> errors_;
-  FifoArray<double, 3> filtered_errors_;
+  FifoArray<double, 3> u_ = {};
+  FifoArray<double, 3> y_ = {};
+  double cutoff_ = NaN;
+  double damping_ = NaN;
 };
 
 }  // namespace path_tracking_pid::details
