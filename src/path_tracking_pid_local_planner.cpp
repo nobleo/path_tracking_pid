@@ -20,7 +20,6 @@
 #include "common.hpp"
 
 // register planner as move_base and move_base plugins
-PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, nav_core::BaseLocalPlanner)
 PLUGINLIB_EXPORT_CLASS(
   path_tracking_pid::TrackingPidLocalPlanner, mbf_costmap_core::CostmapController)
 
@@ -468,7 +467,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
-bool TrackingPidLocalPlanner::isGoalReached()
+bool TrackingPidLocalPlanner::isGoalReached() const
 {
   // Return reached boolean, but never succeed when we're preempting
   return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
