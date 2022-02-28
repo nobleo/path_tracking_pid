@@ -109,10 +109,10 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     return false;
   }
 
-  auto global_plan_copy = global_plan;
+  auto global_plan_map_frame = global_plan;
 
-  std::string path_frame = global_plan_copy.at(0).header.frame_id;
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan_copy.size());
+  std::string path_frame = global_plan_map_frame.at(0).header.frame_id;
+  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan_map_frame.size());
   ROS_DEBUG("Plan is defined in frame '%s'", path_frame.c_str());
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
@@ -132,7 +132,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
         "Path is given in %s frame which is severly mis-aligned with our map-frame: %s",
         path_frame.c_str(), map_frame_.c_str());
     }
-    for (auto & pose_stamped : global_plan_copy) {
+    for (auto & pose_stamped : global_plan_map_frame) {
       tf2::doTransform(pose_stamped.pose, pose_stamped.pose, tf_transform);
       pose_stamped.header.frame_id = map_frame_;
       // 'Project' plan by removing z-component
@@ -141,8 +141,8 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   }
 
   if (controller_debug_enabled_) {
-    received_path_.header = global_plan_copy.at(0).header;
-    received_path_.poses = global_plan_copy;
+    received_path_.header = global_plan_map_frame.at(0).header;
+    received_path_.poses = global_plan_map_frame;
     path_pub_.publish(received_path_);
   }
 
@@ -193,11 +193,11 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     pid_controller_.setPlan(
       tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
       tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform), steering_odom_twist,
-      convert_plan(global_plan_copy));
+      convert_plan(global_plan_map_frame));
   } else {
     pid_controller_.setPlan(
       tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
-      convert_plan(global_plan_copy));
+      convert_plan(global_plan_map_frame));
   }
 
   pid_controller_.setEnabled(true);
