@@ -188,14 +188,18 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
 
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
-    pid_controller_.setPlan(
-      tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
-      tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform), steering_odom_twist,
-      convert_plan(global_plan_map_frame));
+    if (!pid_controller_.setPlan(
+          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform),
+          steering_odom_twist, convert_plan(global_plan_map_frame))) {
+      return false;
+    }
   } else {
-    pid_controller_.setPlan(
-      tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
-      convert_plan(global_plan_map_frame));
+    if (!pid_controller_.setPlan(
+          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          convert_plan(global_plan_map_frame))) {
+      return false;
+    }
   }
 
   pid_controller_.setEnabled(true);

@@ -73,8 +73,9 @@ public:
    * @param current Where is the robot now?
    * @param odom_twist Robot odometry
    * @param global_plan Plan to follow
+   * @return whether the plan was successfully updated or not
    */
-  void setPlan(
+  bool setPlan(
     const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
     const std::vector<tf2::Transform> & global_plan);
 
@@ -85,12 +86,14 @@ public:
    * @param tf_base_to_steered_wheel Where is the steered wheel now?
    * @param steering_odom_twist Steered wheel odometry
    * @param global_plan Plan to follow
+   * @return whether the plan was successfully updated or not
    */
-  void setPlan(
+  bool setPlan(
     const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
     const tf2::Transform & tf_base_to_steered_wheel,
     const geometry_msgs::Twist & steering_odom_twist,
     const std::vector<tf2::Transform> & global_plan);
+
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
@@ -137,8 +140,7 @@ public:
    * @return Update result
    */
   UpdateResult update_with_limits(
-    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    ros::Duration dt);
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist, ros::Duration dt);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds

@@ -43,33 +43,27 @@ bool is_pose_angle_obtuse(
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
 
-// Filters the given plan. The first and last poses are always accepted (if they exist).
-// Intermediate poses are only accepted if the angle (with respect to the previous and next poses)
-// is obtuse.
-std::vector<tf2::Transform> filter_plan(const std::vector<tf2::Transform> & plan)
+/**
+ * Checks the given plan. The first and last poses are always accepted (if they exist). Intermediate
+ * poses are only accepted if the angle (with respect to the previous and next poses) is obtuse.
+ * 
+ * @param[in] plan Plan to check.
+ * @return True if all poses in the plan are accepted. False otherwise.
+ */
+bool check_plan(const std::vector<tf2::Transform> & plan)
 {
   const auto plan_size = plan.size();
-  auto result = std::vector<tf2::Transform>{};
-  result.reserve(plan.size());
-
-  if (plan_size > 0) {
-    result.push_back(plan.front());
-  }
 
   for (int pose_idx = 1; pose_idx < static_cast<int>(plan_size) - 1; ++pose_idx) {
     const auto & prev_pose = plan[pose_idx - 1];
     const auto & pose = plan[pose_idx];
     const auto & next_pose = plan[pose_idx + 1];
-    if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
-      result.push_back(pose);
+    if (!is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
+      return false;
     }
   }
 
-  if (plan_size > 1) {
-    result.push_back(plan.back());
-  }
-
-  return result;
+  return true;
 }
 
 }  // namespace
@@ -150,18 +144,18 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(
   return steering_cmd_vel;
 }
 
-void Controller::setPlan(
+bool Controller::setPlan(
   const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
   const std::vector<tf2::Transform> & global_plan)
 {
   ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
 
-  global_plan_tf_ = filter_plan(global_plan);
-  if (global_plan_tf_.size() != global_plan.size()) {
-    ROS_WARN(
-      "Not all poses of path are used since not all poses were in the expected direction of the "
-      "path!");
+  if (!check_plan(global_plan)) {
+    ROS_WARN("Rejected plan because not all poses were in the expected direction of the path!");
+    return false;
   }
+
+  global_plan_tf_ = global_plan;
 
   if (!config_.track_base_link) {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
@@ -226,17 +220,23 @@ void Controller::setPlan(
   }
   controller_state_.end_phase_enabled = false;
   controller_state_.end_reached = false;
+
+  return true;
 }
 
-void Controller::setPlan(
+bool Controller::setPlan(
   const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
   const tf2::Transform & tf_base_to_steered_wheel,
   const geometry_msgs::Twist & /* steering_odom_twist */,
   const std::vector<tf2::Transform> & global_plan)
 {
-  setPlan(current_tf, odom_twist, global_plan);
-  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.getRotation());
-  // TODO(clopez) use steering_odom_twist to check if setpoint is being followed
+  const auto result = setPlan(current_tf, odom_twist, global_plan);
+
+  if (result) {
+    controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.getRotation());
+  }
+
+  return result;
 }
 
 Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
