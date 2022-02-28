@@ -25,4 +25,13 @@ std::vector<tf2::Transform> deltas_of_plan(const std::vector<tf2::Transform> & p
  */
 std::vector<double> distances_to_goal(const std::vector<tf2::Transform> & deltas);
 
+/**
+ * Determine the inverse turning radiuses for each pose of a plan, based on the given deltas of that
+ * plan. The 2D radius is calculated; the z component is ignored.
+ * 
+ * @param[in] deltas Deltas between consecutive poses of a plan. (Result of deltas_of_plan().)
+ * @return Inverse turning radiuses.
+ */
+std::vector<double> inverse_turning_radiuses(const std::vector<tf2::Transform> & deltas);
+
 }  // namespace path_tracking_pid

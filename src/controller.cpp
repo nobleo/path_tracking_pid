@@ -220,23 +220,7 @@ void Controller::setPlan(
   const auto deltas = deltas_of_plan(global_plan_tf_);
 
   distance_to_goal_vector_ = distances_to_goal(deltas);
-
-  // Repopulate turning radius vector.
-  turning_radius_inv_vector_.clear();
-  turning_radius_inv_vector_.reserve(deltas.size() + 1);
-  std::transform(
-    deltas.cbegin(), deltas.cend(), std::back_inserter(turning_radius_inv_vector_),
-    [](const auto & d) {
-      const auto & origin = d.getOrigin();
-      const auto dpX = origin.x();
-      const auto dpY = origin.y();
-      const auto dpXY2 = std::pow(dpX, 2) + std::pow(dpY, 2);
-      if (dpXY2 < FLT_EPSILON) {
-        return std::numeric_limits<double>::infinity();
-      }
-      return 2 * dpY / dpXY2;
-    });
-  turning_radius_inv_vector_.push_back(0.0);
+  turning_radius_inv_vector_ = inverse_turning_radiuses(deltas);
 
   assert(global_plan_tf_.size() == distance_to_goal_vector_.size());
   assert(global_plan_tf_.size() == turning_radius_inv_vector_.size());
