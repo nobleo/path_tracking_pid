@@ -9,6 +9,72 @@
 
 namespace path_tracking_pid
 {
+
+namespace
+{
+
+// Factory function for a visualization scale vector from the given arguments. (Because the
+// corresponding type has no appropriate constructor.)
+geometry_msgs::Vector3 create_scale(double x, double y, double z)
+{
+  geometry_msgs::Vector3 result;
+
+  result.x = x;
+  result.y = y;
+  result.z = z;
+
+  return result;
+}
+
+// Factory function for a visualization color from the given arguments. (Because the corresponding
+// type has no appropriate constructor.)
+std_msgs::ColorRGBA create_color(float r, float g, float b, float a)
+{
+  std_msgs::ColorRGBA result;
+
+  result.r = r;
+  result.g = g;
+  result.b = b;
+  result.a = a;
+
+  return result;
+}
+
+// Factory function for a visualization marker from the given arguments. Some defaults are changed
+// to hardcoded values to suit our visualization needs.
+visualization_msgs::Marker create_marker(
+  const std::string & frame_id, const std::string & ns, std::int32_t type,
+  const geometry_msgs::Vector3 & scale, const std_msgs::ColorRGBA & color,
+  const Visualization::points_t & points)
+{
+  visualization_msgs::Marker result;
+
+  result.header.frame_id = frame_id;
+  result.header.stamp = ros::Time::now();
+  result.ns = ns;
+  result.action = visualization_msgs::Marker::ADD;
+  result.type = type;
+  result.scale = scale;
+  result.color = color;
+  result.points = points;
+
+  return result;
+}
+
+const auto steps_scale = create_scale(0.5, 0.5, 0.0);
+const auto steps_color = create_color(1.0, 0.5, 0.0, 1.0);
+
+const auto path_scale = create_scale(0.5, 0.5, 0.0);
+const auto path_color = create_color(1.0, 1.0, 0.0, 1.0);
+
+const auto footprint_scale = create_scale(0.1, 0.0, 0.0);
+const auto footprint_color = create_color(0.0, 0.0, 1.0, 0.3);
+
+const auto hull_scale = create_scale(0.2, 0.0, 0.0);
+const auto hull_color = create_color(1.0, 0.0, 0.0, 0.3);
+
+}  // namespace
+
 Visualization::Visualization(ros::NodeHandle nh)
 : marker_pub_{nh.advertise<visualization_msgs::Marker>("visualization_marker", 4)},
   collision_marker_pub_{nh.advertise<visualization_msgs::MarkerArray>("collision_markers", 3)}
@@ -54,97 +120,45 @@ void Visualization::publishCollision(
   const std::string & frame_id, uint8_t cost, const point_t & point, const points_t & footprint,
   const points_t & hull, const points_t & steps, const points_t & path)
 {
-  visualization_msgs::Marker mkSteps;
-  mkSteps.header.frame_id = frame_id;
-  mkSteps.header.stamp = ros::Time::now();
-  mkSteps.ns = "extrapolated poses";
-  mkSteps.action = visualization_msgs::Marker::ADD;
-  mkSteps.pose.orientation.w = 1.0;
-  mkSteps.id = __COUNTER__;
-  mkSteps.type = visualization_msgs::Marker::POINTS;
-  mkSteps.scale.x = 0.5;
-  mkSteps.scale.y = 0.5;
-  mkSteps.color.r = 1.0;
-  mkSteps.color.g = 0.5;
-  mkSteps.color.a = 1.0;
-  mkSteps.points = steps;
+  const auto marker_steps = create_marker(
+    frame_id, "extrapolated poses", visualization_msgs::Marker::POINTS, steps_scale, steps_color,
+    steps);
 
-  visualization_msgs::Marker mkPosesOnPath;
-  mkPosesOnPath.header.frame_id = frame_id;
-  mkPosesOnPath.header.stamp = ros::Time::now();
-  mkPosesOnPath.ns = "goal poses on path";
-  mkPosesOnPath.action = visualization_msgs::Marker::ADD;
-  mkPosesOnPath.pose.orientation.w = 1.0;
-  mkPosesOnPath.id = __COUNTER__;
-  mkPosesOnPath.type = visualization_msgs::Marker::POINTS;
-  mkPosesOnPath.scale.x = 0.5;
-  mkPosesOnPath.scale.y = 0.5;
-  mkPosesOnPath.color.r = 1.0;
-  mkPosesOnPath.color.g = 1.0;
-  mkPosesOnPath.color.a = 1.0;
-  mkPosesOnPath.points = path;
+  const auto marker_path = create_marker(
+    frame_id, "goal poses on path", visualization_msgs::Marker::POINTS, path_scale, path_color,
+    path);
 
-  visualization_msgs::Marker mkCollisionFootprint;
-  mkCollisionFootprint.header.frame_id = frame_id;
-  mkCollisionFootprint.header.stamp = ros::Time::now();
-  mkCollisionFootprint.ns = "Collision footprint";
-  mkCollisionFootprint.action = visualization_msgs::Marker::ADD;
-  mkCollisionFootprint.pose.orientation.w = 1.0;
-  mkCollisionFootprint.id = __COUNTER__;
-  mkCollisionFootprint.type = visualization_msgs::Marker::LINE_LIST;
-  mkCollisionFootprint.scale.x = 0.1;
-  mkCollisionFootprint.color.b = 1.0;
-  mkCollisionFootprint.color.a = 0.3;
-  mkCollisionFootprint.points = footprint;
+  const auto marker_footprint = create_marker(
+    frame_id, "Collision footprint", visualization_msgs::Marker::LINE_LIST, footprint_scale,
+    footprint_color, footprint);
 
-  visualization_msgs::Marker mkCollisionHull;
-  mkCollisionHull.header.frame_id = frame_id;
-  mkCollisionHull.header.stamp = ros::Time::now();
-  mkCollisionHull.ns = "Collision polygon";
-  mkCollisionHull.action = visualization_msgs::Marker::ADD;
-  mkCollisionHull.pose.orientation.w = 1.0;
-  mkCollisionHull.id = __COUNTER__;
-  mkCollisionHull.type = visualization_msgs::Marker::LINE_STRIP;
-  mkCollisionHull.scale.x = 0.2;
-  mkCollisionHull.color.r = 1.0;
-  mkCollisionHull.color.a = 0.3;
-  mkCollisionHull.points = hull;
+  const auto marker_hull = create_marker(
+    frame_id, "Collision polygon", visualization_msgs::Marker::LINE_STRIP, hull_scale, hull_color,
+    hull);
 
-  visualization_msgs::Marker mkCollisionIndicator;
-  mkCollisionIndicator.header.frame_id = frame_id;
-  mkCollisionIndicator.header.stamp = ros::Time::now();
-  mkCollisionIndicator.ns = "Collision object";
-  mkCollisionIndicator.pose.orientation.w = 1.0;
-  mkCollisionIndicator.id = __COUNTER__;
-  mkCollisionIndicator.type = visualization_msgs::Marker::CYLINDER;
-  mkCollisionIndicator.scale.x = 0.5;
-  mkCollisionIndicator.scale.y = 0.5;
-  mkCollisionIndicator.color.r = 1.0;
-  mkCollisionIndicator.color.a = 0.0;
-
-  visualization_msgs::MarkerArray mkCollision;
-  mkCollisionIndicator.scale.z = cost / 255.0;
-  mkCollisionIndicator.color.a = cost / 255.0;
-  mkCollisionIndicator.pose.position = point;
-  mkCollisionIndicator.pose.position.z = mkCollisionIndicator.scale.z * 0.5;
-  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon()) {
-    mkCollisionIndicator.action = visualization_msgs::Marker::ADD;
-  } else {
-    mkCollisionIndicator.action = visualization_msgs::Marker::DELETE;
+  auto marker_indicator = create_marker(
+    frame_id, "Collision object", visualization_msgs::Marker::CYLINDER,
+    create_scale(0.5, 0.5, cost / 255.0),
+    create_color(1.0, 0.0, 0.0, static_cast<float>(cost) / 255.0F), {});
+  marker_indicator.pose.position = point;
+  marker_indicator.pose.position.z = marker_indicator.scale.z * 0.5;
+  if (marker_indicator.scale.z <= std::numeric_limits<float>::epsilon()) {
+    marker_indicator.action = visualization_msgs::Marker::DELETE;
   }
 
-  mkCollision.markers.push_back(mkCollisionIndicator);
+  visualization_msgs::MarkerArray collision;
 
-  mkCollision.markers.push_back(mkCollisionFootprint);
-  mkCollision.markers.push_back(mkCollisionHull);
-  if (!mkSteps.points.empty()) {
-    mkCollision.markers.push_back(mkSteps);
+  collision.markers.push_back(marker_indicator);
+  collision.markers.push_back(marker_footprint);
+  collision.markers.push_back(marker_hull);
+  if (!marker_steps.points.empty()) {
+    collision.markers.push_back(marker_steps);
   }
-  if (!mkPosesOnPath.points.empty()) {
-    mkCollision.markers.push_back(mkPosesOnPath);
+  if (!marker_path.points.empty()) {
+    collision.markers.push_back(marker_path);
   }
 
-  collision_marker_pub_.publish(mkCollision);
+  collision_marker_pub_.publish(collision);
 }
 
 void Visualization::publishSphere(
