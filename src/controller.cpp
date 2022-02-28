@@ -11,6 +11,7 @@
 #include <path_tracking_pid/controller.hpp>
 #include <vector>
 
+#include "calculations.hpp"
 #include "common.hpp"
 
 namespace path_tracking_pid
@@ -217,14 +218,7 @@ void Controller::setPlan(
     }
   }
 
-  // Determine deltas between consecutive points on the global plan.
-  auto deltas = std::vector<tf2::Transform>{};
-  if (!global_plan_tf_.empty()) {
-    deltas.reserve(global_plan_tf_.size() - 1);
-    std::transform(
-      global_plan_tf_.cbegin(), global_plan_tf_.cend() - 1, global_plan_tf_.cbegin() + 1,
-      std::back_inserter(deltas), [](const auto & a, const auto & b) { return a.inverseTimes(b); });
-  }
+  const auto deltas = deltas_of_plan(global_plan_tf_);
 
   // Repopulate distance vector.
   distance_to_goal_vector_.clear();
