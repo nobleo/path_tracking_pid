@@ -145,7 +145,6 @@ private:
   // Rviz visualization
   std::unique_ptr<Visualization> visualization_;
   ros::Publisher path_pub_;
-  ros::Publisher collision_marker_pub_;
 
   ros::Subscriber sub_odom_;
   ros::Publisher feedback_pub_;
