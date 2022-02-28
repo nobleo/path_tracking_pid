@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <path_tracking_pid/controller.hpp>
 #include <vector>
 
@@ -201,20 +202,11 @@ void Controller::setPlan(
 
   // find closest current position to global plan
   double minimum_distance_to_path = 1e3;
-  double dist_to_segment;
-  double iterative_dist_to_goal = 0.0;
-  distance_to_goal_vector_.clear();
-  distance_to_goal_vector_.resize(global_plan_tf_.size());
-  distance_to_goal_vector_[global_plan_tf_.size() - 1] = 0.0;
-  turning_radius_inv_vector_.clear();
-  turning_radius_inv_vector_.resize(global_plan_tf_.size());
-  turning_radius_inv_vector_[global_plan_tf_.size() - 1] = 0.0;
-  tf2::Transform deltaPlan;
   // We define segment0 to be the segment connecting pose0 and pose1.
   // Hence, when picking the starting path's pose, we mean to start at the segment connecting that and the next pose.
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
-    dist_to_segment =
+    const auto dist_to_segment =
       distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
         .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
@@ -223,25 +215,50 @@ void Controller::setPlan(
       minimum_distance_to_path = dist_to_segment;
       controller_state_.current_global_plan_index = idx_path;
     }
-
-    /* Create distance and turning radius vectors once for usage later */
-    deltaPlan = global_plan_tf_[idx_path].inverseTimes(global_plan_tf_[idx_path + 1]);
-    const double dpX = deltaPlan.getOrigin().x();
-    const double dpY = deltaPlan.getOrigin().y();
-    iterative_dist_to_goal += hypot(dpX, dpY);
-    distance_to_goal_vector_[idx_path] = iterative_dist_to_goal;
-    // compute turning radius based on trigonometric analysis
-    // radius such that next pose is connected from current pose with a semi-circle
-    const double dpXY2 = dpY * dpY + dpX * dpX;
-    if (dpXY2 < FLT_EPSILON) {
-      turning_radius_inv_vector_[idx_path] = std::numeric_limits<double>::infinity();
-    } else {
-      //  0.5*dpY*( 1 + dpX*dpX/(dpY*dPY) );
-      // turning_radius_vector[idx_path] = 0.5*(1/dpY)*( dpY*dpY + dpX*dpX );
-      turning_radius_inv_vector_[idx_path] = 2 * dpY / dpXY2;
-    }
-    ROS_DEBUG("turning_radius_inv_vector[%d] = %f", idx_path, turning_radius_inv_vector_[idx_path]);
   }
+
+  // Determine deltas between consecutive points on the global plan.
+  auto deltas = std::vector<tf2::Transform>{};
+  if (!global_plan_tf_.empty()) {
+    deltas.reserve(global_plan_tf_.size() - 1);
+    std::transform(
+      global_plan_tf_.cbegin(), global_plan_tf_.cend() - 1, global_plan_tf_.cbegin() + 1,
+      std::back_inserter(deltas), [](const auto & a, const auto & b) { return a.inverseTimes(b); });
+  }
+
+  // Repopulate distance vector.
+  distance_to_goal_vector_.clear();
+  distance_to_goal_vector_.reserve(deltas.size() + 1);
+  std::transform(
+    deltas.cbegin(), deltas.cend(), std::back_inserter(distance_to_goal_vector_),
+    [](const auto & d) {
+      const auto & origin = d.getOrigin();
+      return hypot(origin.x(), origin.y());
+    });
+  distance_to_goal_vector_.push_back(0.0);
+  std::partial_sum(
+    distance_to_goal_vector_.crbegin(), distance_to_goal_vector_.crend(),
+    distance_to_goal_vector_.rbegin());
+
+  // Repopulate turning radius vector.
+  turning_radius_inv_vector_.clear();
+  turning_radius_inv_vector_.reserve(deltas.size() + 1);
+  std::transform(
+    deltas.cbegin(), deltas.cend(), std::back_inserter(turning_radius_inv_vector_),
+    [](const auto & d) {
+      const auto & origin = d.getOrigin();
+      const auto dpX = origin.x();
+      const auto dpY = origin.y();
+      const auto dpXY2 = std::pow(dpX, 2) + std::pow(dpY, 2);
+      if (dpXY2 < FLT_EPSILON) {
+        return std::numeric_limits<double>::infinity();
+      }
+      return 2 * dpY / dpXY2;
+    });
+  turning_radius_inv_vector_.push_back(0.0);
+
+  assert(global_plan_tf_.size() == distance_to_goal_vector_.size());
+  assert(global_plan_tf_.size() == turning_radius_inv_vector_.size());
 
   // Set initial velocity
   switch (config_.init_vel_method) {
