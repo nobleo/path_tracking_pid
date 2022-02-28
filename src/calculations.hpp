@@ -16,4 +16,13 @@ namespace path_tracking_pid
  */
 std::vector<tf2::Transform> deltas_of_plan(const std::vector<tf2::Transform> & plan);
 
+/**
+ * Determine the distances to the goal for each pose of a plan, based on the given deltas of that
+ * plan. The 2D distance is calculated; the z component is ignored.
+ *
+ * @param[in] deltas Deltas between consecutive poses of a plan. (Result of deltas_of_plan().)
+ * @return Distances to the goal.
+ */
+std::vector<double> distances_to_goal(const std::vector<tf2::Transform> & deltas);
+
 }  // namespace path_tracking_pid
