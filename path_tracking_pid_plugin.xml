@@ -1,9 +1,4 @@
 <library path="lib/libpath_tracking_pid">
-    <class name="path_tracking_pid/TrackingPidLocalPlanner" type="path_tracking_pid::TrackingPidLocalPlanner" base_class_type="nav_core::BaseLocalPlanner">
-        <description>
-            Local planner that tries to stay on the global path as well as it can, using multiple SISO PID controllers for steering calculation and an open-loop strategy for forward velocity
-        </description>
-    </class>
     <class name="path_tracking_pid/TrackingPidLocalPlanner" type="path_tracking_pid::TrackingPidLocalPlanner" base_class_type="mbf_costmap_core::CostmapController">
         <description>
             Local planner that tries to stay on the global path as well as it can, using multiple SISO PID controllers for steering calculation and an open-loop strategy for forward velocity

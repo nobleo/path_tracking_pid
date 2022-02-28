@@ -22,7 +22,6 @@
   <depend>geometry_msgs</depend>
   <depend>mbf_costmap_core</depend>
   <depend>mbf_msgs</depend>
-  <depend>nav_core</depend>
   <depend>nav_msgs</depend>
   <depend>pluginlib</depend>
   <depend>roscpp</depend>
@@ -37,7 +36,6 @@
   <test_depend>rospy</test_depend>
 
   <export>
-    <nav_core plugin="${prefix}/path_tracking_pid_plugin.xml"/>
     <mbf_costmap_core plugin="${prefix}/path_tracking_pid_plugin.xml"/>
   </export>
 </package>
