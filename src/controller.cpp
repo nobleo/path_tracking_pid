@@ -414,15 +414,15 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
   current_with_carrot_origin.setX(current_tf.translation.x + l_ * cos(theda_rp));
   current_with_carrot_origin.setY(current_tf.translation.y + l_ * sin(theda_rp));
   current_with_carrot_origin.setZ(0);
-  RCLCPP_INFO(node_->get_logger(), "l_ is: %f", l_);
-  RCLCPP_INFO(node_->get_logger(), "theda_rp is: %f", theda_rp);
+  RCLCPP_DEBUG(node_->get_logger(), "l_ is: %f", l_);
+  RCLCPP_DEBUG(node_->get_logger(), "theda_rp is: %f", theda_rp);
 
   current_with_carrot_.setOrigin(current_with_carrot_origin);
   tf2::Quaternion cur_rot(current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
   current_with_carrot_.setRotation(cur_rot);
 
-  RCLCPP_INFO(node_->get_logger(), "current_with_carrot_.x is: %f", current_with_carrot_.getOrigin().x());
-  RCLCPP_INFO(node_->get_logger(), "current_with_carrot_.y is: %f", current_with_carrot_.getOrigin().y());
+  RCLCPP_DEBUG(node_->get_logger(), "current_with_carrot_.x is: %f", current_with_carrot_.getOrigin().x());
+  RCLCPP_DEBUG(node_->get_logger(), "current_with_carrot_.y is: %f", current_with_carrot_.getOrigin().y());
 
 
   size_t path_pose_idx;
@@ -609,7 +609,7 @@ geometry_msgs::msg::TwistStamped Controller::update(const double target_x_vel,
                 + target_x_vel * 2.0 * dt.seconds();
   }
   RCLCPP_DEBUG(node_->get_logger(), "t_end_phase_current: %f", t_end_phase_current);
-  RCLCPP_INFO(node_->get_logger(), "d_end_phase: %f", d_end_phase);
+  RCLCPP_DEBUG(node_->get_logger(), "d_end_phase: %f", d_end_phase);
   RCLCPP_DEBUG(node_->get_logger(), "distance_to_goal: %f", distance_to_goal_);
 
   // Get 'angle' towards current_goal
