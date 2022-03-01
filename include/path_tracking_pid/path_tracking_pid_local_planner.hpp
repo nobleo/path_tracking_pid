@@ -90,10 +90,9 @@ public:
 private:
   /**
    * @brief Calculates the velocity command based on the current robot pose given by pose.
-   * @param cmd_vel Output the velocity command
-   * @return true if succeded.
+   * @return Velocity command on success, empty optional otherwise.
    */
-  bool computeVelocityCommands(geometry_msgs::Twist & cmd_vel);
+  std::optional<geometry_msgs::Twist> computeVelocityCommands();
 
   /**
    * @brief Returns true, if the goal is reached.
