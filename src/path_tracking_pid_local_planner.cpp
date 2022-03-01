@@ -2,54 +2,60 @@
 // Created by nobleo on 12-9-18.
 //
 
-#include "path_tracking_pid/path_tracking_pid_local_planner.hpp"
+#include <mbf_msgs/ExePathResult.h>
+#include <path_tracking_pid/PidDebug.h>
+#include <path_tracking_pid/PidFeedback.h>
+#include <pluginlib/class_list_macros.h>
+#include <tf2/utils.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
+#include <path_tracking_pid/path_tracking_pid_local_planner.hpp>
 #include <string>
 #include <vector>
 
-#include "mbf_msgs/ExePathResult.h"
-#include "path_tracking_pid/PidDebug.h"
-#include "path_tracking_pid/PidFeedback.h"
-#include "pluginlib/class_list_macros.h"
-#include "tf2/utils.h"
-#include "visualization_msgs/Marker.h"
-#include "visualization_msgs/MarkerArray.h"
+#include "common.hpp"
 
 // register planner as move_base and move_base plugins
 PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, nav_core::BaseLocalPlanner)
-PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, mbf_costmap_core::CostmapController)
+PLUGINLIB_EXPORT_CLASS(
+  path_tracking_pid::TrackingPidLocalPlanner, mbf_costmap_core::CostmapController)
 
 namespace path_tracking_pid
 {
-TrackingPidLocalPlanner::TrackingPidLocalPlanner() = default;
+namespace
+{
+constexpr double MAP_PARALLEL_THRESH = 0.2;
+constexpr double DT_MAX = 1.5;
 
-TrackingPidLocalPlanner::~TrackingPidLocalPlanner() = default;
+}  // namespace
 
-void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig& config, uint32_t level)
+void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig & config)
 {
   pid_controller_.configure(config);
   controller_debug_enabled_ = config.controller_debug_enabled;
 
-  if (controller_debug_enabled_ && !global_plan_.empty())
-  {
+  if (controller_debug_enabled_ && !global_plan_.empty()) {
     received_path_.header = global_plan_.at(0).header;
     received_path_.poses = global_plan_;
     path_pub_.publish(received_path_);
   }
 }
 
-void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap)
+void TrackingPidLocalPlanner::initialize(
+  std::string name, tf2_ros::Buffer * tf, costmap_2d::Costmap2DROS * costmap)
 {
   ros::NodeHandle nh("~/" + name);
   ros::NodeHandle gn;
   ROS_DEBUG("TrackingPidLocalPlanner::initialize(%s, ..., ...)", name.c_str());
   // setup dynamic reconfigure
-  pid_server_ = std::make_unique<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>>(config_mutex_, nh);
-  dynamic_reconfigure::Server<path_tracking_pid::PidConfig>::CallbackType cb1;
-  cb1 = boost::bind(&TrackingPidLocalPlanner::reconfigure_pid, this, _1, _2);
-  pid_server_->setCallback(cb1);
+  pid_server_ =
+    std::make_unique<dynamic_reconfigure::Server<path_tracking_pid::PidConfig>>(config_mutex_, nh);
+  pid_server_->setCallback(
+    [this](auto & config, auto /*unused*/) { this->reconfigure_pid(config); });
   pid_controller_.setEnabled(false);
 
   bool holonomic_robot;
@@ -65,14 +71,14 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   nh.param<bool>("use_tricycle_model", use_tricycle_model_, false);
   nh.param<std::string>("steered_wheel_frame", steered_wheel_frame_, "steer");
 
-
   collision_marker_pub_ = nh.advertise<visualization_msgs::MarkerArray>("collision_markers", 3);
-  marker_pub_ = nh.advertise<visualization_msgs::Marker>("visualization_marker", 3);
+  visualization_ = std::make_unique<Visualization>(nh);
   debug_pub_ = nh.advertise<path_tracking_pid::PidDebug>("debug", 1);
   path_pub_ = nh.advertise<nav_msgs::Path>("visualization_path", 1, true);
 
   sub_odom_ = gn.subscribe("odom", 1, &TrackingPidLocalPlanner::curOdomCallback, this);
-  sub_vel_max_external_ = nh.subscribe("vel_max", 1, &TrackingPidLocalPlanner::velMaxExternalCallback, this);
+  sub_vel_max_external_ =
+    nh.subscribe("vel_max", 1, &TrackingPidLocalPlanner::velMaxExternalCallback, this);
   feedback_pub_ = nh.advertise<path_tracking_pid::PidFeedback>("feedback", 1);
 
   map_frame_ = costmap->getGlobalFrameID();
@@ -82,11 +88,12 @@ void TrackingPidLocalPlanner::initialize(std::string name, tf2_ros::Buffer* tf, 
   initialized_ = true;
 }
 
-bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& global_plan)
+bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped> & global_plan)
 {
-  if (!initialized_)
-  {
-    ROS_ERROR("path_tracking_pid has not been initialized, please call initialize() before using this planner");
+  if (!initialized_) {
+    ROS_ERROR(
+      "path_tracking_pid has not been initialized, please call initialize() before using this "
+      "planner");
     return false;
   }
 
@@ -97,22 +104,23 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   global_plan_ = global_plan;
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
-  if (map_frame_.compare(path_frame))
-  {
-    ROS_DEBUG("Transforming plan since my global_frame = '%s' and my plan is in frame: '%s'", map_frame_.c_str(),
-              path_frame.c_str());
+  if (map_frame_ != path_frame) {
+    ROS_DEBUG(
+      "Transforming plan since my global_frame = '%s' and my plan is in frame: '%s'",
+      map_frame_.c_str(), path_frame.c_str());
     geometry_msgs::TransformStamped tf_transform;
     tf_transform = tf_->lookupTransform(map_frame_, path_frame, ros::Time(0));
     // Check alignment, when path-frame is severly mis-aligned show error
-    double yaw, pitch, roll;
+    double yaw;
+    double pitch;
+    double roll;
     tf2::getEulerYPR(tf_transform.transform.rotation, yaw, pitch, roll);
-    if (std::fabs(pitch) > MAP_PARALLEL_THRESH || std::fabs(roll) > MAP_PARALLEL_THRESH)
-    {
-      ROS_ERROR("Path is given in %s frame which is severly mis-aligned with our map-frame: %s", path_frame.c_str(),
-                                                                                                 map_frame_.c_str());
+    if (std::fabs(pitch) > MAP_PARALLEL_THRESH || std::fabs(roll) > MAP_PARALLEL_THRESH) {
+      ROS_ERROR(
+        "Path is given in %s frame which is severly mis-aligned with our map-frame: %s",
+        path_frame.c_str(), map_frame_.c_str());
     }
-    for (auto& pose_stamped : global_plan_)
-    {
+    for (auto & pose_stamped : global_plan_) {
       tf2::doTransform(pose_stamped.pose, pose_stamped.pose, tf_transform);
       pose_stamped.header.frame_id = map_frame_;
       // 'Project' plan by removing z-component
@@ -120,59 +128,59 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     }
   }
 
-  if (controller_debug_enabled_)
-  {
+  if (controller_debug_enabled_) {
     received_path_.header = global_plan_.at(0).header;
     received_path_.poses = global_plan_;
     path_pub_.publish(received_path_);
   }
 
-  try
-  {
-    ROS_DEBUG("map_frame: %s, plan_frame: %s, base_link_frame: %s", map_frame_.c_str(), path_frame.c_str(),
-              base_link_frame_.c_str());
+  try {
+    ROS_DEBUG(
+      "map_frame: %s, plan_frame: %s, base_link_frame: %s", map_frame_.c_str(), path_frame.c_str(),
+      base_link_frame_.c_str());
     tfCurPoseStamped_ = tf_->lookupTransform(map_frame_, base_link_frame_, ros::Time(0));
-  }
-  catch (const tf2::TransformException& ex)
-  {
+  } catch (const tf2::TransformException & ex) {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     return false;
   }
 
   // Feasability check, but only when not resuming with odom-vel
-  if (pid_controller_.getConfig().init_vel_method != Pid_Odom &&
-      pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
-      std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
-        pid_controller_.getConfig().init_vel_max_diff)
-  {
-    ROS_ERROR("Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
-              latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
+  if (
+    pid_controller_.getConfig().init_vel_method != Pid_Odom &&
+    pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
+    std::abs(
+      latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
+      pid_controller_.getConfig().init_vel_max_diff) {
+    ROS_ERROR(
+      "Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
+      latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
     return false;
   }
 
-  if (use_tricycle_model_)
-  {
-    try
-    {
-      ROS_DEBUG("base_link_frame: %s, steered_wheel_frame: %s", base_link_frame_.c_str(), steered_wheel_frame_.c_str());
-      tf_base_to_steered_wheel_stamped_ = tf_->lookupTransform(base_link_frame_, steered_wheel_frame_, ros::Time(0));
-    }
-    catch (const tf2::TransformException& ex)
-    {
+  if (use_tricycle_model_) {
+    try {
+      ROS_DEBUG(
+        "base_link_frame: %s, steered_wheel_frame: %s", base_link_frame_.c_str(),
+        steered_wheel_frame_.c_str());
+      tf_base_to_steered_wheel_stamped_ =
+        tf_->lookupTransform(base_link_frame_, steered_wheel_frame_, ros::Time(0));
+    } catch (const tf2::TransformException & ex) {
       ROS_ERROR("Received an exception trying to transform: %s", ex.what());
-      ROS_ERROR("Invalid transformation from base_link_frame to steered_wheel_frame. Tricycle model will be disabled");
+      ROS_ERROR(
+        "Invalid transformation from base_link_frame to steered_wheel_frame. Tricycle model will "
+        "be disabled");
       use_tricycle_model_ = false;
     }
 
-    pid_controller_.setTricycleModel(use_tricycle_model_, tf_base_to_steered_wheel_stamped_.transform);
+    pid_controller_.setTricycleModel(
+      use_tricycle_model_, tf_base_to_steered_wheel_stamped_.transform);
 
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
-    pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-                            tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, global_plan_);
-  }
-  else
-  {
+    pid_controller_.setPlan(
+      tfCurPoseStamped_.transform, latest_odom_.twist.twist,
+      tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, global_plan_);
+  } else {
     pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, global_plan_);
   }
 
@@ -182,79 +190,63 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   return true;
 }
 
-bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
+bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd_vel)
 {
   ros::Time now = ros::Time::now();
-  if (prev_time_.isZero())
-  {
+  if (prev_time_.isZero()) {
     prev_time_ = now - prev_dt_;  // Initialisation round
   }
   ros::Duration dt = now - prev_time_;
-  if (dt.isZero())
-  {
-    ROS_ERROR_THROTTLE(5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
+  if (dt.isZero()) {
+    ROS_ERROR_THROTTLE(
+      5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
     cmd_vel = geometry_msgs::Twist();
     cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
     return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
   }
-  else if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX))
-  {
+  if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX)) {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
     return false;
   }
-  try
-  {
+  try {
     ROS_DEBUG("map_frame: %s, base_link_frame: %s", map_frame_.c_str(), base_link_frame_.c_str());
     tfCurPoseStamped_ = tf_->lookupTransform(map_frame_, base_link_frame_, ros::Time(0));
-  }
-  catch (const tf2::TransformException& ex)
-  {
+  } catch (const tf2::TransformException & ex) {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     active_goal_ = false;
     return false;
   }
 
   // Handle obstacles
-  if (pid_controller_.getConfig().anti_collision)
-  {
+  if (pid_controller_.getConfig().anti_collision) {
     auto cost = projectedCollisionCost();
 
-    if (cost >= costmap_2d::LETHAL_OBSTACLE)
-    {
+    if (cost >= costmap_2d::LETHAL_OBSTACLE) {
       pid_controller_.setVelMaxObstacle(0.0);
-    }
-    else if (pid_controller_.getConfig().obstacle_speed_reduction)
-    {
+    } else if (pid_controller_.getConfig().obstacle_speed_reduction) {
       double max_vel = pid_controller_.getConfig().max_x_vel;
       double reduction_factor = static_cast<double>(cost) / costmap_2d::LETHAL_OBSTACLE;
       double limit = max_vel * (1 - reduction_factor);
       ROS_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
       pid_controller_.setVelMaxObstacle(limit);
-    }
-    else
-    {
+    } else {
       pid_controller_.setVelMaxObstacle(INFINITY);  // set back to inf
     }
-  }
-  else
-  {
+  } else {
     pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   }
 
-  path_tracking_pid::PidDebug pid_debug;
-  double eda = 1 / FLT_EPSILON;  // initial guess. Avoids errors in case function returns due to wrong delta_t;
-  double progress = 0.0;
-  cmd_vel = pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-                                               dt, &eda, &progress, &pid_debug);
+  const auto update_result =
+    pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt);
+  cmd_vel = update_result.velocity_command;
 
   path_tracking_pid::PidFeedback feedback_msg;
-  feedback_msg.eda = ros::Duration(eda);
-  feedback_msg.progress = progress;
+  feedback_msg.eda = ros::Duration(update_result.eda);
+  feedback_msg.progress = update_result.progress;
   feedback_pub_.publish(feedback_msg);
 
-  if (cancel_requested_)
-  {
+  if (cancel_requested_) {
     path_tracking_pid::PidConfig config = pid_controller_.getConfig();
     // Copysign here, such that when cancelling while driving backwards, we decelerate to -0.0 and hence
     // the sign propagates correctly
@@ -265,86 +257,27 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_
     pid_controller_.configure(config);
     pid_server_->updateConfig(config);
     lock.unlock();
-    cancel_requested_ =  false;
+    cancel_requested_ = false;
   }
 
+  if (controller_debug_enabled_) {
+    debug_pub_.publish(update_result.pid_debug);
 
-  if (controller_debug_enabled_)
-  {
-    debug_pub_.publish(pid_debug);
-
-    visualization_msgs::Marker mkCurPose, mkControlPose, mkGoalPose, mkPosOnPlan;
-
-    // configure rviz visualization
-    mkCurPose.header.frame_id = mkControlPose.header.frame_id = map_frame_;
-    mkGoalPose.header.frame_id = mkPosOnPlan.header.frame_id = map_frame_;
-    mkCurPose.header.stamp = mkControlPose.header.stamp = ros::Time::now();
-    mkGoalPose.header.stamp = mkPosOnPlan.header.stamp = ros::Time::now();
-    mkCurPose.ns = "axle point";
-    mkControlPose.ns = "control point";
-    mkGoalPose.ns = "goal point";
-    mkPosOnPlan.ns = "plan point";
-    mkCurPose.action = mkControlPose.action = visualization_msgs::Marker::ADD;
-    mkGoalPose.action = mkPosOnPlan.action = visualization_msgs::Marker::ADD;
-    mkCurPose.pose.orientation.w = mkControlPose.pose.orientation.w = 1.0;
-    mkGoalPose.pose.orientation.w = mkPosOnPlan.pose.orientation.w = 1.0;
-    mkCurPose.id = __COUNTER__;  // id has to be unique, so using a compile-time counter :)
-    mkControlPose.id = __COUNTER__;
-    mkGoalPose.id = __COUNTER__;
-    mkPosOnPlan.id = __COUNTER__;
-    mkCurPose.type = mkControlPose.type = visualization_msgs::Marker::POINTS;
-    mkGoalPose.type = mkPosOnPlan.type = visualization_msgs::Marker::POINTS;
-    mkCurPose.scale.x = 0.5;
-    mkCurPose.scale.y = 0.5;
-    mkControlPose.scale.x = 0.5;
-    mkControlPose.scale.y = 0.5;
-    mkGoalPose.scale.x = 0.5;
-    mkGoalPose.scale.y = 0.5;
-    mkCurPose.color.b = 1.0;
-    mkCurPose.color.a = 1.0;
-    mkControlPose.color.g = 1.0f;
-    mkControlPose.color.a = 1.0;
-    mkGoalPose.color.r = 1.0;
-    mkGoalPose.color.a = 1.0;
-    mkPosOnPlan.scale.x = 0.5;
-    mkPosOnPlan.scale.y = 0.5;
-    mkPosOnPlan.color.a = 1.0;
-    mkPosOnPlan.color.r = 1.0f;
-    mkPosOnPlan.color.g = 0.5f;
-
-    geometry_msgs::Point p;
-    std_msgs::ColorRGBA color;
-    p.x = tfCurPoseStamped_.transform.translation.x;
-    p.y = tfCurPoseStamped_.transform.translation.y;
-    p.z = tfCurPoseStamped_.transform.translation.z;
-    mkCurPose.points.push_back(p);
-
-    tf2::Transform tfControlPose = pid_controller_.getCurrentWithCarrot();
-    p.x = tfControlPose.getOrigin().x();
-    p.y = tfControlPose.getOrigin().y();
-    p.z = tfControlPose.getOrigin().z();
-    mkControlPose.points.push_back(p);
-
-    tf2::Transform tfGoalPose = pid_controller_.getCurrentGoal();
-    p.x = tfGoalPose.getOrigin().x();
-    p.y = tfGoalPose.getOrigin().y();
-    p.z = tfGoalPose.getOrigin().z();
-    mkGoalPose.points.push_back(p);
-
-    tf2::Transform tfCurPose = pid_controller_.getCurrentPosOnPlan();
-    p.x = tfCurPose.getOrigin().x();
-    p.y = tfCurPose.getOrigin().y();
-    p.z = tfCurPose.getOrigin().z();
-    mkPosOnPlan.points.push_back(p);
-
-    marker_pub_.publish(mkCurPose);
-    marker_pub_.publish(mkControlPose);
-    marker_pub_.publish(mkGoalPose);
-    marker_pub_.publish(mkPosOnPlan);
+    // publish rviz visualization
+    std_msgs::Header header;
+    header.stamp = now;
+    header.frame_id = map_frame_;
+    tf2::Transform tfCurPose;
+    tf2::fromMsg(tfCurPoseStamped_.transform, tfCurPose);
+    visualization_->publishAxlePoint(header, tfCurPose);
+    visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
+    visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
+    visualization_->publishPlanPoint(header, pid_controller_.getCurrentPosOnPlan());
   }
 
   prev_time_ = now;
-  prev_dt_ = dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
+  prev_dt_ =
+    dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
   return true;
 }
 
@@ -418,9 +351,11 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Check how far we should check forward
   double x_vel = pid_controller_.getControllerState().current_x_vel;
-  double collision_look_ahead_distance = x_vel*x_vel / (2*pid_controller_.getConfig().target_x_decc)
-                                         + pid_controller_.getConfig().collision_look_ahead_length_offset;
-  uint n_steps = std::ceil(collision_look_ahead_distance / pid_controller_.getConfig().collision_look_ahead_resolution);
+  double collision_look_ahead_distance =
+    x_vel * x_vel / (2 * pid_controller_.getConfig().target_x_decc) +
+    pid_controller_.getConfig().collision_look_ahead_length_offset;
+  uint n_steps = std::ceil(
+    collision_look_ahead_distance / pid_controller_.getConfig().collision_look_ahead_resolution);
   double x_resolution = collision_look_ahead_distance / std::max(static_cast<int>(n_steps), 1);
 
   // Define a x_step transform which will be used to step forward the position.
@@ -438,13 +373,12 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   tf2::Transform projected_step_tf;
   tf2::fromMsg(current_tf, projected_step_tf);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
-  projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, &projected_controller_state);
+  projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, projected_controller_state);
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
-  for (uint step = 0; step < n_steps; step++)
-  {
+  for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
-    projected_step_tf = pid_controller_.findPositionOnPlan(tf2::toMsg(next_straight_step_tf),
-                                                           &projected_controller_state);
+    projected_step_tf = pid_controller_.findPositionOnPlan(
+      tf2::toMsg(next_straight_step_tf), projected_controller_state);
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:
@@ -460,8 +394,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
   uint8_t max_projected_step_cost = 0;
-  for (const auto& projection_tf : projected_steps_tf)
-  {
+  for (const auto & projection_tf : projected_steps_tf) {
+    // Project footprint forward
     double x = projection_tf.getOrigin().x();
     double y = projection_tf.getOrigin().y();
     double yaw = tf2::getYaw(projection_tf.getRotation());
@@ -482,8 +416,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     // Append footprint to polygon
     polygon_t two_footprints = previous_footprint_xy;
     previous_footprint_xy.clear();
-    for (const auto& point : footprint)
-    {
+    for (const auto & point : footprint) {
       boost::geometry::append(two_footprints, point);
       boost::geometry::append(previous_footprint_xy, point);
     }
@@ -495,8 +428,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
     // Add footprint to marker
     geometry_msgs::Point previous_point = footprint.back();
-    for (const auto& point : footprint)
-    {
+    for (const auto & point : footprint) {
       mkCollisionFootprint.points.push_back(previous_point);
       mkCollisionFootprint.points.push_back(point);
       previous_point = point;
@@ -509,9 +441,9 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   std::vector<costmap_2d::MapLocation> collision_polygon_hull_map;
 
   // Convert to map coordinates
-  for (const auto& point : collision_polygon_hull)
-  {
-    int map_x, map_y;
+  for (const auto & point : collision_polygon_hull) {
+    int map_x;
+    int map_y;
     costmap2d->worldToMapEnforceBounds(point.x, point.y, map_x, map_y);
     costmap_2d::MapLocation map_point{static_cast<uint>(map_x), static_cast<uint>(map_y)};
     collision_polygon_hull_map.push_back(map_point);
@@ -523,17 +455,14 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Get the max cost inside the concave polygon
   uint8_t max_cost = 0.0;
-  for (const auto& cell_in_polygon : cells_in_polygon)
-  {
+  for (const auto & cell_in_polygon : cells_in_polygon) {
     // Cost checker is cheaper than polygon checker, so lets do that first
     uint8_t cell_cost = costmap2d->getCost(cell_in_polygon.x, cell_in_polygon.y);
-    if (cell_cost > max_cost && cell_cost != costmap_2d::NO_INFORMATION)
-    {
+    if (cell_cost > max_cost && cell_cost != costmap_2d::NO_INFORMATION) {
       // Check if in concave polygon
       geometry_msgs::Point point;
       costmap2d->mapToWorld(cell_in_polygon.x, cell_in_polygon.y, point.x, point.y);
-      if (boost::geometry::within(point, collision_polygon))
-      {
+      if (boost::geometry::within(point, collision_polygon)) {
         // Protip: uncomment below and 'if (cell_cost > max_cost)' to see evaluated cells
         // boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock_controller(*(costmap2d->getMutex()));
         // costmap2d->setCost(cell_in_polygon.x, cell_in_polygon.y, 100);
@@ -544,34 +473,28 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
         mkCollisionIndicator.color.a = cell_cost / 255.0;
         point.z = mkCollisionIndicator.scale.z * 0.5;
         mkCollisionIndicator.pose.position = point;
-        if (max_cost >= costmap_2d::LETHAL_OBSTACLE)
-        {
+        if (max_cost >= costmap_2d::LETHAL_OBSTACLE) {
           max_projected_step_cost = max_cost;
           break;  // Collision detected, no need to evaluate further
         }
       }
     }
   }
-  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon())
-  {
+  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon()) {
     mkCollisionIndicator.action = visualization_msgs::Marker::ADD;
-  }
-  else
-  {
+  } else {
     mkCollisionIndicator.action = visualization_msgs::Marker::DELETE;
   }
   mkCollision.markers.push_back(mkCollisionIndicator);
 
   // Fiddle the polygon into a marker message
-  for (const geometry_msgs::Point point : collision_polygon)
-  {
+  for (const geometry_msgs::Point point : collision_polygon) {
     mkCollisionHull.points.push_back(point);
   }
 
   mkCollision.markers.push_back(mkCollisionFootprint);
   mkCollision.markers.push_back(mkCollisionHull);
-  if (n_steps > 0)
-  {
+  if (n_steps > 0) {
     mkCollision.markers.push_back(mkSteps);
     mkCollision.markers.push_back(mkPosesOnPath);
   }
@@ -580,19 +503,19 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   return max_projected_step_cost;
 }
 
-uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::PoseStamped& pose,
-                                                          const geometry_msgs::TwistStamped& velocity,
-                                                          geometry_msgs::TwistStamped& cmd_vel, std::string& message)
+uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
+  const geometry_msgs::PoseStamped & /* pose */, const geometry_msgs::TwistStamped & /* velocity */,
+  geometry_msgs::TwistStamped & cmd_vel, std::string & /* message */)
 {
-  if (!initialized_)
-  {
-    ROS_ERROR("path_tracking_pid has not been initialized, please call initialize() before using this planner");
+  if (!initialized_) {
+    ROS_ERROR(
+      "path_tracking_pid has not been initialized, please call initialize() before using this "
+      "planner");
     active_goal_ = false;
     return mbf_msgs::ExePathResult::NOT_INITIALIZED;
   }
   // TODO(Cesar): Use provided pose and odom
-  if (!computeVelocityCommands(cmd_vel.twist))
-  {
+  if (!computeVelocityCommands(cmd_vel.twist)) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::FAILURE;
   }
@@ -600,27 +523,26 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(const geometry_msgs::P
   cmd_vel.header.frame_id = base_link_frame_;
 
   bool moving = std::abs(cmd_vel.twist.linear.x) > VELOCITY_EPS;
-  if (cancel_in_progress_)
-  {
-    if (!moving)
-    {
-        ROS_INFO("Cancel requested and we now (almost) reached velocity 0: %f", cmd_vel.twist.linear.x);
-        cancel_in_progress_ = false;
-        active_goal_ = false;
-        return mbf_msgs::ExePathResult::CANCELED;
+  if (cancel_in_progress_) {
+    if (!moving) {
+      ROS_INFO(
+        "Cancel requested and we now (almost) reached velocity 0: %f", cmd_vel.twist.linear.x);
+      cancel_in_progress_ = false;
+      active_goal_ = false;
+      return mbf_msgs::ExePathResult::CANCELED;
     }
     ROS_INFO_THROTTLE(1.0, "Cancel in progress... remaining x_vel: %f", cmd_vel.twist.linear.x);
-    return TrackingPidLocalPlanner::GRACEFULLY_CANCELLING;
+    return to_underlying(ComputeVelocityCommandsResult::GRACEFULLY_CANCELLING);
   }
 
-  if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS)
-  {
+  if (!moving && pid_controller_.getVelMaxObstacle() < VELOCITY_EPS) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::BLOCKED_PATH;
   }
 
-  if (isGoalReached())
+  if (isGoalReached()) {
     active_goal_ = false;
+  }
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
@@ -630,7 +552,8 @@ bool TrackingPidLocalPlanner::isGoalReached()
   return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
 }
 
-bool TrackingPidLocalPlanner::isGoalReached(double dist_tolerance, double angle_tolerance)
+bool TrackingPidLocalPlanner::isGoalReached(
+  double /* dist_tolerance */, double /* angle_tolerance */)
 {
   return isGoalReached();
 }
@@ -642,20 +565,19 @@ bool TrackingPidLocalPlanner::cancel()
   cancel_in_progress_ = true;
   ros::Rate r(10);
   ROS_INFO("Cancel requested, waiting in loop for cancel to finish");
-  while (active_goal_)
-  {
-      r.sleep();
+  while (active_goal_) {
+    r.sleep();
   }
   ROS_INFO("Finished waiting loop, done cancelling");
   return true;
 }
 
-void TrackingPidLocalPlanner::curOdomCallback(const nav_msgs::Odometry& odom_msg)
+void TrackingPidLocalPlanner::curOdomCallback(const nav_msgs::Odometry & odom_msg)
 {
   latest_odom_ = odom_msg;
 }
 
-void TrackingPidLocalPlanner::velMaxExternalCallback(const std_msgs::Float64& msg)
+void TrackingPidLocalPlanner::velMaxExternalCallback(const std_msgs::Float64 & msg)
 {
   pid_controller_.setVelMaxExternal(msg.data);
 }

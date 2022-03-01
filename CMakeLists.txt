@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-add_compile_options(-std=c++17)
+add_compile_options(-std=c++17 -Wall -Wextra -Wpedantic -Werror)
 project(path_tracking_pid)
 
 ## Find catkin and any catkin packages
@@ -61,21 +61,25 @@ catkin_package(
     visualization_msgs
 )
 
-add_library(${PROJECT_NAME} src/controller.cpp src/${PROJECT_NAME}_local_planner.cpp)
+add_library(${PROJECT_NAME}
+  src/${PROJECT_NAME}_local_planner.cpp
+  src/controller.cpp
+  src/calculations.cpp
+  src/visualization.cpp
+  src/details/second_order_lowpass.cpp
+)
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
-)
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS} ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
+include_directories(include)
 
 # Configure roslint for nodes
 
 # Roslint cpp
-set(ROSLINT_CPP_OPTS "--filter=-legal/copyright")
+set(ROSLINT_CPP_OPTS "--filter=-legal/copyright,-whitespace/braces")
 roslint_cpp()
+roslint_add_test()
 
 install(
   TARGETS
@@ -104,4 +108,9 @@ install(
 
 if(CATKIN_ENABLE_TESTING)
   add_rostest(test/test_path_tracking_pid.test ARGS rviz:=false reconfigure:=false)
+  catkin_add_gtest(unittests
+    test/unittests/test_main.cpp
+    test/unittests/test_fifo_array.cpp
+    test/unittests/test_calculations.cpp)
+  target_link_libraries(unittests ${catkin_LIBRARIES} ${PROJECT_NAME})
 endif()
