@@ -139,9 +139,10 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   }
 
   if (controller_debug_enabled_) {
-    received_path_.header = global_plan_map_frame.at(0).header;
-    received_path_.poses = global_plan_map_frame;
-    path_pub_.publish(received_path_);
+    nav_msgs::Path received_path;
+    received_path.header = global_plan_map_frame.at(0).header;
+    received_path.poses = global_plan_map_frame;
+    path_pub_.publish(received_path);
   }
 
   try {
