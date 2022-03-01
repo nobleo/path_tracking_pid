@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>path_tracking_pid</name>
-  <version>2.16.0</version>
+  <version>2.18.0</version>
   <description>Follows a trajectory with open-loop speed and closed loop (pid) lateral control</description>
 
   <maintainer email="cesar.lopez@nobleo.nl">Cesar Lopez</maintainer>
