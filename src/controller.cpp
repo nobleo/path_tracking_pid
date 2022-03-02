@@ -151,7 +151,7 @@ bool Controller::setPlan(
   ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
 
   if (!check_plan(global_plan)) {
-    ROS_WARN("Rejected plan because not all poses were in the expected direction of the path!");
+    ROS_ERROR("Rejected plan because not all poses were in the expected direction of the path!");
     return false;
   }
 
