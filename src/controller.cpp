@@ -37,57 +37,43 @@ bool have_same_sign(T val1, T val2)
   return std::signbit(val1) == std::signbit(val2);
 }
 
-// Converts a pose to the corresponding transform.
-tf2::Transform to_transform(const geometry_msgs::Pose & pose)
-{
-  tf2::Transform result;
-  tf2::fromMsg(pose, result);
-  return result;
-}
-
 // Returns the square distance between two points
 double distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
   return a.getOrigin().distance2(b.getOrigin());
 }
 
-// Return the square distance between two points.
-double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
-{
-  return std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2);
-}
-
 // Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
 bool is_pose_angle_obtuse(
-  const geometry_msgs::Pose & prev, const geometry_msgs::Pose & cur,
-  const geometry_msgs::Pose & next)
+  const tf2::Transform & prev, const tf2::Transform & cur, const tf2::Transform & next)
 {
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
 
-// Filters (and converts) the given plan. The first and last poses are always accepted (if they
-// exist). Intermediate poses are only accepted if the angle (with respect to the previous and next
-// poses) is obtuse. All accepted poses are converted to transforms.
-std::vector<tf2::Transform> filter_plan(const std::vector<geometry_msgs::PoseStamped> & plan)
+// Filters the given plan. The first and last poses are always accepted (if they exist).
+// Intermediate poses are only accepted if the angle (with respect to the previous and next poses)
+// is obtuse.
+std::vector<tf2::Transform> filter_plan(const std::vector<tf2::Transform> & plan)
 {
   const auto plan_size = plan.size();
   auto result = std::vector<tf2::Transform>{};
+  result.reserve(plan.size());
 
   if (plan_size > 0) {
-    result.push_back(to_transform(plan.front().pose));
+    result.push_back(plan.front());
   }
 
   for (int pose_idx = 1; pose_idx < static_cast<int>(plan_size) - 1; ++pose_idx) {
-    const auto prev_pose = plan[pose_idx - 1].pose;
-    const auto pose = plan[pose_idx].pose;
-    const auto next_pose = plan[pose_idx + 1].pose;
+    const auto & prev_pose = plan[pose_idx - 1];
+    const auto & pose = plan[pose_idx];
+    const auto & next_pose = plan[pose_idx + 1];
     if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
-      result.push_back(to_transform(pose));
+      result.push_back(pose);
     }
   }
 
   if (plan_size > 1) {
-    result.push_back(to_transform(plan.back().pose));
+    result.push_back(plan.back());
   }
 
   return result;
@@ -172,14 +158,10 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(
 }
 
 void Controller::setPlan(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  const std::vector<geometry_msgs::PoseStamped> & global_plan)
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  const std::vector<tf2::Transform> & global_plan)
 {
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
-  ROS_DEBUG("Plan is defined in frame '%s'", global_plan.at(0).header.frame_id.c_str());
-
-  tf2::Transform current_tf2;
-  tf2::convert(current_tf, current_tf2);
+  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
 
   global_plan_tf_ = filter_plan(global_plan);
   if (global_plan_tf_.size() != global_plan.size()) {
@@ -207,7 +189,7 @@ void Controller::setPlan(
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
     const auto dist_to_segment =
-      distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
+      distToSegmentSquared(current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
         .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
@@ -254,13 +236,13 @@ void Controller::setPlan(
 }
 
 void Controller::setPlan(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  const geometry_msgs::Transform & tf_base_to_steered_wheel,
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  const tf2::Transform & tf_base_to_steered_wheel,
   const geometry_msgs::Twist & /* steering_odom_twist */,
-  const std::vector<geometry_msgs::PoseStamped> & global_plan)
+  const std::vector<tf2::Transform> & global_plan)
 {
   setPlan(current_tf, odom_twist, global_plan);
-  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.rotation);
+  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.getRotation());
   // TODO(clopez) use steering_odom_twist to check if setpoint is being followed
 }
 

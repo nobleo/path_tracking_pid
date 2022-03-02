@@ -75,8 +75,8 @@ public:
    * @param global_plan Plan to follow
    */
   void setPlan(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    const std::vector<geometry_msgs::PoseStamped> & global_plan);
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const std::vector<tf2::Transform> & global_plan);
 
   /**
    * Set plan
@@ -87,10 +87,10 @@ public:
    * @param global_plan Plan to follow
    */
   void setPlan(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    const geometry_msgs::Transform & tf_base_to_steered_wheel,
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const tf2::Transform & tf_base_to_steered_wheel,
     const geometry_msgs::Twist & steering_odom_twist,
-    const std::vector<geometry_msgs::PoseStamped> & global_plan);
+    const std::vector<tf2::Transform> & global_plan);
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?

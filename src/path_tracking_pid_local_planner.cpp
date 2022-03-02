@@ -31,6 +31,24 @@ namespace
 constexpr double MAP_PARALLEL_THRESH = 0.2;
 constexpr double DT_MAX = 1.5;
 
+/**
+ * Convert the plan from geometry message format to tf2 format.
+ * 
+ * @param[in] plan Plan to convert.
+ * @return Converted plan.
+ */
+std::vector<tf2::Transform> convert_plan(const std::vector<geometry_msgs::PoseStamped> & plan)
+{
+  auto result = std::vector<tf2::Transform>{};
+
+  result.reserve(plan.size());
+  std::transform(
+    plan.cbegin(), plan.cend(), std::back_inserter(result),
+    [](const geometry_msgs::PoseStamped & msg) { return tf2_convert<tf2::Transform>(msg.pose); });
+
+  return result;
+}
+
 }  // namespace
 
 void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig & config)
@@ -179,10 +197,13 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
     pid_controller_.setPlan(
-      tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-      tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, global_plan_);
+      tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+      tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform), steering_odom_twist,
+      convert_plan(global_plan_));
   } else {
-    pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, global_plan_);
+    pid_controller_.setPlan(
+      tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+      convert_plan(global_plan_));
   }
 
   pid_controller_.setEnabled(true);
