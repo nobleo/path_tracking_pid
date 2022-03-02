@@ -259,8 +259,8 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   }
 
-  const auto update_result =
-    pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt);
+  const auto update_result = pid_controller_.update_with_limits(
+    tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist, dt);
   cmd_vel = update_result.velocity_command;
 
   path_tracking_pid::PidFeedback feedback_msg;

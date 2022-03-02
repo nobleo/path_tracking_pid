@@ -126,7 +126,7 @@ public:
    * @return Update result
    */
   UpdateResult update(
-    double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
+    double target_x_vel, double target_end_x_vel, const tf2::Transform & current_tf,
     const geometry_msgs::Twist & odom_twist, ros::Duration dt);
 
   /**
@@ -137,7 +137,7 @@ public:
    * @return Update result
    */
   UpdateResult update_with_limits(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
     ros::Duration dt);
 
   /**
@@ -147,7 +147,7 @@ public:
    * @return Velocity command
    */
   double mpc_based_max_vel(
-    double target_x_vel, const geometry_msgs::Transform & current_tf,
+    double target_x_vel, const tf2::Transform & current_tf,
     const geometry_msgs::Twist & odom_twist);
 
   /**

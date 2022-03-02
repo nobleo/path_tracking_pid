@@ -24,7 +24,9 @@ constexpr std::underlying_type_t<enum_type> to_underlying(enum_type value) noexc
  * @param[in] input Input object to convert.
  * @return Converted object.
  */
-template <typename result_type, typename input_type>
+template <
+  typename result_type, typename input_type,
+  typename = std::enable_if_t<!std::is_same_v<result_type, input_type>>>
 result_type tf2_convert(const input_type & input)
 {
   result_type result;
