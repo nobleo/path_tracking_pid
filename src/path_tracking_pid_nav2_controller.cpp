@@ -873,6 +873,91 @@ PathTrackingPid::dynamicParametersCallback(
         config_.target_x_vel = parameter.as_double();
       } else if (name == plugin_name_ + ".target_end_x_vel") {
         config_.target_end_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".l") {
+        config_.l = parameter.as_double();
+      } else if (name == plugin_name_ + ".target_x_acc") {
+        config_.target_x_acc = parameter.as_double();
+      } else if (name == plugin_name_ + ".target_x_decc") {
+        config_.target_x_decc = parameter.as_double();
+      } else if (name == plugin_name_ + ".abs_minimum_x_vel") {
+        config_.abs_minimum_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_error_x_vel") {
+        config_.max_error_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_x_vel") {
+        config_.max_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_yaw_vel") {
+        config_.max_yaw_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_yaw_acc") {
+        config_.max_yaw_acc = parameter.as_double();
+      } else if (name == plugin_name_ + ".min_turning_radius") {
+        config_.min_turning_radius = parameter.as_double();
+      } else if (name == plugin_name_ + ".init_vel_max_diff") {
+        config_.init_vel_max_diff = parameter.as_double();
+      }
+      else if (name == plugin_name_ + ".Kp_lat") {
+        config_.Kp_lat = parameter.as_double();
+      } else if (name == plugin_name_ + ".Ki_lat") {
+        config_.Ki_lat = parameter.as_double();
+      } else if (name == plugin_name_ + ".Kd_lat") {
+        config_.Kd_lat = parameter.as_double();
+      } else if (name == plugin_name_ + ".Kp_ang") {
+        config_.Kp_ang = parameter.as_double();
+      } else if (name == plugin_name_ + ".Ki_ang") {
+        config_.Ki_ang = parameter.as_double();
+      } else if (name == plugin_name_ + ".Kd_ang") {
+        config_.Kd_ang = parameter.as_double();
+      }
+      else if (name == plugin_name_ + ".mpc_simulation_sample_time") {
+        config_.mpc_simulation_sample_time = parameter.as_double();
+      } else if (name == plugin_name_ + ".mpc_max_error_lat") {
+        config_.mpc_max_error_lat = parameter.as_double();
+      } else if (name == plugin_name_ + ".mpc_min_x_vel") {
+        config_.mpc_min_x_vel = parameter.as_double();
+      }
+      else if (name == plugin_name_ + ".max_steering_angle") {
+        config_.max_steering_angle = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_steering_x_vel") {
+        config_.max_steering_x_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_steering_x_acc") {
+        config_.max_steering_x_acc = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_steering_yaw_vel") {
+        config_.max_steering_yaw_vel = parameter.as_double();
+      } else if (name == plugin_name_ + ".max_steering_yaw_acc") {
+        config_.max_steering_yaw_acc = parameter.as_double();
+      }
+      else if (name == plugin_name_ + ".collision_look_ahead_length_offset") {
+        config_.collision_look_ahead_length_offset = parameter.as_double();
+      } else if (name == plugin_name_ + ".collision_look_ahead_resolution") {
+        config_.collision_look_ahead_resolution = parameter.as_double();
+      }
+
+    } else if (type == ParameterType::PARAMETER_BOOL) {
+      if (name == plugin_name_ + ".track_base_link") {
+        config_.track_base_link = parameter.as_bool();
+      } else if (name == plugin_name_ + ".feedback_lat") {
+        config_.feedback_lat = parameter.as_bool();
+      } else if (name == plugin_name_ + ".feedback_ang") {
+        config_.feedback_ang = parameter.as_bool();
+      } else if (name == plugin_name_ + ".feedforward_lat") {
+        config_.feedforward_lat = parameter.as_bool();
+      } else if (name == plugin_name_ + ".feedforward_ang") {
+        config_.feedforward_ang = parameter.as_bool();
+      }
+      else if (name == plugin_name_ + ".use_mpc") {
+        config_.use_mpc = parameter.as_bool();
+      } else if (name == plugin_name_ + ".anti_collision") {
+        config_.anti_collision = parameter.as_bool();
+      } else if (name == plugin_name_ + ".obstacle_speed_reduction") {
+        config_.obstacle_speed_reduction = parameter.as_bool();
+      } else if (name == plugin_name_ + ".controller_debug_enabled") {
+        config_.controller_debug_enabled = parameter.as_bool();
+      }
+
+    } else if (type == ParameterType::PARAMETER_INTEGER) {
+      if (name == plugin_name_ + ".mpc_max_fwd_iterations") {
+        config_.mpc_max_fwd_iterations = parameter.as_int();
+      } else if (name == plugin_name_ + ".mpc_max_vel_optimization_iterations") {
+        config_.mpc_max_vel_optimization_iterations = parameter.as_int();
       }
     }
   }
