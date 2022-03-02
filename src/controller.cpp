@@ -109,13 +109,13 @@ void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
 }
 
 void Controller::setTricycleModel(
-  bool tricycle_model_enabled, const geometry_msgs::Transform & tf_base_to_steered_wheel)
+  bool tricycle_model_enabled, const tf2::Transform & tf_base_to_steered_wheel)
 {
   // Set tricycle model
   use_tricycle_model_ = tricycle_model_enabled;
   tf_base_to_steered_wheel_ = tf_base_to_steered_wheel;
-  const double wheel_x = tf_base_to_steered_wheel_.translation.x;
-  const double wheel_y = tf_base_to_steered_wheel_.translation.y;
+  const double wheel_x = tf_base_to_steered_wheel_.getOrigin().x();
+  const double wheel_y = tf_base_to_steered_wheel_.getOrigin().y();
 
   const double distance_base_to_steered_wheel = hypot(wheel_x, wheel_y);
   const double wheel_theta = atan2(wheel_y, wheel_x);
@@ -138,7 +138,7 @@ void Controller::setTricycleModel(
   forward_kinematics_matrix_[1][0] = -inverse_kinematics_matrix_[1][0] / determinant;
   forward_kinematics_matrix_[1][1] = inverse_kinematics_matrix_[0][0] / determinant;
 
-  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel_.rotation);
+  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel_.getRotation());
 }
 
 geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(
