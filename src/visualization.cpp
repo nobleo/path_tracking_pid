@@ -1,17 +1,17 @@
 #include <ros/node_handle.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
 
+#include <algorithm>
 #include <limits>
 #include <path_tracking_pid/visualization.hpp>
 #include <string>
+#include <vector>
 
 namespace path_tracking_pid
 {
 Visualization::Visualization(ros::NodeHandle nh)
-: marker_pub_{nh.advertise<visualization_msgs::Marker>("visualization_marker", 4)},
-  collision_marker_pub_{nh.advertise<visualization_msgs::MarkerArray>("collision_markers", 3)}
+: marker_pub_{nh.advertise<visualization_msgs::Marker>("visualization_marker", 10)}
 {
 }
 
@@ -50,101 +50,130 @@ void Visualization::publishPlanPoint(const std_msgs::Header & header, const tf2:
   publishSphere(header, "plan point", __COUNTER__, pose, color);
 }
 
-void Visualization::publishCollision(
-  const std::string & frame_id, uint8_t cost, const point_t & point, const points_t & footprint,
-  const points_t & hull, const points_t & steps, const points_t & path)
+void Visualization::publishCollisionObject(
+  const std_msgs::Header & header, uint8_t cost, const tf2::Vector3 & point)
 {
-  visualization_msgs::Marker mkSteps;
-  mkSteps.header.frame_id = frame_id;
-  mkSteps.header.stamp = ros::Time::now();
-  mkSteps.ns = "extrapolated poses";
-  mkSteps.action = visualization_msgs::Marker::ADD;
-  mkSteps.pose.orientation.w = 1.0;
-  mkSteps.id = __COUNTER__;
-  mkSteps.type = visualization_msgs::Marker::POINTS;
-  mkSteps.scale.x = 0.5;
-  mkSteps.scale.y = 0.5;
-  mkSteps.color.r = 1.0;
-  mkSteps.color.g = 0.5;
-  mkSteps.color.a = 1.0;
-  mkSteps.points = steps;
-
-  visualization_msgs::Marker mkPosesOnPath;
-  mkPosesOnPath.header.frame_id = frame_id;
-  mkPosesOnPath.header.stamp = ros::Time::now();
-  mkPosesOnPath.ns = "goal poses on path";
-  mkPosesOnPath.action = visualization_msgs::Marker::ADD;
-  mkPosesOnPath.pose.orientation.w = 1.0;
-  mkPosesOnPath.id = __COUNTER__;
-  mkPosesOnPath.type = visualization_msgs::Marker::POINTS;
-  mkPosesOnPath.scale.x = 0.5;
-  mkPosesOnPath.scale.y = 0.5;
-  mkPosesOnPath.color.r = 1.0;
-  mkPosesOnPath.color.g = 1.0;
-  mkPosesOnPath.color.a = 1.0;
-  mkPosesOnPath.points = path;
-
-  visualization_msgs::Marker mkCollisionFootprint;
-  mkCollisionFootprint.header.frame_id = frame_id;
-  mkCollisionFootprint.header.stamp = ros::Time::now();
-  mkCollisionFootprint.ns = "Collision footprint";
-  mkCollisionFootprint.action = visualization_msgs::Marker::ADD;
-  mkCollisionFootprint.pose.orientation.w = 1.0;
-  mkCollisionFootprint.id = __COUNTER__;
-  mkCollisionFootprint.type = visualization_msgs::Marker::LINE_LIST;
-  mkCollisionFootprint.scale.x = 0.1;
-  mkCollisionFootprint.color.b = 1.0;
-  mkCollisionFootprint.color.a = 0.3;
-  mkCollisionFootprint.points = footprint;
-
-  visualization_msgs::Marker mkCollisionHull;
-  mkCollisionHull.header.frame_id = frame_id;
-  mkCollisionHull.header.stamp = ros::Time::now();
-  mkCollisionHull.ns = "Collision polygon";
-  mkCollisionHull.action = visualization_msgs::Marker::ADD;
-  mkCollisionHull.pose.orientation.w = 1.0;
-  mkCollisionHull.id = __COUNTER__;
-  mkCollisionHull.type = visualization_msgs::Marker::LINE_STRIP;
-  mkCollisionHull.scale.x = 0.2;
-  mkCollisionHull.color.r = 1.0;
-  mkCollisionHull.color.a = 0.3;
-  mkCollisionHull.points = hull;
-
-  visualization_msgs::Marker mkCollisionIndicator;
-  mkCollisionIndicator.header.frame_id = frame_id;
-  mkCollisionIndicator.header.stamp = ros::Time::now();
-  mkCollisionIndicator.ns = "Collision object";
-  mkCollisionIndicator.pose.orientation.w = 1.0;
-  mkCollisionIndicator.id = __COUNTER__;
-  mkCollisionIndicator.type = visualization_msgs::Marker::CYLINDER;
-  mkCollisionIndicator.scale.x = 0.5;
-  mkCollisionIndicator.scale.y = 0.5;
-  mkCollisionIndicator.color.r = 1.0;
-  mkCollisionIndicator.color.a = 0.0;
-
-  visualization_msgs::MarkerArray mkCollision;
-  mkCollisionIndicator.scale.z = cost / 255.0;
-  mkCollisionIndicator.color.a = cost / 255.0;
-  mkCollisionIndicator.pose.position = point;
-  mkCollisionIndicator.pose.position.z = mkCollisionIndicator.scale.z * 0.5;
-  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon()) {
-    mkCollisionIndicator.action = visualization_msgs::Marker::ADD;
+  visualization_msgs::Marker marker;
+  marker.header = header;
+  marker.ns = "Collision object";
+  marker.pose.orientation.w = 1.0;
+  marker.id = __COUNTER__;
+  marker.type = visualization_msgs::Marker::CYLINDER;
+  marker.scale.x = 0.5;
+  marker.scale.y = 0.5;
+  marker.color.r = 1.0;
+  marker.color.a = 0.0;
+  marker.scale.z = cost / 255.0;
+  marker.color.a = cost / 255.0;
+  tf2::toMsg(point, marker.pose.position);
+  marker.pose.position.z = marker.scale.z * 0.5;
+  if (marker.scale.z > std::numeric_limits<float>::epsilon()) {
+    marker.action = visualization_msgs::Marker::ADD;
   } else {
-    mkCollisionIndicator.action = visualization_msgs::Marker::DELETE;
+    marker.action = visualization_msgs::Marker::DELETE;
   }
 
-  mkCollision.markers.push_back(mkCollisionIndicator);
+  marker_pub_.publish(marker);
+}
 
-  mkCollision.markers.push_back(mkCollisionFootprint);
-  mkCollision.markers.push_back(mkCollisionHull);
-  if (!mkSteps.points.empty()) {
-    mkCollision.markers.push_back(mkSteps);
-  }
-  if (!mkPosesOnPath.points.empty()) {
-    mkCollision.markers.push_back(mkPosesOnPath);
-  }
+void Visualization::publishExtrapolatedPoses(
+  const std_msgs::Header & header, const std::vector<tf2::Vector3> & steps)
+{
+  visualization_msgs::Marker marker;
+  marker.header = header;
+  marker.ns = "extrapolated poses";
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
+  marker.id = __COUNTER__;
+  marker.type = visualization_msgs::Marker::POINTS;
+  marker.scale.x = 0.5;
+  marker.scale.y = 0.5;
+  marker.color.r = 1.0;
+  marker.color.g = 0.5;
+  marker.color.a = 1.0;
 
-  collision_marker_pub_.publish(mkCollision);
+  std::transform(
+    steps.begin(), steps.end(), std::back_inserter(marker.points), [](const auto & step) {
+      geometry_msgs::Point p;
+      tf2::toMsg(step, p);
+      return p;
+    });
+
+  marker_pub_.publish(marker);
+}
+
+void Visualization::publishgGoalPosesOnPath(
+  const std_msgs::Header & header, const std::vector<tf2::Vector3> & path)
+{
+  visualization_msgs::Marker marker;
+  marker.header = header;
+  marker.ns = "goal poses on path";
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
+  marker.id = __COUNTER__;
+  marker.type = visualization_msgs::Marker::POINTS;
+  marker.scale.x = 0.5;
+  marker.scale.y = 0.5;
+  marker.color.r = 1.0;
+  marker.color.g = 1.0;
+  marker.color.a = 1.0;
+
+  std::transform(
+    path.begin(), path.end(), std::back_inserter(marker.points), [](const auto & step) {
+      geometry_msgs::Point p;
+      tf2::toMsg(step, p);
+      return p;
+    });
+
+  marker_pub_.publish(marker);
+}
+
+void Visualization::publishCollisionFootprint(
+  const std_msgs::Header & header, const std::vector<tf2::Vector3> & footprint)
+{
+  visualization_msgs::Marker marker;
+  marker.header = header;
+  marker.ns = "Collision footprint";
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
+  marker.id = __COUNTER__;
+  marker.type = visualization_msgs::Marker::LINE_LIST;
+  marker.scale.x = 0.1;
+  marker.color.b = 1.0;
+  marker.color.a = 0.3;
+
+  std::transform(
+    footprint.begin(), footprint.end(), std::back_inserter(marker.points), [](const auto & step) {
+      geometry_msgs::Point p;
+      tf2::toMsg(step, p);
+      return p;
+    });
+
+  marker_pub_.publish(marker);
+}
+
+void Visualization::publishCollisionPolygon(
+  const std_msgs::Header & header, const std::vector<tf2::Vector3> & hull)
+{
+  visualization_msgs::Marker marker;
+  marker.header = header;
+  marker.ns = "Collision polygon";
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
+  marker.id = __COUNTER__;
+  marker.type = visualization_msgs::Marker::LINE_STRIP;
+  marker.scale.x = 0.2;
+  marker.color.r = 1.0;
+  marker.color.a = 0.3;
+
+  std::transform(
+    hull.begin(), hull.end(), std::back_inserter(marker.points), [](const auto & step) {
+      geometry_msgs::Point p;
+      tf2::toMsg(step, p);
+      return p;
+    });
+
+  marker_pub_.publish(marker);
 }
 
 void Visualization::publishSphere(
