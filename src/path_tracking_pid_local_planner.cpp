@@ -392,15 +392,15 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Step until lookahead is reached, for every step project the pose back to the path
   std::vector<tf2::Transform> projected_steps_tf;
-  tf2::Transform projected_step_tf;
-  tf2::fromMsg(current_tf, projected_step_tf);
+  auto projected_step_tf = tf2_convert<tf2::Transform>(current_tf);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
-  projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, projected_controller_state);
+  projected_step_tf =
+    pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state);
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
   for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
-    projected_step_tf = pid_controller_.findPositionOnPlan(
-      tf2::toMsg(next_straight_step_tf), projected_controller_state);
+    projected_step_tf =
+      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_controller_state);
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:
