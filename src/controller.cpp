@@ -530,9 +530,7 @@ Controller::UpdateResult Controller::update(
   ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
 
   // Get 'angle' towards current_goal
-  tf2::Transform robot_pose;
-  tf2::convert(current_tf, robot_pose);
-  tf2::Transform base_to_goal = robot_pose.inverseTimes(current_goal_);
+  tf2::Transform base_to_goal = current_tf.inverseTimes(current_goal_);
   const double angle_to_goal = atan2(base_to_goal.getOrigin().x(), -base_to_goal.getOrigin().y());
 
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
