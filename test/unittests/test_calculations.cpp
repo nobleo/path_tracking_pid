@@ -185,7 +185,7 @@ static const auto is_in_direction_of_target_params = std::vector<IsInDirectionOf
   {true, tf2::Transform{{1, -0.5, 0, 0.5, 1, 0, 0, 0, 1}, {11.2, 0.1, 0}}, {11.1, 0.7, 0}, 0.5},
 });
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
   PathTrackingPidCalculations, IsInDirectionOfTargetTestFixture,
   ::testing::ValuesIn(is_in_direction_of_target_params));
 
