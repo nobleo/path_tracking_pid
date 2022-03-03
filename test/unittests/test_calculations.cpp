@@ -187,6 +187,7 @@ static const auto is_in_direction_of_target_params = std::vector<IsInDirectionOf
 
 INSTANTIATE_TEST_CASE_P(
   PathTrackingPidCalculations, IsInDirectionOfTargetTestFixture,
-  ::testing::ValuesIn(is_in_direction_of_target_params));
+  ::testing::ValuesIn(is_in_direction_of_target_params),
+  [](const auto & info) { return std::to_string(info.index); });
 
 }  // namespace
