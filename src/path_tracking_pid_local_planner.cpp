@@ -222,6 +222,9 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
     auto cmd_vel = geometry_msgs::Twist();
     cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
+    // At the first call of computeVelocityCommands() we can't calculate a cmd_vel. We can't return
+    // false because of https://github.com/magazino/move_base_flex/issues/195 so the current
+    // velocity is send instead.
     return cmd_vel;
   }
   if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX)) {
