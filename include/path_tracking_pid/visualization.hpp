@@ -32,11 +32,11 @@ private:
   ros::Publisher marker_pub_;
 
   void publishSphere(
-    const std_msgs::Header & header, const std::string & ns, int id, const tf2::Transform & pose,
+    const std_msgs::Header & header, const std::string & ns, const tf2::Transform & pose,
     const std_msgs::ColorRGBA & color);
   void publishSphere(
-    const std_msgs::Header & header, const std::string & ns, int id,
-    const geometry_msgs::Pose & pose, const std_msgs::ColorRGBA & color);
+    const std_msgs::Header & header, const std::string & ns, const geometry_msgs::Pose & pose,
+    const std_msgs::ColorRGBA & color);
 };
 
 }  // namespace path_tracking_pid

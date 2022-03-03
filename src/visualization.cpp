@@ -21,8 +21,7 @@ void Visualization::publishControlPoint(
   std_msgs::ColorRGBA color;
   color.a = 1.0;
   color.g = 1.0;
-  // id has to be unique, so using a compile-time counter :)
-  publishSphere(header, "control point", __COUNTER__, pose, color);
+  publishSphere(header, "control point", pose, color);
 }
 
 void Visualization::publishAxlePoint(const std_msgs::Header & header, const tf2::Transform & pose)
@@ -30,7 +29,7 @@ void Visualization::publishAxlePoint(const std_msgs::Header & header, const tf2:
   std_msgs::ColorRGBA color;
   color.a = 1.0;
   color.b = 1.0;
-  publishSphere(header, "axle point", __COUNTER__, pose, color);
+  publishSphere(header, "axle point", pose, color);
 }
 
 void Visualization::publishGoalPoint(const std_msgs::Header & header, const tf2::Transform & pose)
@@ -38,7 +37,7 @@ void Visualization::publishGoalPoint(const std_msgs::Header & header, const tf2:
   std_msgs::ColorRGBA color;
   color.a = 1.0;
   color.r = 1.0;
-  publishSphere(header, "goal point", __COUNTER__, pose, color);
+  publishSphere(header, "goal point", pose, color);
 }
 
 void Visualization::publishPlanPoint(const std_msgs::Header & header, const tf2::Transform & pose)
@@ -47,7 +46,7 @@ void Visualization::publishPlanPoint(const std_msgs::Header & header, const tf2:
   color.a = 1.0;
   color.g = 0.5;
   color.r = 1.0;
-  publishSphere(header, "plan point", __COUNTER__, pose, color);
+  publishSphere(header, "plan point", pose, color);
 }
 
 void Visualization::publishCollisionObject(
@@ -57,7 +56,6 @@ void Visualization::publishCollisionObject(
   marker.header = header;
   marker.ns = "Collision object";
   marker.pose.orientation.w = 1.0;
-  marker.id = __COUNTER__;
   marker.type = visualization_msgs::Marker::CYLINDER;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
@@ -84,7 +82,6 @@ void Visualization::publishExtrapolatedPoses(
   marker.ns = "extrapolated poses";
   marker.action = visualization_msgs::Marker::ADD;
   marker.pose.orientation.w = 1.0;
-  marker.id = __COUNTER__;
   marker.type = visualization_msgs::Marker::POINTS;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
@@ -110,7 +107,6 @@ void Visualization::publishgGoalPosesOnPath(
   marker.ns = "goal poses on path";
   marker.action = visualization_msgs::Marker::ADD;
   marker.pose.orientation.w = 1.0;
-  marker.id = __COUNTER__;
   marker.type = visualization_msgs::Marker::POINTS;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
@@ -136,7 +132,6 @@ void Visualization::publishCollisionFootprint(
   marker.ns = "Collision footprint";
   marker.action = visualization_msgs::Marker::ADD;
   marker.pose.orientation.w = 1.0;
-  marker.id = __COUNTER__;
   marker.type = visualization_msgs::Marker::LINE_LIST;
   marker.scale.x = 0.1;
   marker.color.b = 1.0;
@@ -160,7 +155,6 @@ void Visualization::publishCollisionPolygon(
   marker.ns = "Collision polygon";
   marker.action = visualization_msgs::Marker::ADD;
   marker.pose.orientation.w = 1.0;
-  marker.id = __COUNTER__;
   marker.type = visualization_msgs::Marker::LINE_STRIP;
   marker.scale.x = 0.2;
   marker.color.r = 1.0;
@@ -177,22 +171,21 @@ void Visualization::publishCollisionPolygon(
 }
 
 void Visualization::publishSphere(
-  const std_msgs::Header & header, const std::string & ns, int id, const tf2::Transform & pose,
+  const std_msgs::Header & header, const std::string & ns, const tf2::Transform & pose,
   const std_msgs::ColorRGBA & color)
 {
   geometry_msgs::Pose msg;
   tf2::toMsg(pose, msg);
-  publishSphere(header, ns, id, msg, color);
+  publishSphere(header, ns, msg, color);
 }
 
 void Visualization::publishSphere(
-  const std_msgs::Header & header, const std::string & ns, int id, const geometry_msgs::Pose & pose,
+  const std_msgs::Header & header, const std::string & ns, const geometry_msgs::Pose & pose,
   const std_msgs::ColorRGBA & color)
 {
   visualization_msgs::Marker marker;
   marker.header = header;
   marker.ns = ns;
-  marker.id = id;
   marker.type = visualization_msgs::Marker::SPHERE;
   marker.action = visualization_msgs::Marker::ADD;
   marker.pose = pose;
