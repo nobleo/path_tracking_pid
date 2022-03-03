@@ -10,6 +10,17 @@
 
 namespace path_tracking_pid
 {
+std::vector<geometry_msgs::Point> to_msg(std::vector<tf2::Vector3> points)
+{
+  std::vector<geometry_msgs::Point> msgs;
+  std::transform(points.begin(), points.end(), std::back_inserter(msgs), [](const auto & msg) {
+    geometry_msgs::Point p;
+    tf2::toMsg(msg, p);
+    return p;
+  });
+  return msgs;
+}
+
 Visualization::Visualization(ros::NodeHandle nh)
 : marker_pub_{nh.advertise<visualization_msgs::Marker>("visualization_marker", 10)}
 {
@@ -88,14 +99,7 @@ void Visualization::publishExtrapolatedPoses(
   marker.color.r = 1.0;
   marker.color.g = 0.5;
   marker.color.a = 1.0;
-
-  std::transform(
-    steps.begin(), steps.end(), std::back_inserter(marker.points), [](const auto & step) {
-      geometry_msgs::Point p;
-      tf2::toMsg(step, p);
-      return p;
-    });
-
+  marker.points = to_msg(steps);
   marker_pub_.publish(marker);
 }
 
@@ -113,14 +117,7 @@ void Visualization::publishgGoalPosesOnPath(
   marker.color.r = 1.0;
   marker.color.g = 1.0;
   marker.color.a = 1.0;
-
-  std::transform(
-    path.begin(), path.end(), std::back_inserter(marker.points), [](const auto & step) {
-      geometry_msgs::Point p;
-      tf2::toMsg(step, p);
-      return p;
-    });
-
+  marker.points = to_msg(path);
   marker_pub_.publish(marker);
 }
 
@@ -136,14 +133,7 @@ void Visualization::publishCollisionFootprint(
   marker.scale.x = 0.1;
   marker.color.b = 1.0;
   marker.color.a = 0.3;
-
-  std::transform(
-    footprint.begin(), footprint.end(), std::back_inserter(marker.points), [](const auto & step) {
-      geometry_msgs::Point p;
-      tf2::toMsg(step, p);
-      return p;
-    });
-
+  marker.points = to_msg(footprint);
   marker_pub_.publish(marker);
 }
 
@@ -159,14 +149,7 @@ void Visualization::publishCollisionPolygon(
   marker.scale.x = 0.2;
   marker.color.r = 1.0;
   marker.color.a = 0.3;
-
-  std::transform(
-    hull.begin(), hull.end(), std::back_inserter(marker.points), [](const auto & step) {
-      geometry_msgs::Point p;
-      tf2::toMsg(step, p);
-      return p;
-    });
-
+  marker.points = to_msg(hull);
   marker_pub_.publish(marker);
 }
 
