@@ -523,7 +523,7 @@ Controller::UpdateResult Controller::update(
   ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
 
   const auto in_direction_of_goal =
-    !std::signbit(current_tf.getOrigin().dot(current_goal_.getOrigin()));
+    is_in_direction_of_target(current_tf, current_goal_.getOrigin(), target_x_vel);
 
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.

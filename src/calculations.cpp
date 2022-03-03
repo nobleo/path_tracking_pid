@@ -62,4 +62,13 @@ std::vector<double> inverse_turning_radiuses(const std::vector<tf2::Transform> &
   return result;
 }
 
+bool is_in_direction_of_target(
+  const tf2::Transform & current, const tf2::Vector3 & target, double velocity)
+{
+  const auto delta = target - current.getOrigin();
+  const auto projection = current.getBasis().tdotx(delta);
+
+  return !std::signbit(projection * velocity);
+}
+
 }  // namespace path_tracking_pid
