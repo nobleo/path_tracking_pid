@@ -10,6 +10,24 @@
 
 namespace path_tracking_pid
 {
+// Factory function for a visualization color from the given arguments. (Because the corresponding
+// type has no appropriate constructor.)
+std_msgs::ColorRGBA create_color(float r, float g, float b, float a = 1)
+{
+  std_msgs::ColorRGBA color;
+  color.r = r;
+  color.g = g;
+  color.b = b;
+  color.a = a;
+  return color;
+}
+
+const auto red = create_color(1, 0, 0);
+const auto green = create_color(0, 1, 0);
+const auto blue = create_color(1, 0, 1);
+const auto yellow = create_color(1, 1, 0);
+const auto orange = create_color(1, 0.5, 0);
+
 std::vector<geometry_msgs::Point> to_msg(std::vector<tf2::Vector3> points)
 {
   std::vector<geometry_msgs::Point> msgs;
@@ -29,35 +47,24 @@ Visualization::Visualization(ros::NodeHandle nh)
 void Visualization::publishControlPoint(
   const std_msgs::Header & header, const tf2::Transform & pose)
 {
-  std_msgs::ColorRGBA color;
-  color.a = 1.0;
-  color.g = 1.0;
-  publishSphere(header, "control point", pose, color);
+  publishSphere(header, "control point", pose, green);
 }
 
 void Visualization::publishAxlePoint(const std_msgs::Header & header, const tf2::Transform & pose)
 {
   std_msgs::ColorRGBA color;
-  color.a = 1.0;
-  color.b = 1.0;
-  publishSphere(header, "axle point", pose, color);
+  publishSphere(header, "axle point", pose, blue);
 }
 
 void Visualization::publishGoalPoint(const std_msgs::Header & header, const tf2::Transform & pose)
 {
   std_msgs::ColorRGBA color;
-  color.a = 1.0;
-  color.r = 1.0;
-  publishSphere(header, "goal point", pose, color);
+  publishSphere(header, "goal point", pose, red);
 }
 
 void Visualization::publishPlanPoint(const std_msgs::Header & header, const tf2::Transform & pose)
 {
-  std_msgs::ColorRGBA color;
-  color.a = 1.0;
-  color.g = 0.5;
-  color.r = 1.0;
-  publishSphere(header, "plan point", pose, color);
+  publishSphere(header, "plan point", pose, orange);
 }
 
 void Visualization::publishCollisionObject(
@@ -70,10 +77,9 @@ void Visualization::publishCollisionObject(
   marker.type = visualization_msgs::Marker::CYLINDER;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
-  marker.color.r = 1.0;
-  marker.color.a = 0.0;
-  marker.scale.z = cost / 255.0;
+  marker.color = red;
   marker.color.a = cost / 255.0;
+  marker.scale.z = cost / 255.0;
   tf2::toMsg(point, marker.pose.position);
   marker.pose.position.z = marker.scale.z * 0.5;
   if (marker.scale.z > std::numeric_limits<float>::epsilon()) {
@@ -96,9 +102,7 @@ void Visualization::publishExtrapolatedPoses(
   marker.type = visualization_msgs::Marker::POINTS;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
-  marker.color.r = 1.0;
-  marker.color.g = 0.5;
-  marker.color.a = 1.0;
+  marker.color = orange;
   marker.points = to_msg(steps);
   marker_pub_.publish(marker);
 }
@@ -114,9 +118,7 @@ void Visualization::publishgGoalPosesOnPath(
   marker.type = visualization_msgs::Marker::POINTS;
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
-  marker.color.r = 1.0;
-  marker.color.g = 1.0;
-  marker.color.a = 1.0;
+  marker.color = yellow;
   marker.points = to_msg(path);
   marker_pub_.publish(marker);
 }
@@ -131,7 +133,7 @@ void Visualization::publishCollisionFootprint(
   marker.pose.orientation.w = 1.0;
   marker.type = visualization_msgs::Marker::LINE_LIST;
   marker.scale.x = 0.1;
-  marker.color.b = 1.0;
+  marker.color = blue;
   marker.color.a = 0.3;
   marker.points = to_msg(footprint);
   marker_pub_.publish(marker);
@@ -147,7 +149,7 @@ void Visualization::publishCollisionPolygon(
   marker.pose.orientation.w = 1.0;
   marker.type = visualization_msgs::Marker::LINE_STRIP;
   marker.scale.x = 0.2;
-  marker.color.r = 1.0;
+  marker.color = red;
   marker.color.a = 0.3;
   marker.points = to_msg(hull);
   marker_pub_.publish(marker);
