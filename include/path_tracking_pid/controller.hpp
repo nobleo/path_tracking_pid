@@ -11,6 +11,7 @@
 #include <boost/noncopyable.hpp>
 #include <path_tracking_pid/details/derivative.hpp>
 #include <path_tracking_pid/details/fifo_array.hpp>
+#include <path_tracking_pid/details/integral.hpp>
 #include <path_tracking_pid/details/second_order_lowpass.hpp>
 #include <vector>
 
@@ -35,14 +36,14 @@ struct ControllerState
   double previous_steering_yaw_vel = 0.0;
   bool end_phase_enabled = false;
   bool end_reached = false;
-  double error_integral_lat = 0.0;
-  double error_integral_ang = 0.0;
   double tracking_error_lat = 0.0;
   double tracking_error_ang = 0.0;
   // Errors with little history
   details::SecondOrderLowpass error_lat;
-  details::Derivative error_deriv_lat;
   details::SecondOrderLowpass error_ang;
+  details::Integral error_integral_lat;
+  details::Integral error_integral_ang;
+  details::Derivative error_deriv_lat;
   details::Derivative error_deriv_ang;
 };
 

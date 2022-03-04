@@ -427,14 +427,10 @@ Controller::UpdateResult Controller::update(
   dt.toSec();
 
   // integrate the error
-  controller_state_.error_integral_lat += error_lat_filtered * dt.toSec();
-  controller_state_.error_integral_ang += error_ang_filtered * dt.toSec();
-
-  // Apply windup limit to limit the size of the integral term
-  controller_state_.error_integral_lat =
-    std::clamp(controller_state_.error_integral_lat, -windup_limit, windup_limit);
-  controller_state_.error_integral_ang =
-    std::clamp(controller_state_.error_integral_ang, -windup_limit, windup_limit);
+  auto error_integral_lat =
+    controller_state_.error_integral_lat.filter(error_lat_filtered, dt.toSec());
+  auto error_integral_ang =
+    controller_state_.error_integral_ang.filter(error_lat_filtered, dt.toSec());
 
   // Take derivative of error, first the raw unfiltered data:
   auto error_deriv_lat = controller_state_.error_deriv_lat.filter(error_lat_filtered, dt.toSec());
@@ -442,11 +438,11 @@ Controller::UpdateResult Controller::update(
 
   // calculate the control effort
   const auto proportional_lat = config_.Kp_lat * error_lat_filtered;
-  const auto integral_lat = config_.Ki_lat * controller_state_.error_integral_lat;
+  const auto integral_lat = config_.Ki_lat * error_integral_lat;
   const auto derivative_lat = config_.Kd_lat * error_deriv_lat;
 
   const auto proportional_ang = config_.Kp_ang * error_ang_filtered;
-  const auto integral_ang = config_.Ki_ang * controller_state_.error_integral_ang;
+  const auto integral_ang = config_.Ki_ang * error_integral_ang;
   const auto derivative_ang = config_.Kd_ang * error_deriv_ang;
 
   /***** Compute forward velocity *****/
@@ -728,8 +724,8 @@ Controller::UpdateResult Controller::update(
   // Publish control effort if controller enabled
   if (!enabled_)  // Do nothing reset integral action and all filters
   {
-    controller_state_.error_integral_lat = 0.0;
-    controller_state_.error_integral_ang = 0.0;
+    controller_state_.error_integral_lat.reset();
+    controller_state_.error_integral_ang.reset();
   }
 
   controller_state_.current_x_vel = new_x_vel;
@@ -923,6 +919,8 @@ void Controller::configure(path_tracking_pid::PidConfig & config)
 {
   controller_state_.error_lat.configure(config.lowpass_cutoff, config.lowpass_damping);
   controller_state_.error_ang.configure(config.lowpass_cutoff, config.lowpass_damping);
+  controller_state_.error_integral_lat.configure(windup_limit);
+  controller_state_.error_integral_ang.configure(windup_limit);
 
   // Erase all queues when config changes
   controller_state_.error_lat.reset();
@@ -975,11 +973,11 @@ void Controller::reset()
   controller_state_.previous_steering_angle = 0.0;
   controller_state_.previous_steering_yaw_vel = 0.0;
   controller_state_.previous_steering_x_vel = 0.0;
-  controller_state_.error_integral_lat = 0.0;
-  controller_state_.error_integral_ang = 0.0;
   controller_state_.error_lat.reset();
-  controller_state_.error_deriv_lat.reset();
   controller_state_.error_ang.reset();
+  controller_state_.error_integral_lat.reset();
+  controller_state_.error_integral_ang.reset();
+  controller_state_.error_deriv_lat.reset();
   controller_state_.error_deriv_ang.reset();
 }
 

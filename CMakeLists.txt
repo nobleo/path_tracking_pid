@@ -65,6 +65,7 @@ add_library(${PROJECT_NAME}
   src/controller.cpp
   src/calculations.cpp
   src/details/derivative.cpp
+  src/details/integral.cpp
   src/details/second_order_lowpass.cpp
   src/visualization.cpp
 )
@@ -112,6 +113,7 @@ if(CATKIN_ENABLE_TESTING)
     test/unittests/test_calculations.cpp
     test/unittests/test_derivative.cpp
     test/unittests/test_fifo_array.cpp
+    test/unittests/test_integral.cpp
     test/unittests/test_main.cpp
     test/unittests/test_second_order_lowpass.cpp
   )
