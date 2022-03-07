@@ -209,7 +209,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   return true;
 }
 
-bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd_vel)
+std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityCommands()
 {
   ros::Time now = ros::Time::now();
   if (prev_time_.isZero()) {
@@ -219,14 +219,17 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   if (dt.isZero()) {
     ROS_ERROR_THROTTLE(
       5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
-    cmd_vel = geometry_msgs::Twist();
+    auto cmd_vel = geometry_msgs::Twist();
     cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
-    return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
+    // At the first call of computeVelocityCommands() we can't calculate a cmd_vel. We can't return
+    // false because of https://github.com/magazino/move_base_flex/issues/195 so the current
+    // velocity is send instead.
+    return cmd_vel;
   }
   if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX)) {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
-    return false;
+    return std::nullopt;
   }
   try {
     ROS_DEBUG("map_frame: %s, base_link_frame: %s", map_frame_.c_str(), base_link_frame_.c_str());
@@ -234,7 +237,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   } catch (const tf2::TransformException & ex) {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     active_goal_ = false;
-    return false;
+    return std::nullopt;
   }
 
   // Handle obstacles
@@ -258,7 +261,6 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
 
   const auto update_result = pid_controller_.update_with_limits(
     tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist, dt);
-  cmd_vel = update_result.velocity_command;
 
   path_tracking_pid::PidFeedback feedback_msg;
   feedback_msg.eda = ros::Duration(update_result.eda);
@@ -296,7 +298,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   prev_time_ = now;
   prev_dt_ =
     dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
-  return true;
+  return update_result.velocity_command;
 }
 
 uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
@@ -443,10 +445,12 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
     return mbf_msgs::ExePathResult::NOT_INITIALIZED;
   }
   // TODO(Cesar): Use provided pose and odom
-  if (!computeVelocityCommands(cmd_vel.twist)) {
+  const auto opt_cmd_vel = computeVelocityCommands();
+  if (!opt_cmd_vel) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::FAILURE;
   }
+  cmd_vel.twist = *opt_cmd_vel;
   cmd_vel.header.stamp = ros::Time::now();
   cmd_vel.header.frame_id = base_link_frame_;
 
