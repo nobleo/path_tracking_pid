@@ -4,7 +4,6 @@
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/Point.h>
 #include <mbf_costmap_core/costmap_controller.h>
-#include <nav_core/base_local_planner.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <path_tracking_pid/PidConfig.h>
@@ -26,8 +25,7 @@ BOOST_GEOMETRY_REGISTER_POINT_2D(geometry_msgs::Point, double, cs::cartesian, x,
 
 namespace path_tracking_pid
 {
-class TrackingPidLocalPlanner : public nav_core::BaseLocalPlanner,
-                                public mbf_costmap_core::CostmapController,
+class TrackingPidLocalPlanner : public mbf_costmap_core::CostmapController,
                                 private boost::noncopyable
 {
 private:
@@ -58,14 +56,6 @@ public:
   bool setPlan(const std::vector<geometry_msgs::PoseStamped> & global_plan) override;
 
   /**
-   * @brief Calculates the velocity command based on the current robot pose given by pose. See the interface in move
-   * base.
-   * @param cmd_vel Output the velocity command
-   * @return true if succeded.
-   */
-  bool computeVelocityCommands(geometry_msgs::Twist & cmd_vel) override;  // NOLINT
-
-  /**
    * @brief Calculates the velocity command based on the current robot pose given by pose. The velocity
    * and message are not set. See the interface in move base flex.
    * @param pose Current robot pose
@@ -76,13 +66,7 @@ public:
    */
   uint32_t computeVelocityCommands(
     const geometry_msgs::PoseStamped & pose, const geometry_msgs::TwistStamped & velocity,
-    geometry_msgs::TwistStamped & cmd_vel, std::string & message) override;  // NOLINT
-
-  /**
-   * @brief Returns true, if the goal is reached. Currently does not respect the parameters give
-   * @return true, if the goal is reached
-   */
-  bool isGoalReached() override;
+    geometry_msgs::TwistStamped & cmd_vel, std::string & message) override;
 
   /**
    * @brief Returns true, if the goal is reached. Currently does not respect the parameters given.
@@ -105,6 +89,18 @@ public:
 
 private:
   /**
+   * @brief Calculates the velocity command based on the current robot pose given by pose.
+   * @return Velocity command on success, empty optional otherwise.
+   */
+  std::optional<geometry_msgs::Twist> computeVelocityCommands();
+
+  /**
+   * @brief Returns true, if the goal is reached.
+   * @return true, if the goal is reached
+   */
+  bool isGoalReached() const;
+
+  /**
    * Accept a new configuration for the PID controller
    * @param config the new configuration
    */
@@ -122,9 +118,6 @@ private:
   ros::Time prev_time_;
   ros::Duration prev_dt_;
   path_tracking_pid::Controller pid_controller_;
-
-  std::vector<geometry_msgs::PoseStamped> global_plan_;
-  nav_msgs::Path received_path_;
 
   // Obstacle collision detection
   costmap_2d::Costmap2DROS * costmap_ = nullptr;
@@ -146,7 +139,6 @@ private:
   // Rviz visualization
   std::unique_ptr<Visualization> visualization_;
   ros::Publisher path_pub_;
-  ros::Publisher collision_marker_pub_;
 
   ros::Subscriber sub_odom_;
   ros::Publisher feedback_pub_;

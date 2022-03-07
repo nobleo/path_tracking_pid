@@ -66,17 +66,18 @@ public:
    * @param estimate_pose_angle The transformation from base to steered wheel
    */
   void setTricycleModel(
-    bool tricycle_model_enabled, const geometry_msgs::Transform & tf_base_to_steered_wheel);
+    bool tricycle_model_enabled, const tf2::Transform & tf_base_to_steered_wheel);
 
   /**
    * Set plan
    * @param current Where is the robot now?
    * @param odom_twist Robot odometry
    * @param global_plan Plan to follow
+   * @return whether the plan was successfully updated or not
    */
-  void setPlan(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    const std::vector<geometry_msgs::PoseStamped> & global_plan);
+  bool setPlan(
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const std::vector<tf2::Transform> & global_plan);
 
   /**
    * Set plan
@@ -85,12 +86,14 @@ public:
    * @param tf_base_to_steered_wheel Where is the steered wheel now?
    * @param steering_odom_twist Steered wheel odometry
    * @param global_plan Plan to follow
+   * @return whether the plan was successfully updated or not
    */
-  void setPlan(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    const geometry_msgs::Transform & tf_base_to_steered_wheel,
+  bool setPlan(
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+    const tf2::Transform & tf_base_to_steered_wheel,
     const geometry_msgs::Twist & steering_odom_twist,
-    const std::vector<geometry_msgs::PoseStamped> & global_plan);
+    const std::vector<tf2::Transform> & global_plan);
+
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
@@ -99,11 +102,10 @@ public:
    * @return index of current path-pose if requested
    */
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
-    size_t & path_pose_idx);
+    const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx);
   // Overloaded function definition for users that don't require the segment index
   tf2::Transform findPositionOnPlan(
-    const geometry_msgs::Transform & current_tf, ControllerState & controller_state)
+    const tf2::Transform & current_tf, ControllerState & controller_state)
   {
     size_t path_pose_idx;
     return findPositionOnPlan(current_tf, controller_state, path_pose_idx);
@@ -127,7 +129,7 @@ public:
    * @return Update result
    */
   UpdateResult update(
-    double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
+    double target_x_vel, double target_end_x_vel, const tf2::Transform & current_tf,
     const geometry_msgs::Twist & odom_twist, ros::Duration dt);
 
   /**
@@ -138,8 +140,7 @@ public:
    * @return Update result
    */
   UpdateResult update_with_limits(
-    const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-    ros::Duration dt);
+    const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist, ros::Duration dt);
 
   /**
    * Perform prediction steps on the lateral error and return a reduced velocity that stays within bounds
@@ -148,7 +149,7 @@ public:
    * @return Velocity command
    */
   double mpc_based_max_vel(
-    double target_x_vel, const geometry_msgs::Transform & current_tf,
+    double target_x_vel, const tf2::Transform & current_tf,
     const geometry_msgs::Twist & odom_twist);
 
   /**
@@ -250,7 +251,7 @@ private:
 
   // tricycle model
   bool use_tricycle_model_ = false;
-  geometry_msgs::Transform tf_base_to_steered_wheel_;
+  tf2::Transform tf_base_to_steered_wheel_;
   std::array<std::array<double, 2>, 2> inverse_kinematics_matrix_{};
   std::array<std::array<double, 2>, 2> forward_kinematics_matrix_{};
 

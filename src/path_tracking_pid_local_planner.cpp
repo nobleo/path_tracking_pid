@@ -20,7 +20,6 @@
 #include "common.hpp"
 
 // register planner as move_base and move_base plugins
-PLUGINLIB_EXPORT_CLASS(path_tracking_pid::TrackingPidLocalPlanner, nav_core::BaseLocalPlanner)
 PLUGINLIB_EXPORT_CLASS(
   path_tracking_pid::TrackingPidLocalPlanner, mbf_costmap_core::CostmapController)
 
@@ -31,18 +30,30 @@ namespace
 constexpr double MAP_PARALLEL_THRESH = 0.2;
 constexpr double DT_MAX = 1.5;
 
+/**
+ * Convert the plan from geometry message format to tf2 format.
+ * 
+ * @param[in] plan Plan to convert.
+ * @return Converted plan.
+ */
+std::vector<tf2::Transform> convert_plan(const std::vector<geometry_msgs::PoseStamped> & plan)
+{
+  auto result = std::vector<tf2::Transform>{};
+
+  result.reserve(plan.size());
+  std::transform(
+    plan.cbegin(), plan.cend(), std::back_inserter(result),
+    [](const geometry_msgs::PoseStamped & msg) { return tf2_convert<tf2::Transform>(msg.pose); });
+
+  return result;
+}
+
 }  // namespace
 
 void TrackingPidLocalPlanner::reconfigure_pid(path_tracking_pid::PidConfig & config)
 {
   pid_controller_.configure(config);
   controller_debug_enabled_ = config.controller_debug_enabled;
-
-  if (controller_debug_enabled_ && !global_plan_.empty()) {
-    received_path_.header = global_plan_.at(0).header;
-    received_path_.poses = global_plan_;
-    path_pub_.publish(received_path_);
-  }
 }
 
 void TrackingPidLocalPlanner::initialize(
@@ -71,7 +82,6 @@ void TrackingPidLocalPlanner::initialize(
   nh.param<bool>("use_tricycle_model", use_tricycle_model_, false);
   nh.param<std::string>("steered_wheel_frame", steered_wheel_frame_, "steer");
 
-  collision_marker_pub_ = nh.advertise<visualization_msgs::MarkerArray>("collision_markers", 3);
   visualization_ = std::make_unique<Visualization>(nh);
   debug_pub_ = nh.advertise<path_tracking_pid::PidDebug>("debug", 1);
   path_pub_ = nh.advertise<nav_msgs::Path>("visualization_path", 1, true);
@@ -97,11 +107,11 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     return false;
   }
 
-  std::string path_frame = global_plan.at(0).header.frame_id;
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
-  ROS_DEBUG("Plan is defined in frame '%s'", path_frame.c_str());
+  auto global_plan_map_frame = global_plan;
 
-  global_plan_ = global_plan;
+  std::string path_frame = global_plan_map_frame.at(0).header.frame_id;
+  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan_map_frame.size());
+  ROS_DEBUG("Plan is defined in frame '%s'", path_frame.c_str());
 
   /* If frame of received plan is not equal to mbf-map_frame, translate first */
   if (map_frame_ != path_frame) {
@@ -120,7 +130,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
         "Path is given in %s frame which is severly mis-aligned with our map-frame: %s",
         path_frame.c_str(), map_frame_.c_str());
     }
-    for (auto & pose_stamped : global_plan_) {
+    for (auto & pose_stamped : global_plan_map_frame) {
       tf2::doTransform(pose_stamped.pose, pose_stamped.pose, tf_transform);
       pose_stamped.header.frame_id = map_frame_;
       // 'Project' plan by removing z-component
@@ -129,9 +139,10 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   }
 
   if (controller_debug_enabled_) {
-    received_path_.header = global_plan_.at(0).header;
-    received_path_.poses = global_plan_;
-    path_pub_.publish(received_path_);
+    nav_msgs::Path received_path;
+    received_path.header = global_plan_map_frame.at(0).header;
+    received_path.poses = global_plan_map_frame;
+    path_pub_.publish(received_path);
   }
 
   try {
@@ -173,15 +184,23 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     }
 
     pid_controller_.setTricycleModel(
-      use_tricycle_model_, tf_base_to_steered_wheel_stamped_.transform);
+      use_tricycle_model_,
+      tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform));
 
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
-    pid_controller_.setPlan(
-      tfCurPoseStamped_.transform, latest_odom_.twist.twist,
-      tf_base_to_steered_wheel_stamped_.transform, steering_odom_twist, global_plan_);
+    if (!pid_controller_.setPlan(
+          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform),
+          steering_odom_twist, convert_plan(global_plan_map_frame))) {
+      return false;
+    }
   } else {
-    pid_controller_.setPlan(tfCurPoseStamped_.transform, latest_odom_.twist.twist, global_plan_);
+    if (!pid_controller_.setPlan(
+          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          convert_plan(global_plan_map_frame))) {
+      return false;
+    }
   }
 
   pid_controller_.setEnabled(true);
@@ -190,7 +209,7 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   return true;
 }
 
-bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd_vel)
+std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityCommands()
 {
   ros::Time now = ros::Time::now();
   if (prev_time_.isZero()) {
@@ -200,14 +219,17 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   if (dt.isZero()) {
     ROS_ERROR_THROTTLE(
       5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
-    cmd_vel = geometry_msgs::Twist();
+    auto cmd_vel = geometry_msgs::Twist();
     cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
     cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
-    return true;  // False is no use: https://github.com/magazino/move_base_flex/issues/195
+    // At the first call of computeVelocityCommands() we can't calculate a cmd_vel. We can't return
+    // false because of https://github.com/magazino/move_base_flex/issues/195 so the current
+    // velocity is send instead.
+    return cmd_vel;
   }
   if (dt < ros::Duration(0) || dt > ros::Duration(DT_MAX)) {
     ROS_ERROR("Invalid time increment: %f. Aborting", dt.toSec());
-    return false;
+    return std::nullopt;
   }
   try {
     ROS_DEBUG("map_frame: %s, base_link_frame: %s", map_frame_.c_str(), base_link_frame_.c_str());
@@ -215,7 +237,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   } catch (const tf2::TransformException & ex) {
     ROS_ERROR("Received an exception trying to transform: %s", ex.what());
     active_goal_ = false;
-    return false;
+    return std::nullopt;
   }
 
   // Handle obstacles
@@ -237,9 +259,8 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     pid_controller_.setVelMaxObstacle(INFINITY);  // Can be disabled live, so set back to inf
   }
 
-  const auto update_result =
-    pid_controller_.update_with_limits(tfCurPoseStamped_.transform, latest_odom_.twist.twist, dt);
-  cmd_vel = update_result.velocity_command;
+  const auto update_result = pid_controller_.update_with_limits(
+    tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist, dt);
 
   path_tracking_pid::PidFeedback feedback_msg;
   feedback_msg.eda = ros::Duration(update_result.eda);
@@ -267,8 +288,7 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
     std_msgs::Header header;
     header.stamp = now;
     header.frame_id = map_frame_;
-    tf2::Transform tfCurPose;
-    tf2::fromMsg(tfCurPoseStamped_.transform, tfCurPose);
+    const auto tfCurPose = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
     visualization_->publishAxlePoint(header, tfCurPose);
     visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
     visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
@@ -278,77 +298,11 @@ bool TrackingPidLocalPlanner::computeVelocityCommands(geometry_msgs::Twist & cmd
   prev_time_ = now;
   prev_dt_ =
     dt;  // Store last known valid dt for next cycles (https://github.com/magazino/move_base_flex/issues/195)
-  return true;
+  return update_result.velocity_command;
 }
 
 uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 {
-  // configure rviz visualization
-  visualization_msgs::Marker mkSteps;
-  mkSteps.header.frame_id = map_frame_;
-  mkSteps.header.stamp = ros::Time::now();
-  mkSteps.ns = "extrapolated poses";
-  mkSteps.action = visualization_msgs::Marker::ADD;
-  mkSteps.pose.orientation.w = 1.0;
-  mkSteps.id = __COUNTER__;
-  mkSteps.type = visualization_msgs::Marker::POINTS;
-  mkSteps.scale.x = 0.5;
-  mkSteps.scale.y = 0.5;
-  mkSteps.color.r = 1.0;
-  mkSteps.color.g = 0.5;
-  mkSteps.color.a = 1.0;
-
-  visualization_msgs::Marker mkPosesOnPath;
-  mkPosesOnPath.header.frame_id = map_frame_;
-  mkPosesOnPath.header.stamp = ros::Time::now();
-  mkPosesOnPath.ns = "goal poses on path";
-  mkPosesOnPath.action = visualization_msgs::Marker::ADD;
-  mkPosesOnPath.pose.orientation.w = 1.0;
-  mkPosesOnPath.id = __COUNTER__;
-  mkPosesOnPath.type = visualization_msgs::Marker::POINTS;
-  mkPosesOnPath.scale.x = 0.5;
-  mkPosesOnPath.scale.y = 0.5;
-  mkPosesOnPath.color.r = 1.0;
-  mkPosesOnPath.color.g = 1.0;
-  mkPosesOnPath.color.a = 1.0;
-
-  visualization_msgs::Marker mkCollisionFootprint;
-  mkCollisionFootprint.header.frame_id = map_frame_;
-  mkCollisionFootprint.header.stamp = ros::Time::now();
-  mkCollisionFootprint.ns = "Collision footprint";
-  mkCollisionFootprint.action = visualization_msgs::Marker::ADD;
-  mkCollisionFootprint.pose.orientation.w = 1.0;
-  mkCollisionFootprint.id = __COUNTER__;
-  mkCollisionFootprint.type = visualization_msgs::Marker::LINE_LIST;
-  mkCollisionFootprint.scale.x = 0.1;
-  mkCollisionFootprint.color.b = 1.0;
-  mkCollisionFootprint.color.a = 0.3;
-
-  visualization_msgs::Marker mkCollisionHull;
-  mkCollisionHull.header.frame_id = map_frame_;
-  mkCollisionHull.header.stamp = ros::Time::now();
-  mkCollisionHull.ns = "Collision polygon";
-  mkCollisionHull.action = visualization_msgs::Marker::ADD;
-  mkCollisionHull.pose.orientation.w = 1.0;
-  mkCollisionHull.id = __COUNTER__;
-  mkCollisionHull.type = visualization_msgs::Marker::LINE_STRIP;
-  mkCollisionHull.scale.x = 0.2;
-  mkCollisionHull.color.r = 1.0;
-  mkCollisionHull.color.a = 0.3;
-
-  visualization_msgs::Marker mkCollisionIndicator;
-  mkCollisionIndicator.header.frame_id = map_frame_;
-  mkCollisionIndicator.header.stamp = ros::Time::now();
-  mkCollisionIndicator.ns = "Collision object";
-  mkCollisionIndicator.pose.orientation.w = 1.0;
-  mkCollisionIndicator.id = __COUNTER__;
-  mkCollisionIndicator.type = visualization_msgs::Marker::CYLINDER;
-  mkCollisionIndicator.scale.x = 0.5;
-  mkCollisionIndicator.scale.y = 0.5;
-  mkCollisionIndicator.color.r = 1.0;
-  mkCollisionIndicator.color.a = 0.0;
-  visualization_msgs::MarkerArray mkCollision;
-
   // Check how far we should check forward
   double x_vel = pid_controller_.getControllerState().current_x_vel;
   double collision_look_ahead_distance =
@@ -366,31 +320,29 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 
   // Use a controller state to forward project the position on the path
   auto projected_controller_state = pid_controller_.getControllerState();
-  geometry_msgs::Transform current_tf = tfCurPoseStamped_.transform;
 
   // Step until lookahead is reached, for every step project the pose back to the path
+  std::vector<tf2::Vector3> step_points;
+  std::vector<tf2::Vector3> poses_on_path_points;
   std::vector<tf2::Transform> projected_steps_tf;
-  tf2::Transform projected_step_tf;
-  tf2::fromMsg(current_tf, projected_step_tf);
+  auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
-  projected_step_tf = pid_controller_.findPositionOnPlan(current_tf, projected_controller_state);
+  projected_step_tf =
+    pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state);
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
   for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
-    projected_step_tf = pid_controller_.findPositionOnPlan(
-      tf2::toMsg(next_straight_step_tf), projected_controller_state);
+    projected_step_tf =
+      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_controller_state);
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:
-    geometry_msgs::Point mkStep;
-    tf2::toMsg(next_straight_step_tf.getOrigin(), mkStep);
-    mkSteps.points.push_back(mkStep);
-    geometry_msgs::Point mkPointOnPath;
-    tf2::toMsg(projected_step_tf.getOrigin(), mkPointOnPath);
-    mkPosesOnPath.points.push_back(mkPointOnPath);
+    step_points.push_back(next_straight_step_tf.getOrigin());
+    poses_on_path_points.push_back(projected_step_tf.getOrigin());
   }
 
   costmap_2d::Costmap2D* costmap2d = costmap_->getCostmap();
+  std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
   uint8_t max_projected_step_cost = 0;
@@ -429,8 +381,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     // Add footprint to marker
     geometry_msgs::Point previous_point = footprint.back();
     for (const auto & point : footprint) {
-      mkCollisionFootprint.points.push_back(previous_point);
-      mkCollisionFootprint.points.push_back(point);
+      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
+      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
       previous_point = point;
     }
   }
@@ -454,6 +406,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   costmap2d->convexFillCells(collision_polygon_hull_map, cells_in_polygon);
 
   // Get the max cost inside the concave polygon
+  tf2::Vector3 collision_point;
   uint8_t max_cost = 0.0;
   for (const auto & cell_in_polygon : cells_in_polygon) {
     // Cost checker is cheaper than polygon checker, so lets do that first
@@ -463,16 +416,9 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
       geometry_msgs::Point point;
       costmap2d->mapToWorld(cell_in_polygon.x, cell_in_polygon.y, point.x, point.y);
       if (boost::geometry::within(point, collision_polygon)) {
-        // Protip: uncomment below and 'if (cell_cost > max_cost)' to see evaluated cells
-        // boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock_controller(*(costmap2d->getMutex()));
-        // costmap2d->setCost(cell_in_polygon.x, cell_in_polygon.y, 100);
-
         max_cost = cell_cost;
         // Set collision indicator on suspected cell with current cost
-        mkCollisionIndicator.scale.z = cell_cost / 255.0;
-        mkCollisionIndicator.color.a = cell_cost / 255.0;
-        point.z = mkCollisionIndicator.scale.z * 0.5;
-        mkCollisionIndicator.pose.position = point;
+        collision_point = tf2_convert<tf2::Vector3>(point);
         if (max_cost >= costmap_2d::LETHAL_OBSTACLE) {
           max_projected_step_cost = max_cost;
           break;  // Collision detected, no need to evaluate further
@@ -480,25 +426,22 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
       }
     }
   }
-  if (mkCollisionIndicator.scale.z > std::numeric_limits<float>::epsilon()) {
-    mkCollisionIndicator.action = visualization_msgs::Marker::ADD;
-  } else {
-    mkCollisionIndicator.action = visualization_msgs::Marker::DELETE;
-  }
-  mkCollision.markers.push_back(mkCollisionIndicator);
 
   // Fiddle the polygon into a marker message
+  std::vector<tf2::Vector3> collision_hull_points;
   for (const geometry_msgs::Point point : collision_polygon) {
-    mkCollisionHull.points.push_back(point);
+    tf2::Vector3 point_tf2;
+    tf2::fromMsg(point, point_tf2);
+    collision_hull_points.push_back(point_tf2);
   }
-
-  mkCollision.markers.push_back(mkCollisionFootprint);
-  mkCollision.markers.push_back(mkCollisionHull);
-  if (n_steps > 0) {
-    mkCollision.markers.push_back(mkSteps);
-    mkCollision.markers.push_back(mkPosesOnPath);
-  }
-  collision_marker_pub_.publish(mkCollision);
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = map_frame_;
+  visualization_->publishCollisionObject(header, max_cost, collision_point);
+  visualization_->publishExtrapolatedPoses(header, step_points);
+  visualization_->publishgGoalPosesOnPath(header, poses_on_path_points);
+  visualization_->publishCollisionFootprint(header, collision_footprint_points);
+  visualization_->publishCollisionPolygon(header, collision_hull_points);
 
   return max_projected_step_cost;
 }
@@ -515,10 +458,12 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
     return mbf_msgs::ExePathResult::NOT_INITIALIZED;
   }
   // TODO(Cesar): Use provided pose and odom
-  if (!computeVelocityCommands(cmd_vel.twist)) {
+  const auto opt_cmd_vel = computeVelocityCommands();
+  if (!opt_cmd_vel) {
     active_goal_ = false;
     return mbf_msgs::ExePathResult::FAILURE;
   }
+  cmd_vel.twist = *opt_cmd_vel;
   cmd_vel.header.stamp = ros::Time::now();
   cmd_vel.header.frame_id = base_link_frame_;
 
@@ -546,7 +491,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
   return mbf_msgs::ExePathResult::SUCCESS;
 }
 
-bool TrackingPidLocalPlanner::isGoalReached()
+bool TrackingPidLocalPlanner::isGoalReached() const
 {
   // Return reached boolean, but never succeed when we're preempting
   return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;

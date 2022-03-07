@@ -30,67 +30,40 @@ constexpr double ang_lower_limit = -100.0;
 // Anti-windup term. Limits the absolute value of the integral term.
 constexpr double windup_limit = 1000.0;
 
-// Indicates if both values have the same sign.
-template <typename T>
-bool have_same_sign(T val1, T val2)
-{
-  return std::signbit(val1) == std::signbit(val2);
-}
-
-// Converts a pose to the corresponding transform.
-tf2::Transform to_transform(const geometry_msgs::Pose & pose)
-{
-  tf2::Transform result;
-  tf2::fromMsg(pose, result);
-  return result;
-}
-
 // Returns the square distance between two points
 double distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
   return a.getOrigin().distance2(b.getOrigin());
 }
 
-// Return the square distance between two points.
-double distSquared(const geometry_msgs::Pose & a, const geometry_msgs::Pose & b)
-{
-  return std::pow(a.position.x - b.position.x, 2) + std::pow(a.position.y - b.position.y, 2);
-}
-
 // Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
 bool is_pose_angle_obtuse(
-  const geometry_msgs::Pose & prev, const geometry_msgs::Pose & cur,
-  const geometry_msgs::Pose & next)
+  const tf2::Transform & prev, const tf2::Transform & cur, const tf2::Transform & next)
 {
   return distSquared(prev, next) > (distSquared(prev, cur) + distSquared(cur, next));
 }
 
-// Filters (and converts) the given plan. The first and last poses are always accepted (if they
-// exist). Intermediate poses are only accepted if the angle (with respect to the previous and next
-// poses) is obtuse. All accepted poses are converted to transforms.
-std::vector<tf2::Transform> filter_plan(const std::vector<geometry_msgs::PoseStamped> & plan)
+/**
+ * Checks the given plan. The first and last poses are always accepted (if they exist). Intermediate
+ * poses are only accepted if the angle (with respect to the previous and next poses) is obtuse.
+ * 
+ * @param[in] plan Plan to check.
+ * @return True if all poses in the plan are accepted. False otherwise.
+ */
+bool check_plan(const std::vector<tf2::Transform> & plan)
 {
   const auto plan_size = plan.size();
-  auto result = std::vector<tf2::Transform>{};
-
-  if (plan_size > 0) {
-    result.push_back(to_transform(plan.front().pose));
-  }
 
   for (int pose_idx = 1; pose_idx < static_cast<int>(plan_size) - 1; ++pose_idx) {
-    const auto prev_pose = plan[pose_idx - 1].pose;
-    const auto pose = plan[pose_idx].pose;
-    const auto next_pose = plan[pose_idx + 1].pose;
-    if (is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
-      result.push_back(to_transform(pose));
+    const auto & prev_pose = plan[pose_idx - 1];
+    const auto & pose = plan[pose_idx];
+    const auto & next_pose = plan[pose_idx + 1];
+    if (!is_pose_angle_obtuse(prev_pose, pose, next_pose)) {
+      return false;
     }
   }
 
-  if (plan_size > 1) {
-    result.push_back(to_transform(plan.back().pose));
-  }
-
-  return result;
+  return true;
 }
 
 }  // namespace
@@ -109,13 +82,13 @@ void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
 }
 
 void Controller::setTricycleModel(
-  bool tricycle_model_enabled, const geometry_msgs::Transform & tf_base_to_steered_wheel)
+  bool tricycle_model_enabled, const tf2::Transform & tf_base_to_steered_wheel)
 {
   // Set tricycle model
   use_tricycle_model_ = tricycle_model_enabled;
   tf_base_to_steered_wheel_ = tf_base_to_steered_wheel;
-  const double wheel_x = tf_base_to_steered_wheel_.translation.x;
-  const double wheel_y = tf_base_to_steered_wheel_.translation.y;
+  const double wheel_x = tf_base_to_steered_wheel_.getOrigin().x();
+  const double wheel_y = tf_base_to_steered_wheel_.getOrigin().y();
 
   const double distance_base_to_steered_wheel = hypot(wheel_x, wheel_y);
   const double wheel_theta = atan2(wheel_y, wheel_x);
@@ -138,7 +111,7 @@ void Controller::setTricycleModel(
   forward_kinematics_matrix_[1][0] = -inverse_kinematics_matrix_[1][0] / determinant;
   forward_kinematics_matrix_[1][1] = inverse_kinematics_matrix_[0][0] / determinant;
 
-  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel_.rotation);
+  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel_.getRotation());
 }
 
 geometry_msgs::Twist Controller::computeTricycleModelForwardKinematics(
@@ -171,22 +144,18 @@ TricycleSteeringCmdVel Controller::computeTricycleModelInverseKinematics(
   return steering_cmd_vel;
 }
 
-void Controller::setPlan(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  const std::vector<geometry_msgs::PoseStamped> & global_plan)
+bool Controller::setPlan(
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  const std::vector<tf2::Transform> & global_plan)
 {
-  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%d)", (int)global_plan.size());
-  ROS_DEBUG("Plan is defined in frame '%s'", global_plan.at(0).header.frame_id.c_str());
+  ROS_DEBUG("TrackingPidLocalPlanner::setPlan(%zu)", global_plan.size());
 
-  tf2::Transform current_tf2;
-  tf2::convert(current_tf, current_tf2);
-
-  global_plan_tf_ = filter_plan(global_plan);
-  if (global_plan_tf_.size() != global_plan.size()) {
-    ROS_WARN(
-      "Not all poses of path are used since not all poses were in the expected direction of the "
-      "path!");
+  if (!check_plan(global_plan)) {
+    ROS_ERROR("Rejected plan because not all poses were in the expected direction of the path!");
+    return false;
   }
+
+  global_plan_tf_ = global_plan;
 
   if (!config_.track_base_link) {
     // Add carrot length to plan using goal pose (we assume the last pose contains correct angle)
@@ -207,7 +176,7 @@ void Controller::setPlan(
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
     const auto dist_to_segment =
-      distToSegmentSquared(current_tf2, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
+      distToSegmentSquared(current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
         .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
@@ -251,17 +220,23 @@ void Controller::setPlan(
   }
   controller_state_.end_phase_enabled = false;
   controller_state_.end_reached = false;
+
+  return true;
 }
 
-void Controller::setPlan(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  const geometry_msgs::Transform & tf_base_to_steered_wheel,
+bool Controller::setPlan(
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
+  const tf2::Transform & tf_base_to_steered_wheel,
   const geometry_msgs::Twist & /* steering_odom_twist */,
-  const std::vector<geometry_msgs::PoseStamped> & global_plan)
+  const std::vector<tf2::Transform> & global_plan)
 {
-  setPlan(current_tf, odom_twist, global_plan);
-  controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.rotation);
-  // TODO(clopez) use steering_odom_twist to check if setpoint is being followed
+  const auto result = setPlan(current_tf, odom_twist, global_plan);
+
+  if (result) {
+    controller_state_.previous_steering_angle = tf2::getYaw(tf_base_to_steered_wheel.getRotation());
+  }
+
+  return result;
 }
 
 Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
@@ -306,11 +281,9 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
 }
 
 tf2::Transform Controller::findPositionOnPlan(
-  const geometry_msgs::Transform & current_tf, ControllerState & controller_state,
-  size_t & path_pose_idx)
+  const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx)
 {
-  tf2::Transform current_tf2;
-  tf2::convert(current_tf, current_tf2);
+  auto current_tf2 = current_tf;
   // 'Project' current_tf by removing z-component
   tf2::Vector3 originProj = current_tf2.getOrigin();
   originProj.setZ(0.0);
@@ -410,7 +383,7 @@ tf2::Transform Controller::findPositionOnPlan(
 }
 
 Controller::UpdateResult Controller::update(
-  double target_x_vel, double target_end_x_vel, const geometry_msgs::Transform & current_tf,
+  double target_x_vel, double target_end_x_vel, const tf2::Transform & current_tf,
   const geometry_msgs::Twist & odom_twist, ros::Duration dt)
 {
   UpdateResult result;
@@ -419,16 +392,14 @@ Controller::UpdateResult Controller::update(
   const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute location of the point to be controlled
-  const double theda_rp = tf2::getYaw(current_tf.rotation);
+  const double theda_rp = tf2::getYaw(current_tf.getRotation());
   tf2::Vector3 current_with_carrot_origin;
-  current_with_carrot_origin.setX(current_tf.translation.x + config_.l * cos(theda_rp));
-  current_with_carrot_origin.setY(current_tf.translation.y + config_.l * sin(theda_rp));
+  current_with_carrot_origin.setX(current_tf.getOrigin().x() + config_.l * cos(theda_rp));
+  current_with_carrot_origin.setY(current_tf.getOrigin().y() + config_.l * sin(theda_rp));
   current_with_carrot_origin.setZ(0);
 
   current_with_carrot_.setOrigin(current_with_carrot_origin);
-  tf2::Quaternion cur_rot(
-    current_tf.rotation.x, current_tf.rotation.y, current_tf.rotation.z, current_tf.rotation.w);
-  current_with_carrot_.setRotation(cur_rot);
+  current_with_carrot_.setRotation(current_tf.getRotation());
 
   size_t path_pose_idx;
   if (config_.track_base_link) {
@@ -444,10 +415,8 @@ Controller::UpdateResult Controller::update(
     current_goal_.setOrigin(newControlOrigin);
   } else {
     // find position of current position with projected carrot
-    geometry_msgs::Transform current_with_carrot_g;
-    tf2::convert(current_with_carrot_, current_with_carrot_g);
     current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_with_carrot_g, controller_state_, path_pose_idx);
+      findPositionOnPlan(current_with_carrot_, controller_state_, path_pose_idx);
   }
 
   result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
@@ -488,9 +457,7 @@ Controller::UpdateResult Controller::update(
                  global_plan_tf_[path_pose_idx].getOrigin().y(),
                  global_plan_tf_[path_pose_idx].getOrigin().z()));
 
-  tf2::Vector3 current_tracking_err =
-    -(path_segmen_tf.inverse() *
-      tf2::Vector3(current_tf.translation.x, current_tf.translation.y, current_tf.translation.z));
+  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * current_tf.getOrigin());
 
   // trackin_error here represents the error between tracked link and position on plan
   controller_state_.tracking_error_lat = current_tracking_err.y();
@@ -555,16 +522,13 @@ Controller::UpdateResult Controller::update(
   ROS_DEBUG("d_end_phase: %f", d_end_phase);
   ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
 
-  // Get 'angle' towards current_goal
-  tf2::Transform robot_pose;
-  tf2::convert(current_tf, robot_pose);
-  tf2::Transform base_to_goal = robot_pose.inverseTimes(current_goal_);
-  const double angle_to_goal = atan2(base_to_goal.getOrigin().x(), -base_to_goal.getOrigin().y());
+  const auto in_direction_of_goal =
+    is_in_direction_of_target(current_tf, current_goal_.getOrigin(), target_x_vel);
 
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
   // This is to avoid skipping paths that start with opposite velocity.
-  if ((distance_to_goal_ <= fabs(d_end_phase)) && have_same_sign(target_x_vel, angle_to_goal)) {
+  if ((distance_to_goal_ <= fabs(d_end_phase)) && in_direction_of_goal) {
     // This state will be remebered to avoid jittering on target_x_vel
     controller_state_.end_phase_enabled = true;
   }
@@ -820,8 +784,7 @@ Controller::UpdateResult Controller::update(
 }
 
 Controller::UpdateResult Controller::update_with_limits(
-  const geometry_msgs::Transform & current_tf, const geometry_msgs::Twist & odom_twist,
-  ros::Duration dt)
+  const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist, ros::Duration dt)
 {
   // All limits are absolute
   double max_x_vel = std::abs(config_.target_x_vel);
@@ -868,8 +831,7 @@ Controller::UpdateResult Controller::update_with_limits(
 // output updated velocity command: (Current position, current measured velocity, closest point index, estimated
 // duration of arrival, debug info)
 double Controller::mpc_based_max_vel(
-  double target_x_vel, const geometry_msgs::Transform & current_tf,
-  const geometry_msgs::Twist & odom_twist)
+  double target_x_vel, const tf2::Transform & current_tf, const geometry_msgs::Twist & odom_twist)
 {
   // Temporary save global data
   ControllerState controller_state_saved;
@@ -883,7 +845,7 @@ double Controller::mpc_based_max_vel(
   int mpc_fwd_iter = 0;  // Reset MPC iterations
 
   // Create predicted position vector
-  geometry_msgs::Transform predicted_tf = current_tf;
+  auto predicted_tf = current_tf;
   geometry_msgs::Twist pred_twist = odom_twist;
 
   double new_nominal_x_vel = target_x_vel;  // Start off from the current velocity
@@ -949,14 +911,16 @@ double Controller::mpc_based_max_vel(
                      .velocity_command;
 
       // Run plant model
-      const double theta = tf2::getYaw(predicted_tf.rotation);
-      predicted_tf.translation.x +=
-        pred_twist.linear.x * cos(theta) * config_.mpc_simulation_sample_time;
-      predicted_tf.translation.y +=
-        pred_twist.linear.x * sin(theta) * config_.mpc_simulation_sample_time;
+      const double theta = tf2::getYaw(predicted_tf.getRotation());
+      predicted_tf.getOrigin().setX(
+        predicted_tf.getOrigin().getX() +
+        pred_twist.linear.x * cos(theta) * config_.mpc_simulation_sample_time);
+      predicted_tf.getOrigin().setY(
+        predicted_tf.getOrigin().getY() +
+        pred_twist.linear.x * sin(theta) * config_.mpc_simulation_sample_time);
       tf2::Quaternion q;
       q.setRPY(0, 0, theta + pred_twist.angular.z * config_.mpc_simulation_sample_time);
-      predicted_tf.rotation = tf2::toMsg(q);
+      predicted_tf.setRotation(q);
     }
   }
   // Apply limits to the velocity
