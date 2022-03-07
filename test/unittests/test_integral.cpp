@@ -22,3 +22,32 @@ TEST(Integral, StepResponse)
     EXPECT_NEAR(result, expected_response[i], eps);
   }
 }
+
+TEST(Integral, Reset)
+{
+  double dt = 0.1;
+  double windup_limit = 0.5;
+
+  Integral filter{windup_limit};
+
+  EXPECT_NEAR(filter.filter(1, dt), 0.05, eps);
+  EXPECT_NEAR(filter.filter(1, dt), 0.15, eps);
+  filter.reset();
+  EXPECT_NEAR(filter.filter(1, dt), 0.05, eps);
+  EXPECT_NEAR(filter.filter(1, dt), 0.15, eps);
+}
+
+TEST(Integral, Configure)
+{
+  double dt = 0.1;
+  double windup_limit = 0.2;
+
+  Integral filter{windup_limit};
+
+  EXPECT_NEAR(filter.filter(1, dt), 0.05, eps);
+  EXPECT_NEAR(filter.filter(1, dt), 0.15, eps);
+  EXPECT_NEAR(filter.filter(1, dt), 0.20, eps);
+  filter.configure(0.35);
+  EXPECT_NEAR(filter.filter(1, dt), 0.30, eps);
+  EXPECT_NEAR(filter.filter(1, dt), 0.35, eps);
+}

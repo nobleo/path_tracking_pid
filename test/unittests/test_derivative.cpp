@@ -21,3 +21,14 @@ TEST(Derivative, StepResponse)
     EXPECT_NEAR(result, expected_response[i], eps);
   }
 }
+
+TEST(Derivative, Reset)
+{
+  double dt = 0.1;
+
+  Derivative filter;
+
+  EXPECT_NEAR(filter.filter(1, dt), 10, eps);
+  filter.reset();
+  EXPECT_NEAR(filter.filter(0, dt), 0, eps);
+}

@@ -77,3 +77,57 @@ TEST(SecondOrderLowpass, StepResponseDamping)
     EXPECT_NEAR(result, expected_response[i], eps);
   }
 }
+
+TEST(SecondOrderLowpass, Reset)
+{
+  double dt = 0.1;
+  double cutoff = 1 / dt / 4;
+  double damping = sqrt(2);
+
+  SecondOrderLowpass filter(cutoff, damping);
+
+  std::vector<double> expected_response = {0.16071, 0.514214, 0.770813, 0.877725, 0.939488};
+  for (int i = 0; i < static_cast<int>(expected_response.size()); ++i) {
+    SCOPED_TRACE(i);
+
+    auto result = filter.filter(1, dt);
+    EXPECT_NEAR(result, expected_response[i], eps);
+  }
+
+  filter.reset();
+
+  for (int i = 0; i < static_cast<int>(expected_response.size()); ++i) {
+    SCOPED_TRACE(i);
+
+    auto result = filter.filter(1, dt);
+    EXPECT_NEAR(result, expected_response[i], eps);
+  }
+}
+
+TEST(SecondOrderLowpass, Configure)
+{
+  double dt = 0.1;
+  double cutoff = 1 / dt / 4;
+  double damping = sqrt(2);
+
+  SecondOrderLowpass filter(cutoff, damping);
+
+  std::vector<double> expected_response = {0.16071, 0.514214, 0.770813, 0.877725, 0.939488};
+  for (int i = 0; i < static_cast<int>(expected_response.size()); ++i) {
+    SCOPED_TRACE(i);
+
+    auto result = filter.filter(1, dt);
+    EXPECT_NEAR(result, expected_response[i], eps);
+  }
+
+  filter.configure(cutoff / 2, damping);
+
+  // no configure step response is {0.968659, 0.984211, 0.991911, 0.995898, 0.997907}
+  expected_response = {0.957154, 0.969162, 0.977792, 0.984006, 0.988481};
+  for (int i = 0; i < static_cast<int>(expected_response.size()); ++i) {
+    SCOPED_TRACE(i);
+
+    auto result = filter.filter(1, dt);
+    EXPECT_NEAR(result, expected_response[i], eps);
+  }
+}
