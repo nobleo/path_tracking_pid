@@ -104,7 +104,7 @@ class TestPathTrackingPID(unittest.TestCase):
             rospy.sleep(10.0)
             self.assertTrue(checker.slowed_down)
 
-        finished_in_time = client.wait_for_result(timeout=rospy.Duration(60))
+        finished_in_time = client.wait_for_result(timeout=rospy.Duration(120))
         self.assertTrue(finished_in_time, msg="Action call didn't return in time")
         self.assertEqual(client.get_state(), outcome_exp, msg="Wrong action outcome")
 
