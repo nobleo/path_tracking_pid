@@ -30,13 +30,6 @@ constexpr double ang_lower_limit = -100.0;
 // Anti-windup term. Limits the absolute value of the integral term.
 constexpr double windup_limit = 1000.0;
 
-// Indicates if both values have the same sign.
-template <typename T>
-bool have_same_sign(T val1, T val2)
-{
-  return std::signbit(val1) == std::signbit(val2);
-}
-
 // Returns the square distance between two points
 double distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
@@ -529,14 +522,13 @@ Controller::UpdateResult Controller::update(
   ROS_DEBUG("d_end_phase: %f", d_end_phase);
   ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
 
-  // Get 'angle' towards current_goal
-  tf2::Transform base_to_goal = current_tf.inverseTimes(current_goal_);
-  const double angle_to_goal = atan2(base_to_goal.getOrigin().x(), -base_to_goal.getOrigin().y());
+  const auto in_direction_of_goal =
+    is_in_direction_of_target(current_tf, current_goal_.getOrigin(), target_x_vel);
 
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
   // This is to avoid skipping paths that start with opposite velocity.
-  if ((distance_to_goal_ <= fabs(d_end_phase)) && have_same_sign(target_x_vel, angle_to_goal)) {
+  if ((distance_to_goal_ <= fabs(d_end_phase)) && in_direction_of_goal) {
     // This state will be remebered to avoid jittering on target_x_vel
     controller_state_.end_phase_enabled = true;
   }

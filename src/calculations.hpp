@@ -34,4 +34,16 @@ std::vector<double> distances_to_goal(const std::vector<tf2::Transform> & deltas
  */
 std::vector<double> inverse_turning_radiuses(const std::vector<tf2::Transform> & deltas);
 
+/**
+ * Determine if the given current pose is in the direction of the given target position taking the
+ * given velocity into account.
+ *
+ * @param[in] current Current pose.
+ * @param[in] target Target position.
+ * @param[in] velocity Forward velocity in m/s.
+ * @return True if it is in the direction of the target, false otherwise.
+ */
+bool is_in_direction_of_target(
+  const tf2::Transform & current, const tf2::Vector3 & target, double velocity);
+
 }  // namespace path_tracking_pid
