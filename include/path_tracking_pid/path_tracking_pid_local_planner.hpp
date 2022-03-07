@@ -66,7 +66,7 @@ public:
    */
   uint32_t computeVelocityCommands(
     const geometry_msgs::PoseStamped & pose, const geometry_msgs::TwistStamped & velocity,
-    geometry_msgs::TwistStamped & cmd_vel, std::string & message) override;  // NOLINT
+    geometry_msgs::TwistStamped & cmd_vel, std::string & message) override;
 
   /**
    * @brief Returns true, if the goal is reached. Currently does not respect the parameters given.
@@ -93,7 +93,7 @@ private:
    * @param cmd_vel Output the velocity command
    * @return true if succeded.
    */
-  bool computeVelocityCommands(geometry_msgs::Twist & cmd_vel);  // NOLINT
+  bool computeVelocityCommands(geometry_msgs::Twist & cmd_vel);
 
   /**
    * @brief Returns true, if the goal is reached.
