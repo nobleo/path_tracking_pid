@@ -316,8 +316,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   auto projected_controller_state = pid_controller_.getControllerState();
 
   // Step until lookahead is reached, for every step project the pose back to the path
-  std::vector<geometry_msgs::Point> step_points;
-  std::vector<geometry_msgs::Point> poses_on_path_points;
+  std::vector<tf2::Vector3> step_points;
+  std::vector<tf2::Vector3> poses_on_path_points;
   std::vector<tf2::Transform> projected_steps_tf;
   auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
@@ -331,15 +331,11 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:
-    geometry_msgs::Point mkStep;
-    tf2::toMsg(next_straight_step_tf.getOrigin(), mkStep);
-    step_points.push_back(mkStep);
-    geometry_msgs::Point mkPointOnPath;
-    tf2::toMsg(projected_step_tf.getOrigin(), mkPointOnPath);
-    poses_on_path_points.push_back(mkPointOnPath);
+    step_points.push_back(next_straight_step_tf.getOrigin());
+    poses_on_path_points.push_back(projected_step_tf.getOrigin());
   }
 
-  std::vector<geometry_msgs::Point> collision_footprint_points;
+  std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
   for (const auto & projection_tf : projected_steps_tf) {
@@ -366,8 +362,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     // Add footprint to marker
     geometry_msgs::Point previous_point = footprint.back();
     for (const auto & point : footprint) {
-      collision_footprint_points.push_back(previous_point);
-      collision_footprint_points.push_back(point);
+      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
+      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
       previous_point = point;
     }
   }
@@ -392,7 +388,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   costmap2d->convexFillCells(collision_polygon_hull_map, cells_in_polygon);
 
   // Get the max cost inside the concave polygon
-  geometry_msgs::Point collision_point;
+  tf2::Vector3 collision_point;
   uint8_t max_cost = 0.0;
   for (const auto & cell_in_polygon : cells_in_polygon) {
     // Cost checker is cheaper than polygon checker, so lets do that first
@@ -404,7 +400,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
       if (boost::geometry::within(point, collision_polygon)) {
         max_cost = cell_cost;
         // Set collision indicator on suspected cell with current cost
-        collision_point = point;
+        collision_point = tf2_convert<tf2::Vector3>(point);
         if (max_cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
           break;  // Collision detected, no need to evaluate further
         }
@@ -413,14 +409,20 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   }
 
   // Fiddle the polygon into a marker message
-  std::vector<geometry_msgs::Point> collision_hull_points;
+  std::vector<tf2::Vector3> collision_hull_points;
   for (const geometry_msgs::Point point : collision_polygon) {
-    collision_hull_points.push_back(point);
+    tf2::Vector3 point_tf2;
+    tf2::fromMsg(point, point_tf2);
+    collision_hull_points.push_back(point_tf2);
   }
-
-  visualization_->publishCollision(
-    map_frame_, max_cost, collision_point, collision_footprint_points, collision_hull_points,
-    step_points, poses_on_path_points);
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = map_frame_;
+  visualization_->publishCollisionObject(header, max_cost, collision_point);
+  visualization_->publishExtrapolatedPoses(header, step_points);
+  visualization_->publishgGoalPosesOnPath(header, poses_on_path_points);
+  visualization_->publishCollisionFootprint(header, collision_footprint_points);
+  visualization_->publishCollisionPolygon(header, collision_hull_points);
 
   return max_cost;
 }
