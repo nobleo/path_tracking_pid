@@ -10,6 +10,7 @@ namespace
 
 using path_tracking_pid::deltas_of_plan;
 using path_tracking_pid::distances_to_goal;
+using path_tracking_pid::distSquared;
 using path_tracking_pid::inverse_turning_radiuses;
 using path_tracking_pid::is_in_direction_of_target;
 
@@ -189,5 +190,12 @@ INSTANTIATE_TEST_CASE_P(
   PathTrackingPidCalculations, IsInDirectionOfTargetTestFixture,
   ::testing::ValuesIn(is_in_direction_of_target_params),
   [](const auto & info) { return std::to_string(info.index); });
+
+TEST(PathTrackingPidCalculations, DistSquared)
+{
+  EXPECT_EQ(14, distSquared(create_transform(1, 2, 3), create_transform(2, 4, 6)));
+  EXPECT_EQ(45, distSquared(create_transform(6, 2, 0), create_transform(2, 4, -5)));
+  EXPECT_EQ(0, distSquared(create_transform(1, 2, 3), create_transform(1, 2, 3)));
+}
 
 }  // namespace

@@ -71,4 +71,9 @@ bool is_in_direction_of_target(
   return !std::signbit(projection * velocity);
 }
 
+double distSquared(const tf2::Transform & a, const tf2::Transform & b)
+{
+  return a.getOrigin().distance2(b.getOrigin());
+}
+
 }  // namespace path_tracking_pid

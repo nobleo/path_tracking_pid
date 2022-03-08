@@ -30,12 +30,6 @@ constexpr double ang_lower_limit = -100.0;
 // Anti-windup term. Limits the absolute value of the integral term.
 constexpr double windup_limit = 1000.0;
 
-// Returns the square distance between two points
-double distSquared(const tf2::Transform & a, const tf2::Transform & b)
-{
-  return a.getOrigin().distance2(b.getOrigin());
-}
-
 // Indicates if the angle of the cur pose is obtuse (with respect to the prev and next poses).
 bool is_pose_angle_obtuse(
   const tf2::Transform & prev, const tf2::Transform & cur, const tf2::Transform & next)
