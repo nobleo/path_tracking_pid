@@ -244,11 +244,11 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
   if (pid_controller_.getConfig().anti_collision) {
     auto cost = projectedCollisionCost();
 
-    if (cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+    if (cost >= costmap_2d::LETHAL_OBSTACLE) {
       pid_controller_.setVelMaxObstacle(0.0);
     } else if (pid_controller_.getConfig().obstacle_speed_reduction) {
       double max_vel = pid_controller_.getConfig().max_x_vel;
-      double reduction_factor = static_cast<double>(cost) / costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+      double reduction_factor = static_cast<double>(cost) / costmap_2d::LETHAL_OBSTACLE;
       double limit = max_vel * (1 - reduction_factor);
       ROS_DEBUG("Cost: %d, factor: %f, limit: %f", cost, reduction_factor, limit);
       pid_controller_.setVelMaxObstacle(limit);
@@ -341,14 +341,27 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     poses_on_path_points.push_back(projected_step_tf.getOrigin());
   }
 
+  costmap_2d::Costmap2D* costmap2d = costmap_->getCostmap();
   std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
+  uint8_t max_projected_step_cost = 0;
   for (const auto & projection_tf : projected_steps_tf) {
     // Project footprint forward
     double x = projection_tf.getOrigin().x();
     double y = projection_tf.getOrigin().y();
     double yaw = tf2::getYaw(projection_tf.getRotation());
+
+    // Calculate cost by checking base link location in costmap
+    int map_x, map_y;
+    costmap2d->worldToMapEnforceBounds(x, y, map_x, map_y);
+    uint8_t projected_step_cost = costmap2d->getCost(map_x, map_y);
+    if (projected_step_cost > max_projected_step_cost)
+    {
+      max_projected_step_cost = projected_step_cost;
+    }
+
+    // Project footprint forward
     std::vector<geometry_msgs::Point> footprint;
     costmap_2d::transformFootprint(x, y, yaw, costmap_->getRobotFootprint(), footprint);
 
@@ -375,7 +388,6 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   }
 
   // Create a convex hull so we can use costmap2d->convexFillCells
-  costmap_2d::Costmap2D * costmap2d = costmap_->getCostmap();
   polygon_t collision_polygon_hull;
   boost::geometry::convex_hull(collision_polygon, collision_polygon_hull);
   std::vector<costmap_2d::MapLocation> collision_polygon_hull_map;
@@ -407,7 +419,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
         max_cost = cell_cost;
         // Set collision indicator on suspected cell with current cost
         collision_point = tf2_convert<tf2::Vector3>(point);
-        if (max_cost >= costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
+        if (max_cost >= costmap_2d::LETHAL_OBSTACLE) {
+          max_projected_step_cost = max_cost;
           break;  // Collision detected, no need to evaluate further
         }
       }
@@ -430,7 +443,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   visualization_->publishCollisionFootprint(header, collision_footprint_points);
   visualization_->publishCollisionPolygon(header, collision_hull_points);
 
-  return max_cost;
+  return max_projected_step_cost;
 }
 
 uint32_t TrackingPidLocalPlanner::computeVelocityCommands(

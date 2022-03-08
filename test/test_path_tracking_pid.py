@@ -62,6 +62,10 @@ class TestPathTrackingPID(unittest.TestCase):
             initialpose_pub.publish(pose)
             rospy.sleep(0.1)  # Fill tf buffers
 
+        self.max_tracking_error_linear_x = rospy.get_param("~max_tracking_error_linear_x", 0.1)
+        self.max_tracking_error_linear_y = rospy.get_param("~max_tracking_error_linear_y", 0.1)
+        self.max_tracking_error_angular_z = rospy.get_param("~max_tracking_error_angular_z", 0.1)
+
         # Publisher for obstacles:
         self.obstacle_pub = rospy.Publisher("pointcloud", PointCloud, latch=True, queue_size=1)
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
@@ -109,9 +113,9 @@ class TestPathTrackingPID(unittest.TestCase):
             return
 
         # Check the errors
-        self.assertLess(error_catcher.error.linear.x, 0.1)
-        self.assertLess(error_catcher.error.linear.y, 0.1)
-        self.assertLess(error_catcher.error.angular.z, 0.1)
+        self.assertLess(error_catcher.error.linear.x, self.max_tracking_error_linear_x)
+        self.assertLess(error_catcher.error.linear.y, self.max_tracking_error_linear_y)
+        self.assertLess(error_catcher.error.angular.z, self.max_tracking_error_angular_z)
 
         # Do the same for backward movements if last path was a success
         if client.get_state() != GS.SUCCEEDED or rospy.get_param("backward", True):
