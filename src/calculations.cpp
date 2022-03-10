@@ -1,5 +1,7 @@
 #include "calculations.hpp"
 
+#include <tf2/utils.h>
+
 #include <algorithm>
 #include <limits>
 #include <numeric>
@@ -74,6 +76,43 @@ bool is_in_direction_of_target(
 double distSquared(const tf2::Transform & a, const tf2::Transform & b)
 {
   return a.getOrigin().distance2(b.getOrigin());
+}
+
+tf2::Transform closestPointOnSegment(
+  const tf2::Transform & point, const tf2::Transform & segment_start,
+  const tf2::Transform & segment_end, bool estimate_pose_angle)
+{
+  const double l2 = distSquared(segment_start, segment_end);
+  if (l2 == 0) {
+    return segment_end;
+  }
+
+  tf2::Transform result;
+
+  const double t = std::clamp(
+    ((point.getOrigin().x() - segment_start.getOrigin().x()) *
+       (segment_end.getOrigin().x() - segment_start.getOrigin().x()) +
+     (point.getOrigin().y() - segment_start.getOrigin().y()) *
+       (segment_end.getOrigin().y() - segment_start.getOrigin().y())) /
+      l2,
+    0.0, 1.0);
+  result.setOrigin(tf2::Vector3(
+    segment_start.getOrigin().x() +
+      t * (segment_end.getOrigin().x() - segment_start.getOrigin().x()),
+    segment_start.getOrigin().y() +
+      t * (segment_end.getOrigin().y() - segment_start.getOrigin().y()),
+    0.0));
+
+  const auto yaw = estimate_pose_angle
+                     ? atan2(
+                         segment_end.getOrigin().y() - segment_start.getOrigin().y(),
+                         segment_end.getOrigin().x() - segment_start.getOrigin().x())
+                     : tf2::getYaw(segment_start.getRotation());
+  tf2::Quaternion pose_quaternion;
+  pose_quaternion.setRPY(0.0, 0.0, yaw);
+  result.setRotation(pose_quaternion);
+
+  return result;
 }
 
 }  // namespace path_tracking_pid

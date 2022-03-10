@@ -234,39 +234,6 @@ bool Controller::setPlan(
   return result;
 }
 
-tf2::Transform Controller::closestPointOnSegment(
-  const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-  bool estimate_pose_angle)
-{
-  const double l2 = distSquared(pose_v, pose_w);
-  if (l2 == 0) {
-    return pose_w;
-  }
-
-  tf2::Transform result;
-
-  const double t = std::clamp(
-    ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
-       (pose_w.getOrigin().x() - pose_v.getOrigin().x()) +
-     (pose_p.getOrigin().y() - pose_v.getOrigin().y()) *
-       (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
-      l2,
-    0.0, 1.0);
-  result.setOrigin(tf2::Vector3(
-    pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
-    pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
-
-  const auto yaw = estimate_pose_angle ? atan2(
-                                           pose_w.getOrigin().y() - pose_v.getOrigin().y(),
-                                           pose_w.getOrigin().x() - pose_v.getOrigin().x())
-                                       : tf2::getYaw(pose_v.getRotation());
-  tf2::Quaternion pose_quaternion;
-  pose_quaternion.setRPY(0.0, 0.0, yaw);
-  result.setRotation(pose_quaternion);
-
-  return result;
-}
-
 tf2::Transform Controller::findPositionOnPlan(
   const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx)
 {

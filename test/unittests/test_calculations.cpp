@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <tf2/utils.h>
 
 #include <limits>
 #include <vector>
@@ -8,6 +9,7 @@
 namespace
 {
 
+using path_tracking_pid::closestPointOnSegment;
 using path_tracking_pid::deltas_of_plan;
 using path_tracking_pid::distances_to_goal;
 using path_tracking_pid::distSquared;
@@ -20,6 +22,14 @@ tf2::Transform create_transform(double x, double y, double z)
   tf2::Transform result;
   result.getBasis().setIdentity();
   result.setOrigin({x, y, z});
+  return result;
+}
+
+// Create a quaternion based on the given roll, pitch and yaw.
+tf2::Quaternion create_quaternion(double roll, double pitch, double yaw)
+{
+  tf2::Quaternion result;
+  result.setRPY(roll, pitch, yaw);
   return result;
 }
 
@@ -196,6 +206,100 @@ TEST(PathTrackingPidCalculations, DistSquared)
   EXPECT_EQ(14, distSquared(create_transform(1, 2, 3), create_transform(2, 4, 6)));
   EXPECT_EQ(45, distSquared(create_transform(6, 2, 0), create_transform(2, 4, -5)));
   EXPECT_EQ(0, distSquared(create_transform(1, 2, 3), create_transform(1, 2, 3)));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_AtEnd)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = end;
+  const auto ref = end;
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_AtStart)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = start;
+  const auto ref = start;
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_CloseToEnd)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = create_transform(7, 5, 0);
+  const auto ref = end;
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_CloseToStart)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = create_transform(-7, -5, 0);
+  const auto ref = start;
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_Halfway)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = create_transform(2, 4, 0);
+  const auto ref = create_transform(3, 3, 0);
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_TwoThirds)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(8, 5, 0);
+  const auto point = create_transform(2, 12, 0);
+  const auto ref = create_transform(6, 4, 0);
+
+  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_OtherYaw)
+{
+  const auto start = tf2::Transform(create_quaternion(1, 1, 1), {2, 2, 0});
+  const auto end = create_transform(4, 4, 0);
+  const auto point = create_transform(2, 4, 0);
+  const auto ref = tf2::Transform(create_quaternion(0, 0, 1), {3, 3, 0});
+  const auto result = closestPointOnSegment(point, start, end, false);
+
+  EXPECT_EQ(ref.getOrigin(), result.getOrigin());
+  // allow for small differences in the basis because of rounding errors in the calculations
+  for (auto r = 0; r < 3; ++r) {
+    for (auto c = 0; c < 3; ++c) {
+      EXPECT_NEAR(ref.getBasis()[r][c], result.getBasis()[r][c], 1e-6);
+    }
+  }
+}
+
+TEST(PathTrackingPidCalculations, ClosestPointOnSegment_EstimateAngle)
+{
+  const auto start = create_transform(2, 2, 0);
+  const auto end = create_transform(4, 4, 0);
+  const auto point = create_transform(2, 4, 0);
+  const auto ref = tf2::Transform(create_quaternion(0, 0, M_PI / 4.0), {3, 3, 0});
+  const auto result = closestPointOnSegment(point, start, end, true);
+
+  EXPECT_EQ(ref.getOrigin(), result.getOrigin());
+  // allow for small differences in the basis because of rounding errors in the calculations
+  for (auto r = 0; r < 3; ++r) {
+    for (auto c = 0; c < 3; ++c) {
+      EXPECT_NEAR(ref.getBasis()[r][c], result.getBasis()[r][c], 1e-6);
+    }
+  }
 }
 
 }  // namespace
