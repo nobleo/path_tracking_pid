@@ -193,14 +193,6 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  // Result of distToSegmentSquared().
-  struct DistToSegmentSquaredResult
-  {
-    tf2::Transform pose_projection;
-    double distance2_to_p = 0;  // Square distance in meter squared.
-    double distance_to_w = 0;   // Distance in meter.
-  };
-
   /**
    * @brief Closest point between a line segment and a point
    * Calculate the closest point between the line segment bounded by PV and the point W.
@@ -210,10 +202,9 @@ private:
    * @param[in] pose_w The point
    * @param[in] estimate_pose_angle Indicates if the pose angle should be estimated from the line
    *                                segment (true) or if the pose angle from pose_v should be used.
-   * @return The pose projection of the closest point with the distance (squared) to pose_p and
-   *         the distance to pose_w.
+   * @return The pose projection of the closest point.
    */
-  static DistToSegmentSquaredResult distToSegmentSquared(
+  static tf2::Transform closestPointOnSegment(
     const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
     bool estimate_pose_angle);
 

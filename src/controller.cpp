@@ -169,10 +169,10 @@ bool Controller::setPlan(
   // Hence, when picking the starting path's pose, we mean to start at the segment connecting that and the next pose.
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
-    const auto dist_to_segment =
-      distToSegmentSquared(
-        current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1], estimate_pose_angle_)
-        .distance2_to_p;
+    const auto dist_to_segment = distSquared(
+      current_tf, closestPointOnSegment(
+                    current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1],
+                    estimate_pose_angle_));
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
     if (dist_to_segment < minimum_distance_to_path) {
@@ -234,22 +234,16 @@ bool Controller::setPlan(
   return result;
 }
 
-Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
+tf2::Transform Controller::closestPointOnSegment(
   const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
   bool estimate_pose_angle)
 {
   const double l2 = distSquared(pose_v, pose_w);
   if (l2 == 0) {
-    DistToSegmentSquaredResult result;
-
-    result.pose_projection = pose_w;
-    result.distance_to_w = 0.0;
-    result.distance2_to_p = distSquared(pose_p, pose_w);
-
-    return result;
+    return pose_w;
   }
 
-  DistToSegmentSquaredResult result;
+  tf2::Transform result;
 
   const double t = std::clamp(
     ((pose_p.getOrigin().x() - pose_v.getOrigin().x()) *
@@ -258,7 +252,7 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
        (pose_w.getOrigin().y() - pose_v.getOrigin().y())) /
       l2,
     0.0, 1.0);
-  result.pose_projection.setOrigin(tf2::Vector3(
+  result.setOrigin(tf2::Vector3(
     pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
     pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
 
@@ -268,10 +262,7 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
                                        : tf2::getYaw(pose_v.getRotation());
   tf2::Quaternion pose_quaternion;
   pose_quaternion.setRPY(0.0, 0.0, yaw);
-  result.pose_projection.setRotation(pose_quaternion);
-
-  result.distance_to_w = sqrt(distSquared(result.pose_projection, pose_w));
-  result.distance2_to_p = distSquared(pose_p, result.pose_projection);
+  result.setRotation(pose_quaternion);
 
   return result;
 }
@@ -332,50 +323,58 @@ tf2::Transform Controller::findPositionOnPlan(
   // the closest line segment to the current carrot
 
   if (controller_state.current_global_plan_index == 0) {
-    const auto dist_result = distToSegmentSquared(
+    const auto closest_point = closestPointOnSegment(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
 
-    distance_to_goal_ = distance_to_goal_vector_[1] + dist_result.distance_to_w;
+    distance_to_goal_ =
+      distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_point));
     controller_state.last_visited_pose_index = 0;
     path_pose_idx = controller_state.current_global_plan_index;
 
-    return dist_result.pose_projection;
+    return closest_point;
   }
 
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
-    const auto dist_result = distToSegmentSquared(
+    const auto closest_point = closestPointOnSegment(
       current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
       global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
-    distance_to_goal_ = dist_result.distance_to_w;
+    distance_to_goal_ =
+      sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_point));
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
     path_pose_idx = controller_state.current_global_plan_index - 1;
 
-    return dist_result.pose_projection;
+    return closest_point;
   }
 
-  const auto dist_result_ahead = distToSegmentSquared(
+  const auto closest_point_ahead = closestPointOnSegment(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index],
     global_plan_tf_[controller_state.current_global_plan_index + 1], estimate_pose_angle_);
-  const auto dist_result_behind = distToSegmentSquared(
+  const auto closest_point_behind = closestPointOnSegment(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
     global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
-  if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
-    distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
-                        dist_result_ahead.distance_to_w;
+  if (
+    distSquared(current_tf2, closest_point_ahead) <
+    distSquared(current_tf2, closest_point_behind)) {
+    distance_to_goal_ =
+      distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
+      sqrt(distSquared(
+        global_plan_tf_[controller_state.current_global_plan_index + 1], closest_point_ahead));
     controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
     path_pose_idx = controller_state.current_global_plan_index;
 
-    return dist_result_ahead.pose_projection;
+    return closest_point_ahead;
   }
 
-  distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index] +
-                      dist_result_behind.distance_to_w;
+  distance_to_goal_ =
+    distance_to_goal_vector_[controller_state.current_global_plan_index] +
+    sqrt(distSquared(
+      global_plan_tf_[controller_state.current_global_plan_index], closest_point_behind));
   controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
   path_pose_idx = controller_state.current_global_plan_index;
 
-  return dist_result_behind.pose_projection;
+  return closest_point_behind;
 }
 
 Controller::UpdateResult Controller::update(
