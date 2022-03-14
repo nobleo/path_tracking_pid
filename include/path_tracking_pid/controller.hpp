@@ -193,21 +193,6 @@ public:
   double getVelMaxObstacle() const;
 
 private:
-  /**
-   * @brief Closest point between a line segment and a point
-   * Calculate the closest point between the line segment bounded by PV and the point W.
-   * 
-   * @param[in] pose_p Start of the line segment
-   * @param[in] pose_v End of the line segment
-   * @param[in] pose_w The point
-   * @param[in] estimate_pose_angle Indicates if the pose angle should be estimated from the line
-   *                                segment (true) or if the pose angle from pose_v should be used.
-   * @return The pose projection of the closest point.
-   */
-  static tf2::Transform closestPointOnSegment(
-    const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
-    bool estimate_pose_angle);
-
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
   TricycleSteeringCmdVel computeTricycleModelInverseKinematics(
     const geometry_msgs::Twist & cmd_vel);
