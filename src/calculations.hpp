@@ -46,4 +46,13 @@ std::vector<double> inverse_turning_radiuses(const std::vector<tf2::Transform> &
 bool is_in_direction_of_target(
   const tf2::Transform & current, const tf2::Vector3 & target, double velocity);
 
+/**
+ * Returns the square distance between two poses.
+ * 
+ * @param[in] a Pose A.
+ * @param[in] b Pose B.
+ * @return Distance between A and B.
+ */
+double distSquared(const tf2::Transform & a, const tf2::Transform & b);
+
 }  // namespace path_tracking_pid
