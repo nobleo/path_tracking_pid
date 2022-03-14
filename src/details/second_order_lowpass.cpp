@@ -3,34 +3,43 @@
 
 namespace path_tracking_pid::details
 {
-namespace
+SecondOrderLowpass::SecondOrderLowpass(double cutoff, double damping)
+: cutoff_(cutoff), damping_(damping)
 {
-// Used in filter calculations. Default 1.0 corresponds to a cutoff frequency at 1/4 of the sample rate.
-constexpr double cutoff = 1.;
+}
 
-}  // namespace
-
-void SecondOrderLowpass::push(double value)
+void SecondOrderLowpass::configure(double cutoff, double damping)
 {
-  errors_.push(value);
+  cutoff_ = cutoff;
+  damping_ = damping;
+}
 
-  filtered_errors_.push(
-    (1 / (1 + cutoff * cutoff + M_SQRT2 * cutoff)) *
-    (errors_.at<2>() + 2 * errors_.at<1>() + errors_.at<0>() -
-     (cutoff * cutoff - M_SQRT2 * cutoff + 1) * filtered_errors_.at<1>() -
-     (-2 * cutoff * cutoff + 2) * filtered_errors_.at<0>()));
+double SecondOrderLowpass::filter(double u, double step_size)
+{
+  // save history
+  u_.push(u);
+  y_.push(u);  // increase index so the math below looks correct
+
+  if (cutoff_ == 0) {
+    return u;
+  }
+
+  // A continous time second order lowpass was discretized with Tustin's method. For a mathematical
+  // explanation, see doc/second_order_lowpass_tustin.ipynb
+  auto c = cutoff_;
+  auto d = damping_;
+  auto T = step_size;
+  auto a = 2 * M_PI * c;
+  auto b = T * a;
+  y_[0] = ((pow(b, 2)) * u_[0] + (2 * pow(b, 2)) * u_[1] + (pow(b, 2)) * u_[2] -
+           (2 * pow(b, 2) - 8) * y_[1] - (pow(b, 2) - 4 * T * a * d + 4) * y_[2]) /
+          (pow(b, 2) + 4 * T * a * d + 4);
+  return y_[0];
 }
 
 void SecondOrderLowpass::reset()
 {
-  errors_.reset();
-  filtered_errors_.reset();
+  u_ = {};
+  y_ = {};
 }
-
-const FifoArray<double, 3> & SecondOrderLowpass::errors() const { return errors_; }
-const FifoArray<double, 3> & SecondOrderLowpass::filtered_errors() const
-{
-  return filtered_errors_;
-}
-
 }  // namespace path_tracking_pid::details

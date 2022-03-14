@@ -4,7 +4,6 @@
 
 namespace
 {
-
 using path_tracking_pid::details::FifoArray;
 
 TEST(PathTrackingPidDetailsFifoArray, Initialize)
@@ -112,6 +111,16 @@ TEST(PathTrackingPidDetailsFifoArray, OtherSize)
   EXPECT_EQ(fifo[2], 4);
   EXPECT_EQ(fifo[3], 3);
   EXPECT_EQ(fifo[4], 2);
+}
+
+TEST(PathTrackingPidDetailsFifoArray, Assign)
+{
+  FifoArray<int, 3> fifo;
+  fifo[0] = 1;
+
+  EXPECT_EQ(fifo[0], 1);
+  EXPECT_EQ(fifo[1], 0);
+  EXPECT_EQ(fifo[2], 0);
 }
 
 }  // namespace

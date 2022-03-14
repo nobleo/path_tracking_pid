@@ -15,4 +15,5 @@ PathTrackingPID:
   abs_minimum_x_vel: 0.0
   anti_collision: true
   use_mpc: false
+  feedforward_ang: true
   controller_debug_enabled: true
