@@ -56,9 +56,9 @@ bool is_in_direction_of_target(
 double distSquared(const tf2::Transform & a, const tf2::Transform & b);
 
 /**
- * @brief Closest point between a line segment and a point
+ * @brief Closest pose between a line segment and a point
  *
- * Calculate the closest point between the line segment bounded by `segment_start` and `segment_end`
+ * Calculate the closest pose between the line segment bounded by `segment_start` and `segment_end`
  * and point `point`.
  *
  * @param[in] point               The point
@@ -69,7 +69,7 @@ double distSquared(const tf2::Transform & a, const tf2::Transform & b);
  *                                used.
  * @return The pose projection of the closest point.
  */
-tf2::Transform closestPointOnSegment(
+tf2::Transform closestPoseOnSegment(
   const tf2::Transform & point, const tf2::Transform & segment_start,
   const tf2::Transform & segment_end, bool estimate_pose_angle);
 

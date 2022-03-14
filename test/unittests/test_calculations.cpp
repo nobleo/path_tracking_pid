@@ -9,7 +9,7 @@
 namespace
 {
 
-using path_tracking_pid::closestPointOnSegment;
+using path_tracking_pid::closestPoseOnSegment;
 using path_tracking_pid::deltas_of_plan;
 using path_tracking_pid::distances_to_goal;
 using path_tracking_pid::distSquared;
@@ -208,73 +208,73 @@ TEST(PathTrackingPidCalculations, DistSquared)
   EXPECT_EQ(0, distSquared(create_transform(1, 2, 3), create_transform(1, 2, 3)));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_AtEnd)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_AtEnd)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = end;
   const auto ref = end;
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_AtStart)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_AtStart)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = start;
   const auto ref = start;
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_CloseToEnd)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_CloseToEnd)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = create_transform(7, 5, 0);
   const auto ref = end;
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_CloseToStart)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_CloseToStart)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = create_transform(-7, -5, 0);
   const auto ref = start;
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_Halfway)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_Halfway)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = create_transform(2, 4, 0);
   const auto ref = create_transform(3, 3, 0);
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_TwoThirds)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_TwoThirds)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(8, 5, 0);
   const auto point = create_transform(2, 12, 0);
   const auto ref = create_transform(6, 4, 0);
 
-  EXPECT_EQ(ref, closestPointOnSegment(point, start, end, false));
+  EXPECT_EQ(ref, closestPoseOnSegment(point, start, end, false));
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_OtherYaw)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_OtherYaw)
 {
   const auto start = tf2::Transform(create_quaternion(1, 1, 1), {2, 2, 0});
   const auto end = create_transform(4, 4, 0);
   const auto point = create_transform(2, 4, 0);
   const auto ref = tf2::Transform(create_quaternion(0, 0, 1), {3, 3, 0});
-  const auto result = closestPointOnSegment(point, start, end, false);
+  const auto result = closestPoseOnSegment(point, start, end, false);
 
   EXPECT_EQ(ref.getOrigin(), result.getOrigin());
   // allow for small differences in the basis because of rounding errors in the calculations
@@ -285,13 +285,13 @@ TEST(PathTrackingPidCalculations, ClosestPointOnSegment_OtherYaw)
   }
 }
 
-TEST(PathTrackingPidCalculations, ClosestPointOnSegment_EstimateAngle)
+TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_EstimateAngle)
 {
   const auto start = create_transform(2, 2, 0);
   const auto end = create_transform(4, 4, 0);
   const auto point = create_transform(2, 4, 0);
   const auto ref = tf2::Transform(create_quaternion(0, 0, M_PI / 4.0), {3, 3, 0});
-  const auto result = closestPointOnSegment(point, start, end, true);
+  const auto result = closestPoseOnSegment(point, start, end, true);
 
   EXPECT_EQ(ref.getOrigin(), result.getOrigin());
   // allow for small differences in the basis because of rounding errors in the calculations

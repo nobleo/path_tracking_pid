@@ -78,7 +78,7 @@ double distSquared(const tf2::Transform & a, const tf2::Transform & b)
   return a.getOrigin().distance2(b.getOrigin());
 }
 
-tf2::Transform closestPointOnSegment(
+tf2::Transform closestPoseOnSegment(
   const tf2::Transform & point, const tf2::Transform & segment_start,
   const tf2::Transform & segment_end, bool estimate_pose_angle)
 {

@@ -170,7 +170,7 @@ bool Controller::setPlan(
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
     const auto dist_to_segment = distSquared(
-      current_tf, closestPointOnSegment(
+      current_tf, closestPoseOnSegment(
                     current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1],
                     estimate_pose_angle_));
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
@@ -290,58 +290,57 @@ tf2::Transform Controller::findPositionOnPlan(
   // the closest line segment to the current carrot
 
   if (controller_state.current_global_plan_index == 0) {
-    const auto closest_point = closestPointOnSegment(
+    const auto closest_pose = closestPoseOnSegment(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
 
     distance_to_goal_ =
-      distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_point));
+      distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_pose));
     controller_state.last_visited_pose_index = 0;
     path_pose_idx = controller_state.current_global_plan_index;
 
-    return closest_point;
+    return closest_pose;
   }
 
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
-    const auto closest_point = closestPointOnSegment(
+    const auto closest_pose = closestPoseOnSegment(
       current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
       global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
     distance_to_goal_ =
-      sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_point));
+      sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_pose));
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
     path_pose_idx = controller_state.current_global_plan_index - 1;
 
-    return closest_point;
+    return closest_pose;
   }
 
-  const auto closest_point_ahead = closestPointOnSegment(
+  const auto closest_pose_ahead = closestPoseOnSegment(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index],
     global_plan_tf_[controller_state.current_global_plan_index + 1], estimate_pose_angle_);
-  const auto closest_point_behind = closestPointOnSegment(
+  const auto closest_pose_behind = closestPoseOnSegment(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
     global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
   if (
-    distSquared(current_tf2, closest_point_ahead) <
-    distSquared(current_tf2, closest_point_behind)) {
+    distSquared(current_tf2, closest_pose_ahead) < distSquared(current_tf2, closest_pose_behind)) {
     distance_to_goal_ =
       distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
       sqrt(distSquared(
-        global_plan_tf_[controller_state.current_global_plan_index + 1], closest_point_ahead));
+        global_plan_tf_[controller_state.current_global_plan_index + 1], closest_pose_ahead));
     controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
     path_pose_idx = controller_state.current_global_plan_index;
 
-    return closest_point_ahead;
+    return closest_pose_ahead;
   }
 
   distance_to_goal_ =
     distance_to_goal_vector_[controller_state.current_global_plan_index] +
     sqrt(distSquared(
-      global_plan_tf_[controller_state.current_global_plan_index], closest_point_behind));
+      global_plan_tf_[controller_state.current_global_plan_index], closest_pose_behind));
   controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
   path_pose_idx = controller_state.current_global_plan_index;
 
-  return closest_point_behind;
+  return closest_pose_behind;
 }
 
 Controller::UpdateResult Controller::update(
