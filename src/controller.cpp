@@ -72,7 +72,7 @@ void Controller::setHolonomic(bool holonomic)
 void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
 {
   // Set configuration parameters
-  estimate_pose_angle_enabled_ = estimate_pose_angle;
+  estimate_pose_angle_ = estimate_pose_angle;
 }
 
 void Controller::setTricycleModel(
@@ -170,7 +170,8 @@ bool Controller::setPlan(
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
     const auto dist_to_segment =
-      distToSegmentSquared(current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1])
+      distToSegmentSquared(
+        current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1], estimate_pose_angle_)
         .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
@@ -234,7 +235,8 @@ bool Controller::setPlan(
 }
 
 Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
-  const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w) const
+  const tf2::Transform & pose_p, const tf2::Transform & pose_v, const tf2::Transform & pose_w,
+  bool estimate_pose_angle)
 {
   const double l2 = distSquared(pose_v, pose_w);
   if (l2 == 0) {
@@ -260,10 +262,10 @@ Controller::DistToSegmentSquaredResult Controller::distToSegmentSquared(
     pose_v.getOrigin().x() + t * (pose_w.getOrigin().x() - pose_v.getOrigin().x()),
     pose_v.getOrigin().y() + t * (pose_w.getOrigin().y() - pose_v.getOrigin().y()), 0.0));
 
-  const auto yaw = estimate_pose_angle_enabled_ ? atan2(
-                                                    pose_w.getOrigin().y() - pose_v.getOrigin().y(),
-                                                    pose_w.getOrigin().x() - pose_v.getOrigin().x())
-                                                : tf2::getYaw(pose_v.getRotation());
+  const auto yaw = estimate_pose_angle ? atan2(
+                                           pose_w.getOrigin().y() - pose_v.getOrigin().y(),
+                                           pose_w.getOrigin().x() - pose_v.getOrigin().x())
+                                       : tf2::getYaw(pose_v.getRotation());
   tf2::Quaternion pose_quaternion;
   pose_quaternion.setRPY(0.0, 0.0, yaw);
   result.pose_projection.setRotation(pose_quaternion);
@@ -330,8 +332,8 @@ tf2::Transform Controller::findPositionOnPlan(
   // the closest line segment to the current carrot
 
   if (controller_state.current_global_plan_index == 0) {
-    const auto dist_result =
-      distToSegmentSquared(current_tf2, global_plan_tf_[0], global_plan_tf_[1]);
+    const auto dist_result = distToSegmentSquared(
+      current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
 
     distance_to_goal_ = distance_to_goal_vector_[1] + dist_result.distance_to_w;
     controller_state.last_visited_pose_index = 0;
@@ -343,7 +345,7 @@ tf2::Transform Controller::findPositionOnPlan(
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
     const auto dist_result = distToSegmentSquared(
       current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
-      global_plan_tf_[controller_state.current_global_plan_index]);
+      global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
     distance_to_goal_ = dist_result.distance_to_w;
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
@@ -354,10 +356,10 @@ tf2::Transform Controller::findPositionOnPlan(
 
   const auto dist_result_ahead = distToSegmentSquared(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index],
-    global_plan_tf_[controller_state.current_global_plan_index + 1]);
+    global_plan_tf_[controller_state.current_global_plan_index + 1], estimate_pose_angle_);
   const auto dist_result_behind = distToSegmentSquared(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
-    global_plan_tf_[controller_state.current_global_plan_index]);
+    global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
   if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
     distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
