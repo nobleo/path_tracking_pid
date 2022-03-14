@@ -72,7 +72,7 @@ void Controller::setHolonomic(bool holonomic)
 void Controller::setEstimatePoseAngle(bool estimate_pose_angle)
 {
   // Set configuration parameters
-  estimate_pose_angle_enabled_ = estimate_pose_angle;
+  estimate_pose_angle_ = estimate_pose_angle;
 }
 
 void Controller::setTricycleModel(
@@ -169,10 +169,10 @@ bool Controller::setPlan(
   // Hence, when picking the starting path's pose, we mean to start at the segment connecting that and the next pose.
   for (int idx_path = static_cast<int>(global_plan_tf_.size() - 2); idx_path >= 0; --idx_path) {
     /* Get distance to segment to determine if this is the segment to start at */
-    const auto dist_to_segment = distToSegmentSquared(
-                                   current_tf, global_plan_tf_[idx_path],
-                                   global_plan_tf_[idx_path + 1], estimate_pose_angle_enabled_)
-                                   .distance2_to_p;
+    const auto dist_to_segment =
+      distToSegmentSquared(
+        current_tf, global_plan_tf_[idx_path], global_plan_tf_[idx_path + 1], estimate_pose_angle_)
+        .distance2_to_p;
     // Calculate 3D distance, since current_tf2 might have significant z-offset and roll/pitch values w.r.t. path-pose
     // When not doing this, we're brutely projecting in robot's frame and might snap to another segment!
     if (dist_to_segment < minimum_distance_to_path) {
@@ -333,7 +333,7 @@ tf2::Transform Controller::findPositionOnPlan(
 
   if (controller_state.current_global_plan_index == 0) {
     const auto dist_result = distToSegmentSquared(
-      current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_enabled_);
+      current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
 
     distance_to_goal_ = distance_to_goal_vector_[1] + dist_result.distance_to_w;
     controller_state.last_visited_pose_index = 0;
@@ -345,7 +345,7 @@ tf2::Transform Controller::findPositionOnPlan(
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
     const auto dist_result = distToSegmentSquared(
       current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
-      global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_enabled_);
+      global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
     distance_to_goal_ = dist_result.distance_to_w;
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
@@ -356,10 +356,10 @@ tf2::Transform Controller::findPositionOnPlan(
 
   const auto dist_result_ahead = distToSegmentSquared(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index],
-    global_plan_tf_[controller_state.current_global_plan_index + 1], estimate_pose_angle_enabled_);
+    global_plan_tf_[controller_state.current_global_plan_index + 1], estimate_pose_angle_);
   const auto dist_result_behind = distToSegmentSquared(
     current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
-    global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_enabled_);
+    global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
 
   if (dist_result_ahead.distance2_to_p < dist_result_behind.distance2_to_p) {
     distance_to_goal_ = distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +

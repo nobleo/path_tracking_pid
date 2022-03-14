@@ -245,7 +245,7 @@ private:
 
   bool enabled_ = true;
   bool holonomic_robot_enable_ = false;
-  bool estimate_pose_angle_enabled_ = false;
+  bool estimate_pose_angle_ = false;
 
   // feedforward controller
   double feedforward_lat_ = 0.0;
