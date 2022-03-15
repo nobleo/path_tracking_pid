@@ -318,8 +318,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   double max_abs_x_vel = std::abs(x_vel) > std::abs(target_x_vel) ? x_vel : target_x_vel;
   x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, max_abs_x_vel), 0.0, 0.0));
 
-  // Use a controller state to forward project the position on the path
-  auto projected_controller_state = pid_controller_.getControllerState();
+  // Keep track of the projected position on the path.
+  auto projected_global_plan_index = pid_controller_.getControllerState().current_global_plan_index;
 
   // Step until lookahead is reached, for every step project the pose back to the path
   std::vector<tf2::Vector3> step_points;
@@ -328,12 +328,12 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
   projected_step_tf =
-    pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state).position;
+    pid_controller_.findPositionOnPlan(projected_step_tf, projected_global_plan_index).position;
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
   for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
     projected_step_tf =
-      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_controller_state)
+      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_global_plan_index)
         .position;
     projected_steps_tf.push_back(projected_step_tf);
 
