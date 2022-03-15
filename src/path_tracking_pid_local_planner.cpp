@@ -159,12 +159,11 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
   if (
     pid_controller_.getConfig().init_vel_method != Pid_Odom &&
     pid_controller_.getConfig().init_vel_max_diff >= 0.0 &&
-    std::abs(
-      latest_odom_.twist.twist.linear.x - pid_controller_.getControllerState().current_x_vel) >
+    std::abs(latest_odom_.twist.twist.linear.x - pid_controller_.getCurrentForwardVelocity()) >
       pid_controller_.getConfig().init_vel_max_diff) {
     ROS_ERROR(
       "Significant diff between odom (%f) and controller_state (%f) detected. Aborting!",
-      latest_odom_.twist.twist.linear.x, pid_controller_.getControllerState().current_x_vel);
+      latest_odom_.twist.twist.linear.x, pid_controller_.getCurrentForwardVelocity());
     return false;
   }
 
@@ -220,8 +219,8 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
     ROS_ERROR_THROTTLE(
       5, "dt=0 detected, skipping loop(s). Possible overloaded cpu or simulating too fast");
     auto cmd_vel = geometry_msgs::Twist();
-    cmd_vel.linear.x = pid_controller_.getControllerState().current_x_vel;
-    cmd_vel.angular.z = pid_controller_.getControllerState().current_yaw_vel;
+    cmd_vel.linear.x = pid_controller_.getCurrentForwardVelocity();
+    cmd_vel.angular.z = pid_controller_.getCurrentYawVelocity();
     // At the first call of computeVelocityCommands() we can't calculate a cmd_vel. We can't return
     // false because of https://github.com/magazino/move_base_flex/issues/195 so the current
     // velocity is send instead.
@@ -304,7 +303,7 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
 uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
 {
   // Check how far we should check forward
-  double x_vel = pid_controller_.getControllerState().current_x_vel;
+  double x_vel = pid_controller_.getCurrentForwardVelocity();
   double collision_look_ahead_distance =
     x_vel * x_vel / (2 * pid_controller_.getConfig().target_x_decc) +
     pid_controller_.getConfig().collision_look_ahead_length_offset;
@@ -319,7 +318,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   x_step_tf.setOrigin(tf2::Vector3(copysign(x_resolution, max_abs_x_vel), 0.0, 0.0));
 
   // Keep track of the projected position on the path.
-  auto projected_global_plan_index = pid_controller_.getControllerState().current_global_plan_index;
+  auto projected_global_plan_index = pid_controller_.getCurrentGlobalPlanIndex();
 
   // Step until lookahead is reached, for every step project the pose back to the path
   std::vector<tf2::Vector3> step_points;
@@ -494,7 +493,7 @@ uint32_t TrackingPidLocalPlanner::computeVelocityCommands(
 bool TrackingPidLocalPlanner::isGoalReached() const
 {
   // Return reached boolean, but never succeed when we're preempting
-  return pid_controller_.getControllerState().end_reached && !cancel_in_progress_;
+  return pid_controller_.isEndReached() && !cancel_in_progress_;
 }
 
 bool TrackingPidLocalPlanner::isGoalReached(
