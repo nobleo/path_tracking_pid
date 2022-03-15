@@ -101,16 +101,17 @@ public:
   {
     tf2::Transform position;
     std::size_t path_pose_idx = 0;
+    double distance_to_goal = 0;
   };
 
   /**
    * Find position on plan by looking at the surroundings of last known pose.
    * @param current Where is the robot now?
    * @param controller_state  The current state of the controller that gets updated by this function
-   * @return Found position on plan and the index of current path-pose
+   * @return Found position on plan, index of current path-pose and the distance to the goal.
    */
   FindPositionOnPlanResult findPositionOnPlan(
-    const tf2::Transform & current_tf, ControllerState & controller_state);
+    const tf2::Transform & current_tf, ControllerState & controller_state) const;
 
   // Result of update() and update_with_limits().
   struct UpdateResult
