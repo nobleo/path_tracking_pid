@@ -311,9 +311,8 @@ Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
     const auto distance_to_goal =
       distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_pose));
-    controller_state.last_visited_pose_index = 0;
 
-    return {closest_pose, controller_state.current_global_plan_index, distance_to_goal};
+    return {closest_pose, controller_state.current_global_plan_index, distance_to_goal, 0};
   }
 
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
@@ -322,9 +321,10 @@ Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
       global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
     const auto distance_to_goal =
       sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_pose));
-    controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
 
-    return {closest_pose, controller_state.current_global_plan_index - 1, distance_to_goal};
+    return {
+      closest_pose, controller_state.current_global_plan_index - 1, distance_to_goal,
+      global_plan_tf_.size() - 2};
   }
 
   const auto closest_pose_ahead = closestPoseOnSegment(
@@ -340,18 +340,20 @@ Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
       distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
       sqrt(distSquared(
         global_plan_tf_[controller_state.current_global_plan_index + 1], closest_pose_ahead));
-    controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
 
-    return {closest_pose_ahead, controller_state.current_global_plan_index, distance_to_goal};
+    return {
+      closest_pose_ahead, controller_state.current_global_plan_index, distance_to_goal,
+      controller_state.current_global_plan_index};
   }
 
   const auto distance_to_goal =
     distance_to_goal_vector_[controller_state.current_global_plan_index] +
     sqrt(distSquared(
       global_plan_tf_[controller_state.current_global_plan_index], closest_pose_behind));
-  controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
 
-  return {closest_pose_behind, controller_state.current_global_plan_index, distance_to_goal};
+  return {
+    closest_pose_behind, controller_state.current_global_plan_index, distance_to_goal,
+    controller_state.current_global_plan_index - 1};
 }
 
 Controller::UpdateResult Controller::update(
@@ -584,10 +586,10 @@ Controller::UpdateResult Controller::update(
 
   if (config_.feedforward_ang) {
     feedforward_ang_ =
-      turning_radius_inv_vector_[controller_state_.last_visited_pose_index] * control_effort_long_;
+      turning_radius_inv_vector_[find_result.last_visited_pose_index] * control_effort_long_;
     ROS_DEBUG(
-      "turning_radius_inv_vector[%lu] = %f", controller_state_.last_visited_pose_index,
-      turning_radius_inv_vector_[controller_state_.last_visited_pose_index]);
+      "turning_radius_inv_vector[%lu] = %f", find_result.last_visited_pose_index,
+      turning_radius_inv_vector_[find_result.last_visited_pose_index]);
 
     control_effort_ang_ = control_effort_ang_ + feedforward_ang_;
   } else {
