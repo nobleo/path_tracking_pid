@@ -328,12 +328,13 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
   projected_step_tf =
-    pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state);
+    pid_controller_.findPositionOnPlan(projected_step_tf, projected_controller_state).position;
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
   for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
     projected_step_tf =
-      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_controller_state);
+      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_controller_state)
+        .position;
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:
@@ -341,7 +342,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     poses_on_path_points.push_back(projected_step_tf.getOrigin());
   }
 
-  costmap_2d::Costmap2D* costmap2d = costmap_->getCostmap();
+  costmap_2d::Costmap2D * costmap2d = costmap_->getCostmap();
   std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
@@ -356,8 +357,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     int map_x, map_y;
     costmap2d->worldToMapEnforceBounds(x, y, map_x, map_y);
     uint8_t projected_step_cost = costmap2d->getCost(map_x, map_y);
-    if (projected_step_cost > max_projected_step_cost)
-    {
+    if (projected_step_cost > max_projected_step_cost) {
       max_projected_step_cost = projected_step_cost;
     }
 

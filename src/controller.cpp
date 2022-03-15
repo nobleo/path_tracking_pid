@@ -251,8 +251,8 @@ bool Controller::setPlan(
   return result;
 }
 
-tf2::Transform Controller::findPositionOnPlan(
-  const tf2::Transform & current_tf, ControllerState & controller_state, size_t & path_pose_idx)
+Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
+  const tf2::Transform & current_tf, ControllerState & controller_state)
 {
   auto current_tf2 = current_tf;
   // 'Project' current_tf by removing z-component
@@ -313,9 +313,8 @@ tf2::Transform Controller::findPositionOnPlan(
     distance_to_goal_ =
       distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_pose));
     controller_state.last_visited_pose_index = 0;
-    path_pose_idx = controller_state.current_global_plan_index;
 
-    return closest_pose;
+    return {closest_pose, controller_state.current_global_plan_index};
   }
 
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
@@ -326,9 +325,8 @@ tf2::Transform Controller::findPositionOnPlan(
     distance_to_goal_ =
       sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_pose));
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
-    path_pose_idx = controller_state.current_global_plan_index - 1;
 
-    return closest_pose;
+    return {closest_pose, controller_state.current_global_plan_index - 1};
   }
 
   const auto closest_pose_ahead = closestPoseOnSegment(
@@ -345,9 +343,8 @@ tf2::Transform Controller::findPositionOnPlan(
       sqrt(distSquared(
         global_plan_tf_[controller_state.current_global_plan_index + 1], closest_pose_ahead));
     controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
-    path_pose_idx = controller_state.current_global_plan_index;
 
-    return closest_pose_ahead;
+    return {closest_pose_ahead, controller_state.current_global_plan_index};
   }
 
   distance_to_goal_ =
@@ -355,9 +352,8 @@ tf2::Transform Controller::findPositionOnPlan(
     sqrt(distSquared(
       global_plan_tf_[controller_state.current_global_plan_index], closest_pose_behind));
   controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
-  path_pose_idx = controller_state.current_global_plan_index;
 
-  return closest_pose_behind;
+  return {closest_pose_behind, controller_state.current_global_plan_index};
 }
 
 Controller::UpdateResult Controller::update(
@@ -369,9 +365,10 @@ Controller::UpdateResult Controller::update(
   current_with_carrot_ = getControlPointPose(current_tf, config_.l);
 
   const auto & reference_pose = config_.track_base_link ? current_tf : current_with_carrot_;
-  size_t path_pose_idx;
-  current_pos_on_plan_ = current_goal_ =
-    findPositionOnPlan(reference_pose, controller_state_, path_pose_idx);
+  const auto find_result = findPositionOnPlan(reference_pose, controller_state_);
+  const auto & path_pose_idx = find_result.path_pose_idx;
+
+  current_pos_on_plan_ = current_goal_ = find_result.position;
 
   if (config_.track_base_link) {
     current_goal_ = getControlPointPose(current_goal_, config_.l);
