@@ -252,7 +252,7 @@ bool Controller::setPlan(
 }
 
 Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
-  const tf2::Transform & current_tf, ControllerState & controller_state)
+  const tf2::Transform & current_tf, ControllerState & controller_state) const
 {
   auto current_tf2 = current_tf;
   // 'Project' current_tf by removing z-component
@@ -309,24 +309,22 @@ Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
   if (controller_state.current_global_plan_index == 0) {
     const auto closest_pose = closestPoseOnSegment(
       current_tf2, global_plan_tf_[0], global_plan_tf_[1], estimate_pose_angle_);
-
-    distance_to_goal_ =
+    const auto distance_to_goal =
       distance_to_goal_vector_[1] + sqrt(distSquared(global_plan_tf_[1], closest_pose));
     controller_state.last_visited_pose_index = 0;
 
-    return {closest_pose, controller_state.current_global_plan_index};
+    return {closest_pose, controller_state.current_global_plan_index, distance_to_goal};
   }
 
   if (controller_state.current_global_plan_index == global_plan_tf_.size() - 1) {
     const auto closest_pose = closestPoseOnSegment(
       current_tf2, global_plan_tf_[controller_state.current_global_plan_index - 1],
       global_plan_tf_[controller_state.current_global_plan_index], estimate_pose_angle_);
-
-    distance_to_goal_ =
+    const auto distance_to_goal =
       sqrt(distSquared(global_plan_tf_[controller_state.current_global_plan_index], closest_pose));
     controller_state.last_visited_pose_index = global_plan_tf_.size() - 2;
 
-    return {closest_pose, controller_state.current_global_plan_index - 1};
+    return {closest_pose, controller_state.current_global_plan_index - 1, distance_to_goal};
   }
 
   const auto closest_pose_ahead = closestPoseOnSegment(
@@ -338,22 +336,22 @@ Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
 
   if (
     distSquared(current_tf2, closest_pose_ahead) < distSquared(current_tf2, closest_pose_behind)) {
-    distance_to_goal_ =
+    const auto distance_to_goal =
       distance_to_goal_vector_[controller_state.current_global_plan_index + 1] +
       sqrt(distSquared(
         global_plan_tf_[controller_state.current_global_plan_index + 1], closest_pose_ahead));
     controller_state.last_visited_pose_index = controller_state.current_global_plan_index;
 
-    return {closest_pose_ahead, controller_state.current_global_plan_index};
+    return {closest_pose_ahead, controller_state.current_global_plan_index, distance_to_goal};
   }
 
-  distance_to_goal_ =
+  const auto distance_to_goal =
     distance_to_goal_vector_[controller_state.current_global_plan_index] +
     sqrt(distSquared(
       global_plan_tf_[controller_state.current_global_plan_index], closest_pose_behind));
   controller_state.last_visited_pose_index = controller_state.current_global_plan_index - 1;
 
-  return {closest_pose_behind, controller_state.current_global_plan_index};
+  return {closest_pose_behind, controller_state.current_global_plan_index, distance_to_goal};
 }
 
 Controller::UpdateResult Controller::update(
@@ -368,6 +366,7 @@ Controller::UpdateResult Controller::update(
   const auto find_result = findPositionOnPlan(reference_pose, controller_state_);
   const auto & path_pose_idx = find_result.path_pose_idx;
 
+  distance_to_goal_ = find_result.distance_to_goal;
   current_pos_on_plan_ = current_goal_ = find_result.position;
 
   if (config_.track_base_link) {
