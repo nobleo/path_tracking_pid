@@ -210,7 +210,6 @@ private:
   std::vector<tf2::Transform> global_plan_tf_;     // Global plan vector
   std::vector<double> distance_to_goal_vector_;    // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
-  double distance_to_goal_ = NAN;
   tf2::Transform current_goal_;
   tf2::Transform current_pos_on_plan_;
   tf2::Transform current_with_carrot_;

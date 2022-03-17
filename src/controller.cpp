@@ -365,15 +365,15 @@ Controller::UpdateResult Controller::update(
   const auto & reference_pose = config_.track_base_link ? current_tf : current_with_carrot_;
   const auto find_result = findPositionOnPlan(reference_pose, controller_state_);
   const auto & path_pose_idx = find_result.path_pose_idx;
+  const auto & distance_to_goal = find_result.distance_to_goal;
 
-  distance_to_goal_ = find_result.distance_to_goal;
   current_pos_on_plan_ = current_goal_ = find_result.position;
 
   if (config_.track_base_link) {
     current_goal_ = getControlPointPose(current_goal_, config_.l);
   }
 
-  result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
+  result.progress = 1.0 - distance_to_goal / distance_to_goal_vector_[0];
 
   // Compute errorPose between controlPose and currentGoalPose
   const auto error = current_with_carrot_.inverseTimes(current_goal_);
@@ -467,7 +467,7 @@ Controller::UpdateResult Controller::update(
   }
   ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
   ROS_DEBUG("d_end_phase: %f", d_end_phase);
-  ROS_DEBUG("distance_to_goal: %f", distance_to_goal_);
+  ROS_DEBUG("distance_to_goal: %f", distance_to_goal);
 
   const auto in_direction_of_goal =
     is_in_direction_of_target(current_tf, current_goal_.getOrigin(), target_x_vel);
@@ -475,7 +475,7 @@ Controller::UpdateResult Controller::update(
   // If we are as close to our goal or closer then we need to reach end velocity, enable end_phase.
   // However, if robot is not facing to the same direction as the local velocity target vector, don't enable end_phase.
   // This is to avoid skipping paths that start with opposite velocity.
-  if ((distance_to_goal_ <= fabs(d_end_phase)) && in_direction_of_goal) {
+  if ((distance_to_goal <= fabs(d_end_phase)) && in_direction_of_goal) {
     // This state will be remebered to avoid jittering on target_x_vel
     controller_state_.end_phase_enabled = true;
   }
@@ -540,7 +540,7 @@ Controller::UpdateResult Controller::update(
   // Or when the end velocity is reached.
   // Warning! If target_end_x_vel == 0 and min_vel = 0 then the robot might not reach end pose
   if (
-    (distance_to_goal_ == 0.0 && target_end_x_vel >= VELOCITY_EPS) ||
+    (distance_to_goal == 0.0 && target_end_x_vel >= VELOCITY_EPS) ||
     (controller_state_.end_phase_enabled && new_x_vel >= target_end_x_vel - VELOCITY_EPS &&
      new_x_vel <= target_end_x_vel + VELOCITY_EPS)) {
     controller_state_.end_reached = true;
@@ -553,7 +553,7 @@ Controller::UpdateResult Controller::update(
     // eda (Estimated duration of arrival) estimation
     if (fabs(target_x_vel) > VELOCITY_EPS) {
       const double t_const =
-        (copysign(distance_to_goal_, target_x_vel) - d_end_phase) / target_x_vel;
+        (copysign(distance_to_goal, target_x_vel) - d_end_phase) / target_x_vel;
       result.eda = fmin(fmax(t_end_phase_current, 0.0) + fmax(t_const, 0.0), LONG_DURATION);
     } else {
       result.eda = LONG_DURATION;
