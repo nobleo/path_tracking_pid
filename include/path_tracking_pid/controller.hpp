@@ -28,7 +28,6 @@ struct TricycleSteeringCmdVel
 struct ControllerState
 {
   size_t current_global_plan_index = 0;
-  size_t last_visited_pose_index = 0;
   double current_x_vel = 0.0;
   double current_yaw_vel = 0.0;
   double previous_steering_angle = 0.0;
@@ -102,6 +101,7 @@ public:
     tf2::Transform position;
     std::size_t path_pose_idx = 0;
     double distance_to_goal = 0;
+    std::size_t last_visited_pose_index = 0;
   };
 
   /**
