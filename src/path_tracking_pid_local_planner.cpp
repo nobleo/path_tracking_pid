@@ -328,13 +328,12 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
   projected_step_tf =
-    pid_controller_.findPositionOnPlan(projected_step_tf, projected_global_plan_index).position;
+    pid_controller_.findPoseOnPlan(projected_step_tf, projected_global_plan_index).pose;
   projected_steps_tf.push_back(projected_step_tf);  // Add base_link projected pose
   for (uint step = 0; step < n_steps; step++) {
     tf2::Transform next_straight_step_tf = projected_step_tf * x_step_tf;
     projected_step_tf =
-      pid_controller_.findPositionOnPlan(next_straight_step_tf, projected_global_plan_index)
-        .position;
+      pid_controller_.findPoseOnPlan(next_straight_step_tf, projected_global_plan_index).pose;
     projected_steps_tf.push_back(projected_step_tf);
 
     // Fill markers:

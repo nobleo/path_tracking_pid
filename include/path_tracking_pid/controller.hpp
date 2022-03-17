@@ -95,23 +95,23 @@ public:
     const geometry_msgs::Twist & steering_odom_twist,
     const std::vector<tf2::Transform> & global_plan);
 
-  /** Result of findPositionOnPlan(). */
-  struct FindPositionOnPlanResult
+  /** Result of findPoseOnPlan(). */
+  struct FindPoseOnPlanResult
   {
-    tf2::Transform position;
+    tf2::Transform pose;
     std::size_t path_pose_idx = 0;
     double distance_to_goal = 0;
     std::size_t last_visited_pose_index = 0;
   };
 
   /**
-   * Find position on plan by looking at the surroundings of last known pose.
+   * Find pose on plan by looking at the surroundings of last known pose.
    * @param[in]     current_tf        Where is the robot now?
    * @param[in,out] global_plan_index Global plan index where the search should start. Updated to
    *                                  current global plan index once found.
-   * @return Found position on plan and related data.
+   * @return Found pose on plan and related data.
    */
-  FindPositionOnPlanResult findPositionOnPlan(
+  FindPoseOnPlanResult findPoseOnPlan(
     const tf2::Transform & current_tf, std::size_t & global_plan_index) const;
 
   // Result of update() and update_with_limits().

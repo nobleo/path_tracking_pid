@@ -251,7 +251,7 @@ bool Controller::setPlan(
   return result;
 }
 
-Controller::FindPositionOnPlanResult Controller::findPositionOnPlan(
+Controller::FindPoseOnPlanResult Controller::findPoseOnPlan(
   const tf2::Transform & current_tf, std::size_t & global_plan_index) const
 {
   auto current_tf2 = current_tf;
@@ -356,11 +356,11 @@ Controller::UpdateResult Controller::update(
 
   const auto & reference_pose = config_.track_base_link ? current_tf : current_with_carrot_;
   const auto find_result =
-    findPositionOnPlan(reference_pose, controller_state_.current_global_plan_index);
+    findPoseOnPlan(reference_pose, controller_state_.current_global_plan_index);
   const auto & path_pose_idx = find_result.path_pose_idx;
   const auto & distance_to_goal = find_result.distance_to_goal;
 
-  current_pos_on_plan_ = current_goal_ = find_result.position;
+  current_pos_on_plan_ = current_goal_ = find_result.pose;
 
   if (config_.track_base_link) {
     current_goal_ = getControlPointPose(current_goal_, config_.l);
