@@ -25,27 +25,6 @@ struct TricycleSteeringCmdVel
   double acceleration = 0.0;
 };
 
-struct ControllerState
-{
-  size_t current_global_plan_index = 0;
-  double current_x_vel = 0.0;
-  double current_yaw_vel = 0.0;
-  double previous_steering_angle = 0.0;
-  double previous_steering_x_vel = 0.0;
-  double previous_steering_yaw_vel = 0.0;
-  bool end_phase_enabled = false;
-  bool end_reached = false;
-  double tracking_error_lat = 0.0;
-  double tracking_error_ang = 0.0;
-  // Errors with little history
-  details::SecondOrderLowpass error_lat;
-  details::SecondOrderLowpass error_ang;
-  details::Integral error_integral_lat;
-  details::Integral error_integral_ang;
-  details::Derivative error_deriv_lat;
-  details::Derivative error_deriv_ang;
-};
-
 class Controller : private boost::noncopyable
 {
 public:
@@ -183,8 +162,20 @@ public:
   tf2::Transform getCurrentWithCarrot() const { return current_with_carrot_; }
   tf2::Transform getCurrentPosOnPlan() const { return current_pos_on_plan_; }
 
-  // Inline get-function for controller-state
-  ControllerState getControllerState() const { return controller_state_; }
+  /** Get current forward velocity. */
+  double getCurrentForwardVelocity() const { return controller_state_.current_x_vel; }
+
+  /** Get current yaw velocity. */
+  double getCurrentYawVelocity() const { return controller_state_.current_yaw_vel; }
+
+  /** Indicates if the end is reached. */
+  bool isEndReached() const { return controller_state_.end_reached; }
+
+  /** Gets the current global plan index. */
+  std::size_t getCurrentGlobalPlanIndex() const
+  {
+    return controller_state_.current_global_plan_index;
+  }
 
   // Set new vel_max_external value
   void setVelMaxExternal(double value);
@@ -196,6 +187,27 @@ public:
   double getVelMaxObstacle() const;
 
 private:
+  struct ControllerState
+  {
+    size_t current_global_plan_index = 0;
+    double current_x_vel = 0.0;
+    double current_yaw_vel = 0.0;
+    double previous_steering_angle = 0.0;
+    double previous_steering_x_vel = 0.0;
+    double previous_steering_yaw_vel = 0.0;
+    bool end_phase_enabled = false;
+    bool end_reached = false;
+    double tracking_error_lat = 0.0;
+    double tracking_error_ang = 0.0;
+    // Errors with little history
+    details::SecondOrderLowpass error_lat;
+    details::SecondOrderLowpass error_ang;
+    details::Integral error_integral_lat;
+    details::Integral error_integral_ang;
+    details::Derivative error_deriv_lat;
+    details::Derivative error_deriv_ang;
+  };
+
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);
   TricycleSteeringCmdVel computeTricycleModelInverseKinematics(
     const geometry_msgs::Twist & cmd_vel);
