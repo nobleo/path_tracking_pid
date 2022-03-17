@@ -60,6 +60,23 @@ bool check_plan(const std::vector<tf2::Transform> & plan)
   return true;
 }
 
+/**
+ * Determine the control point pose based on the given pose and control distance.
+ * 
+ * @param[in] pose Pose to transform.
+ * @param[in] control_distance Control distance to use.
+ * @return Control point pose.
+ */
+tf2::Transform getControlPointPose(const tf2::Transform & pose, double control_distance)
+{
+  const auto theda_rp = tf2::getYaw(pose.getRotation());
+  const auto origin = tf2::Vector3{
+    pose.getOrigin().x() + control_distance * cos(theda_rp),
+    pose.getOrigin().y() + control_distance * sin(theda_rp), 0};
+
+  return tf2::Transform{pose.getRotation(), origin};
+}
+
 }  // namespace
 
 void Controller::setHolonomic(bool holonomic)
@@ -349,41 +366,21 @@ Controller::UpdateResult Controller::update(
 {
   UpdateResult result;
 
-  const double current_x_vel = controller_state_.current_x_vel;
-  const double current_yaw_vel = controller_state_.current_yaw_vel;
+  current_with_carrot_ = getControlPointPose(current_tf, config_.l);
 
-  // Compute location of the point to be controlled
-  const double theda_rp = tf2::getYaw(current_tf.getRotation());
-  tf2::Vector3 current_with_carrot_origin;
-  current_with_carrot_origin.setX(current_tf.getOrigin().x() + config_.l * cos(theda_rp));
-  current_with_carrot_origin.setY(current_tf.getOrigin().y() + config_.l * sin(theda_rp));
-  current_with_carrot_origin.setZ(0);
-
-  current_with_carrot_.setOrigin(current_with_carrot_origin);
-  current_with_carrot_.setRotation(current_tf.getRotation());
-
+  const auto & reference_pose = config_.track_base_link ? current_tf : current_with_carrot_;
   size_t path_pose_idx;
+  current_pos_on_plan_ = current_goal_ =
+    findPositionOnPlan(reference_pose, controller_state_, path_pose_idx);
+
   if (config_.track_base_link) {
-    // Find closes robot position to path and then project carrot on goal
-    current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_tf, controller_state_, path_pose_idx);
-    // To track the base link the goal is then transform to the control point goal
-    double theda_rp = tf2::getYaw(current_goal_.getRotation());
-    tf2::Vector3 newControlOrigin;
-    newControlOrigin.setX(current_goal_.getOrigin().x() + config_.l * cos(theda_rp));
-    newControlOrigin.setY(current_goal_.getOrigin().y() + config_.l * sin(theda_rp));
-    newControlOrigin.setZ(0);
-    current_goal_.setOrigin(newControlOrigin);
-  } else {
-    // find position of current position with projected carrot
-    current_pos_on_plan_ = current_goal_ =
-      findPositionOnPlan(current_with_carrot_, controller_state_, path_pose_idx);
+    current_goal_ = getControlPointPose(current_goal_, config_.l);
   }
 
   result.progress = 1.0 - distance_to_goal_ / distance_to_goal_vector_[0];
 
   // Compute errorPose between controlPose and currentGoalPose
-  tf2::Transform error = current_with_carrot_.inverseTimes(current_goal_);
+  const auto error = current_with_carrot_.inverseTimes(current_goal_);
 
   //***** Feedback control *****//
   if (!((config_.Kp_lat <= 0. && config_.Ki_lat <= 0. && config_.Kd_lat <= 0.) ||
@@ -449,6 +446,9 @@ Controller::UpdateResult Controller::update(
   // Apply acceleration limits and end velocity
   double t_end_phase_current;
   double d_end_phase;
+
+  const double current_x_vel = controller_state_.current_x_vel;
+  const double current_yaw_vel = controller_state_.current_yaw_vel;
 
   // Compute time to reach end velocity from current velocity
   // Compute estimate overall distance during end_phase
