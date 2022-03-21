@@ -8,13 +8,15 @@
 
 namespace
 {
-
 using path_tracking_pid::closestPoseOnSegment;
 using path_tracking_pid::deltas_of_plan;
 using path_tracking_pid::distances_to_goal;
 using path_tracking_pid::distSquared;
+using path_tracking_pid::getControlPointPose;
 using path_tracking_pid::inverse_turning_radiuses;
 using path_tracking_pid::is_in_direction_of_target;
+
+constexpr auto eps = 1e-6;
 
 // Create a transform (with an identity basis) based on the given coordinates.
 tf2::Transform create_transform(double x, double y, double z)
@@ -298,6 +300,21 @@ TEST(PathTrackingPidCalculations, ClosestPoseOnSegment_EstimateAngle)
   for (auto r = 0; r < 3; ++r) {
     for (auto c = 0; c < 3; ++c) {
       EXPECT_NEAR(ref.getBasis()[r][c], result.getBasis()[r][c], 1e-6);
+    }
+  }
+}
+
+TEST(PathTrackingPidCalculations, getControlPointPose)
+{
+  auto pose = tf2::Transform{create_quaternion(0, 0, M_PI_4), tf2::Vector3{2, 1, 0}};
+  auto result = getControlPointPose(pose, M_SQRT2);
+  auto ref = tf2::Transform(create_quaternion(0, 0, M_PI_4), {3, 2, 0});
+
+  EXPECT_EQ(ref.getOrigin(), result.getOrigin());
+  // allow for small differences in the basis because of rounding errors in the calculations
+  for (auto r = 0; r < 3; ++r) {
+    for (auto c = 0; c < 3; ++c) {
+      EXPECT_NEAR(ref.getBasis()[r][c], result.getBasis()[r][c], eps);
     }
   }
 }
