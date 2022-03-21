@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "common.hpp"
+
 namespace path_tracking_pid
 {
 // Factory function for a visualization color from the given arguments. (Because the corresponding
@@ -28,13 +30,11 @@ const auto blue = create_color(1, 0, 1);
 const auto yellow = create_color(1, 1, 0);
 const auto orange = create_color(1, 0.5, 0);
 
-std::vector<geometry_msgs::Point> to_msg(std::vector<tf2::Vector3> points)
+std::vector<geometry_msgs::Point> to_msgs(std::vector<tf2::Vector3> points)
 {
   std::vector<geometry_msgs::Point> msgs;
-  std::transform(points.begin(), points.end(), std::back_inserter(msgs), [](const auto & msg) {
-    geometry_msgs::Point p;
-    tf2::toMsg(msg, p);
-    return p;
+  std::transform(points.begin(), points.end(), std::back_inserter(msgs), [](const auto & point) {
+    return to_msg<geometry_msgs::Point>(point);
   });
   return msgs;
 }
@@ -80,7 +80,7 @@ void Visualization::publishCollisionObject(
   marker.color = red;
   marker.color.a = cost / 255.0;
   marker.scale.z = cost / 255.0;
-  tf2::toMsg(point, marker.pose.position);
+  marker.pose.position = to_msg<geometry_msgs::Point>(point);
   marker.pose.position.z = marker.scale.z * 0.5;
   if (marker.scale.z > std::numeric_limits<float>::epsilon()) {
     marker.action = visualization_msgs::Marker::ADD;
@@ -103,7 +103,7 @@ void Visualization::publishExtrapolatedPoses(
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
   marker.color = orange;
-  marker.points = to_msg(steps);
+  marker.points = to_msgs(steps);
   marker_pub_.publish(marker);
 }
 
@@ -119,7 +119,7 @@ void Visualization::publishgGoalPosesOnPath(
   marker.scale.x = 0.5;
   marker.scale.y = 0.5;
   marker.color = yellow;
-  marker.points = to_msg(path);
+  marker.points = to_msgs(path);
   marker_pub_.publish(marker);
 }
 
@@ -135,7 +135,7 @@ void Visualization::publishCollisionFootprint(
   marker.scale.x = 0.1;
   marker.color = blue;
   marker.color.a = 0.3;
-  marker.points = to_msg(footprint);
+  marker.points = to_msgs(footprint);
   marker_pub_.publish(marker);
 }
 
@@ -151,7 +151,7 @@ void Visualization::publishCollisionPolygon(
   marker.scale.x = 0.2;
   marker.color = red;
   marker.color.a = 0.3;
-  marker.points = to_msg(hull);
+  marker.points = to_msgs(hull);
   marker_pub_.publish(marker);
 }
 
@@ -159,9 +159,7 @@ void Visualization::publishSphere(
   const std_msgs::Header & header, const std::string & ns, const tf2::Transform & pose,
   const std_msgs::ColorRGBA & color)
 {
-  geometry_msgs::Pose msg;
-  tf2::toMsg(pose, msg);
-  publishSphere(header, ns, msg, color);
+  publishSphere(header, ns, to_msg<geometry_msgs::Pose>(pose), color);
 }
 
 void Visualization::publishSphere(

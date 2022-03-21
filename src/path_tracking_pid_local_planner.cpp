@@ -43,7 +43,7 @@ std::vector<tf2::Transform> convert_plan(const std::vector<geometry_msgs::PoseSt
   result.reserve(plan.size());
   std::transform(
     plan.cbegin(), plan.cend(), std::back_inserter(result),
-    [](const geometry_msgs::PoseStamped & msg) { return tf2_convert<tf2::Transform>(msg.pose); });
+    [](const geometry_msgs::PoseStamped & msg) { return from_msg<tf2::Transform>(msg.pose); });
 
   return result;
 }
@@ -183,20 +183,19 @@ bool TrackingPidLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamp
     }
 
     pid_controller_.setTricycleModel(
-      use_tricycle_model_,
-      tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform));
+      use_tricycle_model_, from_msg<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform));
 
     // TODO(clopez): subscribe to steered wheel odom
     geometry_msgs::Twist steering_odom_twist;
     if (!pid_controller_.setPlan(
-          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
-          tf2_convert<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform),
+          from_msg<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          from_msg<tf2::Transform>(tf_base_to_steered_wheel_stamped_.transform),
           steering_odom_twist, convert_plan(global_plan_map_frame))) {
       return false;
     }
   } else {
     if (!pid_controller_.setPlan(
-          tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
+          from_msg<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist,
           convert_plan(global_plan_map_frame))) {
       return false;
     }
@@ -259,7 +258,7 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
   }
 
   const auto update_result = pid_controller_.update_with_limits(
-    tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist, dt);
+    from_msg<tf2::Transform>(tfCurPoseStamped_.transform), latest_odom_.twist.twist, dt);
 
   path_tracking_pid::PidFeedback feedback_msg;
   feedback_msg.eda = ros::Duration(update_result.eda);
@@ -287,7 +286,7 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
     std_msgs::Header header;
     header.stamp = now;
     header.frame_id = map_frame_;
-    const auto tfCurPose = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
+    const auto tfCurPose = from_msg<tf2::Transform>(tfCurPoseStamped_.transform);
     visualization_->publishAxlePoint(header, tfCurPose);
     visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
     visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
@@ -324,7 +323,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   std::vector<tf2::Vector3> step_points;
   std::vector<tf2::Vector3> poses_on_path_points;
   std::vector<tf2::Transform> projected_steps_tf;
-  auto projected_step_tf = tf2_convert<tf2::Transform>(tfCurPoseStamped_.transform);
+  auto projected_step_tf = from_msg<tf2::Transform>(tfCurPoseStamped_.transform);
   projected_steps_tf.push_back(projected_step_tf);  // Evaluate collision at base_link
   projected_step_tf =
     pid_controller_.findPoseOnPlan(projected_step_tf, projected_global_plan_index).pose;
@@ -379,8 +378,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     // Add footprint to marker
     geometry_msgs::Point previous_point = footprint.back();
     for (const auto & point : footprint) {
-      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
-      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
+      collision_footprint_points.push_back(from_msg<tf2::Vector3>(previous_point));
+      collision_footprint_points.push_back(from_msg<tf2::Vector3>(point));
       previous_point = point;
     }
   }
@@ -416,7 +415,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
       if (boost::geometry::within(point, collision_polygon)) {
         max_cost = cell_cost;
         // Set collision indicator on suspected cell with current cost
-        collision_point = tf2_convert<tf2::Vector3>(point);
+        collision_point = from_msg<tf2::Vector3>(point);
         if (max_cost >= costmap_2d::LETHAL_OBSTACLE) {
           max_projected_step_cost = max_cost;
           break;  // Collision detected, no need to evaluate further
@@ -428,9 +427,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   // Fiddle the polygon into a marker message
   std::vector<tf2::Vector3> collision_hull_points;
   for (const geometry_msgs::Point point : collision_polygon) {
-    tf2::Vector3 point_tf2;
-    tf2::fromMsg(point, point_tf2);
-    collision_hull_points.push_back(point_tf2);
+    collision_hull_points.push_back(from_msg<tf2::Vector3>(point));
   }
   std_msgs::Header header;
   header.stamp = ros::Time::now();
