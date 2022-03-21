@@ -116,12 +116,7 @@ tf2::Transform closestPoseOnSegment(
 
 tf2::Transform getControlPointPose(const tf2::Transform & pose, double control_distance)
 {
-  const auto theda_rp = tf2::getYaw(pose.getRotation());
-  const auto origin = tf2::Vector3{
-    pose.getOrigin().x() + control_distance * cos(theda_rp),
-    pose.getOrigin().y() + control_distance * sin(theda_rp), 0};
-
-  return tf2::Transform{pose.getRotation(), origin};
+  return tf2::Transform{pose.getBasis(), pose * tf2::Vector3{control_distance, 0, 0}};
 }
 
 }  // namespace path_tracking_pid
