@@ -451,12 +451,12 @@ Controller::UpdateResult Controller::update(
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (-config_.target_x_decc);
     d_end_phase = current_x_vel * t_end_phase_current -
                   0.5 * (config_.target_x_decc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  fabs(target_x_vel) * 2.0 * dt.toSec();
   } else {
     t_end_phase_current = (target_end_x_vel - current_x_vel) / (config_.target_x_acc);
     d_end_phase = current_x_vel * t_end_phase_current +
                   0.5 * (config_.target_x_acc) * t_end_phase_current * t_end_phase_current +
-                  target_x_vel * 2.0 * dt.toSec();
+                  fabs(target_x_vel) * 2.0 * dt.toSec();
   }
   ROS_DEBUG("t_end_phase_current: %f", t_end_phase_current);
   ROS_DEBUG("d_end_phase: %f", d_end_phase);
