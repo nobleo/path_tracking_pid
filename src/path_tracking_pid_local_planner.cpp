@@ -32,7 +32,7 @@ constexpr double DT_MAX = 1.5;
 
 /**
  * Convert the plan from geometry message format to tf2 format.
- * 
+ *
  * @param[in] plan Plan to convert.
  * @return Converted plan.
  */
@@ -241,7 +241,7 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
 
   // Handle obstacles
   if (pid_controller_.getConfig().anti_collision) {
-    auto cost = projectedCollisionCost();
+    auto cost = projectedCollisionCost(projectionSteps(), visualization_);
 
     if (cost >= costmap_2d::LETHAL_OBSTACLE) {
       pid_controller_.setVelMaxObstacle(0.0);
@@ -300,7 +300,7 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
   return update_result.velocity_command;
 }
 
-uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
+std::vector<tf2::Transform> TrackingPidLocalPlanner::projectionSteps()
 {
   // Check how far we should check forward
   double x_vel = pid_controller_.getCurrentForwardVelocity();
@@ -340,12 +340,25 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
     poses_on_path_points.push_back(projected_step_tf.getOrigin());
   }
 
+  // Visualize
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = map_frame_;
+  visualization_->publishExtrapolatedPoses(header, step_points);
+  visualization_->publishgGoalPosesOnPath(header, poses_on_path_points);
+
+  return projected_steps_tf;
+}
+
+uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
+  const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz) const
+{
   costmap_2d::Costmap2D * costmap2d = costmap_->getCostmap();
   std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
   uint8_t max_projected_step_cost = 0;
-  for (const auto & projection_tf : projected_steps_tf) {
+  for (const auto & projection_tf : projected_steps) {
     // Project footprint forward
     double x = projection_tf.getOrigin().x();
     double y = projection_tf.getOrigin().y();
@@ -435,11 +448,9 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost()
   std_msgs::Header header;
   header.stamp = ros::Time::now();
   header.frame_id = map_frame_;
-  visualization_->publishCollisionObject(header, max_cost, collision_point);
-  visualization_->publishExtrapolatedPoses(header, step_points);
-  visualization_->publishgGoalPosesOnPath(header, poses_on_path_points);
-  visualization_->publishCollisionFootprint(header, collision_footprint_points);
-  visualization_->publishCollisionPolygon(header, collision_hull_points);
+  viz->publishCollisionObject(header, max_cost, collision_point);
+  viz->publishCollisionFootprint(header, collision_footprint_points);
+  viz->publishCollisionPolygon(header, collision_hull_points);
 
   return max_projected_step_cost;
 }

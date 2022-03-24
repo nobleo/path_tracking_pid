@@ -112,7 +112,10 @@ private:
 
   void velMaxExternalCallback(const std_msgs::Float64 & msg);
 
-  uint8_t projectedCollisionCost();
+  std::vector<tf2::Transform> projectionSteps();
+
+  uint8_t projectedCollisionCost(
+    const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz) const;
 
   nav_msgs::Odometry latest_odom_;
   ros::Time prev_time_;
