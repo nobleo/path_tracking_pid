@@ -9,7 +9,6 @@
 
 namespace path_tracking_pid
 {
-
 std::vector<tf2::Transform> deltas_of_plan(const std::vector<tf2::Transform> & plan)
 {
   auto result = std::vector<tf2::Transform>{};
@@ -113,6 +112,11 @@ tf2::Transform closestPoseOnSegment(
   result.setRotation(pose_quaternion);
 
   return result;
+}
+
+tf2::Transform getControlPointPose(const tf2::Transform & pose, double control_distance)
+{
+  return tf2::Transform{pose.getBasis(), pose * tf2::Vector3{control_distance, 0, 0}};
 }
 
 }  // namespace path_tracking_pid

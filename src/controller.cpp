@@ -60,23 +60,6 @@ bool check_plan(const std::vector<tf2::Transform> & plan)
   return true;
 }
 
-/**
- * Determine the control point pose based on the given pose and control distance.
- * 
- * @param[in] pose Pose to transform.
- * @param[in] control_distance Control distance to use.
- * @return Control point pose.
- */
-tf2::Transform getControlPointPose(const tf2::Transform & pose, double control_distance)
-{
-  const auto theda_rp = tf2::getYaw(pose.getRotation());
-  const auto origin = tf2::Vector3{
-    pose.getOrigin().x() + control_distance * cos(theda_rp),
-    pose.getOrigin().y() + control_distance * sin(theda_rp), 0};
-
-  return tf2::Transform{pose.getRotation(), origin};
-}
-
 }  // namespace
 
 void Controller::setHolonomic(bool holonomic)

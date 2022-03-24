@@ -6,7 +6,6 @@
 
 namespace path_tracking_pid
 {
-
 /**
  * Determine the deltas between consecutive poses in the given plan. Each delta is the inverse of a
  * pose times the next pose. If the plan contains fewer than 2 poses, the output is empty.
@@ -72,5 +71,14 @@ double distSquared(const tf2::Transform & a, const tf2::Transform & b);
 tf2::Transform closestPoseOnSegment(
   const tf2::Transform & point, const tf2::Transform & segment_start,
   const tf2::Transform & segment_end, bool estimate_pose_angle);
+
+/**
+ * Determine the control point pose based on the given pose and control distance.
+ *
+ * @param[in] pose Pose to transform.
+ * @param[in] control_distance Control distance to use.
+ * @return Control point pose.
+ */
+tf2::Transform getControlPointPose(const tf2::Transform & pose, double control_distance);
 
 }  // namespace path_tracking_pid
