@@ -241,7 +241,9 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
 
   // Handle obstacles
   if (pid_controller_.getConfig().anti_collision) {
-    auto cost = projectedCollisionCost(projectionSteps(), visualization_);
+    const std::vector<geometry_msgs::Point> footprint = costmap_->getRobotFootprint();
+    auto cost = projectedCollisionCost(
+      costmap_->getCostmap(), footprint, projectionSteps(), visualization_, map_frame_);
 
     if (cost >= costmap_2d::LETHAL_OBSTACLE) {
       pid_controller_.setVelMaxObstacle(0.0);
@@ -351,9 +353,10 @@ std::vector<tf2::Transform> TrackingPidLocalPlanner::projectionSteps()
 }
 
 uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
-  const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz) const
+  costmap_2d::Costmap2D * costmap2d, const std::vector<geometry_msgs::Point> & footprint,
+  const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz,
+  const std::string viz_frame)
 {
-  costmap_2d::Costmap2D * costmap2d = costmap_->getCostmap();
   std::vector<tf2::Vector3> collision_footprint_points;
   polygon_t previous_footprint_xy;
   polygon_t collision_polygon;
@@ -373,13 +376,13 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
     }
 
     // Project footprint forward
-    std::vector<geometry_msgs::Point> footprint;
-    costmap_2d::transformFootprint(x, y, yaw, costmap_->getRobotFootprint(), footprint);
+    std::vector<geometry_msgs::Point> footprint_proj;
+    costmap_2d::transformFootprint(x, y, yaw, footprint, footprint_proj);
 
     // Append footprint to polygon
     polygon_t two_footprints = previous_footprint_xy;
     previous_footprint_xy.clear();
-    for (const auto & point : footprint) {
+    for (const auto & point : footprint_proj) {
       boost::geometry::append(two_footprints, point);
       boost::geometry::append(previous_footprint_xy, point);
     }
@@ -390,8 +393,8 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
     collision_polygon = union_(collision_polygon, two_footprint_hull);
 
     // Add footprint to marker
-    geometry_msgs::Point previous_point = footprint.back();
-    for (const auto & point : footprint) {
+    geometry_msgs::Point previous_point = footprint_proj.back();
+    for (const auto & point : footprint_proj) {
       collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
       collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
       previous_point = point;
@@ -447,7 +450,7 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
   }
   std_msgs::Header header;
   header.stamp = ros::Time::now();
-  header.frame_id = map_frame_;
+  header.frame_id = viz_frame;
   viz->publishCollisionObject(header, max_cost, collision_point);
   viz->publishCollisionFootprint(header, collision_footprint_points);
   viz->publishCollisionPolygon(header, collision_hull_points);

@@ -112,10 +112,25 @@ private:
 
   void velMaxExternalCallback(const std_msgs::Float64 & msg);
 
+  /**
+   * @brief Project an amount of steps in the direction of movement based on velocity
+   * @return Projected steps
+   */
   std::vector<tf2::Transform> projectionSteps();
 
-  uint8_t projectedCollisionCost(
-    const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz) const;
+  /**
+   * @brief Projects the footprint along the projected steps and determines maximum cost in that area
+   * @param costmap2d
+   * @param footprint
+   * @param projected_steps
+   * @param viz Used for marker publishing
+   * @param viz_frame Used for marker publishing
+   * @return Maximum cost
+   */
+  static uint8_t projectedCollisionCost(
+    costmap_2d::Costmap2D * costmap2d, const std::vector<geometry_msgs::Point> & footprint,
+    const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz,
+    const std::string viz_frame);
 
   nav_msgs::Odometry latest_odom_;
   ros::Time prev_time_;
