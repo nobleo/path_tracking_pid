@@ -352,28 +352,19 @@ std::vector<tf2::Transform> TrackingPidLocalPlanner::projectionSteps()
   return projected_steps_tf;
 }
 
-uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
-  costmap_2d::Costmap2D * costmap2d, const std::vector<geometry_msgs::Point> & footprint,
+boost::geometry::model::ring<geometry_msgs::Point> TrackingPidLocalPlanner::projectionFootprint(
+  const std::vector<geometry_msgs::Point> & footprint,
   const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz,
   const std::string viz_frame)
 {
-  std::vector<tf2::Vector3> collision_footprint_points;
+  std::vector<tf2::Vector3> projected_footprint_points;
   polygon_t previous_footprint_xy;
-  polygon_t collision_polygon;
-  uint8_t max_projected_step_cost = 0;
+  polygon_t projected_polygon;
   for (const auto & projection_tf : projected_steps) {
     // Project footprint forward
     double x = projection_tf.getOrigin().x();
     double y = projection_tf.getOrigin().y();
     double yaw = tf2::getYaw(projection_tf.getRotation());
-
-    // Calculate cost by checking base link location in costmap
-    int map_x, map_y;
-    costmap2d->worldToMapEnforceBounds(x, y, map_x, map_y);
-    uint8_t projected_step_cost = costmap2d->getCost(map_x, map_y);
-    if (projected_step_cost > max_projected_step_cost) {
-      max_projected_step_cost = projected_step_cost;
-    }
 
     // Project footprint forward
     std::vector<geometry_msgs::Point> footprint_proj;
@@ -390,14 +381,41 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
     boost::geometry::correct(two_footprints);
     polygon_t two_footprint_hull;
     boost::geometry::convex_hull(two_footprints, two_footprint_hull);
-    collision_polygon = union_(collision_polygon, two_footprint_hull);
+    projected_polygon = union_(projected_polygon, two_footprint_hull);
 
     // Add footprint to marker
     geometry_msgs::Point previous_point = footprint_proj.back();
     for (const auto & point : footprint_proj) {
-      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
-      collision_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
+      projected_footprint_points.push_back(tf2_convert<tf2::Vector3>(previous_point));
+      projected_footprint_points.push_back(tf2_convert<tf2::Vector3>(point));
       previous_point = point;
+    }
+  }
+
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = viz_frame;
+  viz->publishCollisionFootprint(header, projected_footprint_points);
+
+  return projected_polygon;
+}
+
+uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
+  costmap_2d::Costmap2D * costmap2d, const std::vector<geometry_msgs::Point> & footprint,
+  const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz,
+  const std::string viz_frame)
+{
+  auto collision_polygon = projectionFootprint(footprint, projected_steps, viz, viz_frame);
+
+  // Calculate cost by checking base link location in costmap
+  uint8_t max_projected_step_cost = 0;
+  for (const auto & projection_tf : projected_steps) {
+    int map_x, map_y;
+    costmap2d->worldToMapEnforceBounds(
+      projection_tf.getOrigin().x(), projection_tf.getOrigin().y(), map_x, map_y);
+    uint8_t projected_step_cost = costmap2d->getCost(map_x, map_y);
+    if (projected_step_cost > max_projected_step_cost) {
+      max_projected_step_cost = projected_step_cost;
     }
   }
 
@@ -452,7 +470,6 @@ uint8_t TrackingPidLocalPlanner::projectedCollisionCost(
   header.stamp = ros::Time::now();
   header.frame_id = viz_frame;
   viz->publishCollisionObject(header, max_cost, collision_point);
-  viz->publishCollisionFootprint(header, collision_footprint_points);
   viz->publishCollisionPolygon(header, collision_hull_points);
 
   return max_projected_step_cost;
