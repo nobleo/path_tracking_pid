@@ -29,7 +29,7 @@ class TrackingPidLocalPlanner : public mbf_costmap_core::CostmapController,
                                 private boost::noncopyable
 {
 private:
-  typedef boost::geometry::model::ring<geometry_msgs::Point> polygon_t;
+  using polygon_t = boost::geometry::model::ring<geometry_msgs::Point>;
 
   static inline polygon_t union_(const polygon_t & polygon1, const polygon_t & polygon2)
   {
@@ -117,6 +117,19 @@ private:
    * @return Projected steps
    */
   std::vector<tf2::Transform> projectionSteps();
+
+  /**
+   * @brief Expand the footprint with the projected steps
+   * @param footprint
+   * @param projected_steps
+   * @param viz Used for marker publishing
+   * @param viz_frame Used for marker publishing
+   * @return Projected footprint
+   */
+  static polygon_t projectionFootprint(
+    const std::vector<geometry_msgs::Point> & footprint,
+    const std::vector<tf2::Transform> & projected_steps, std::unique_ptr<Visualization> & viz,
+    const std::string viz_frame);
 
   /**
    * @brief Projects the footprint along the projected steps and determines maximum cost in that area
