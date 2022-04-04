@@ -9,7 +9,7 @@ PathTrackingPID:
   holonomic_robot: false
   track_base_link: true
   estimate_pose_angle: false
-  base_link_frame: 'base_link'
+  base_link_frame: 'nav_link'
   target_x_acc: 1.0
   target_x_decc: 0.3
   abs_minimum_x_vel: 0.0

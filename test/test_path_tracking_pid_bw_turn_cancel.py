@@ -11,7 +11,7 @@ from geometry_msgs.msg import Point, Pose
 from math import atan2
 from mbf_msgs.msg import ExePathAction, ExePathGoal
 from nav_msgs.msg import Odometry
-from numpy import linspace
+from numpy import linspace, append
 from visualization_msgs.msg import Marker
 
 from paths import create_path
@@ -72,34 +72,34 @@ class TestPathTrackingPID(unittest.TestCase):
         # Subscribe to visualization-markers to track control direction
         self.vis_sub = rospy.Subscriber("move_base_flex/PathTrackingPID/visualization_marker", Marker, self.vis_cb)
 
-        (x_circ, y_circ, yaw_circ) = points_on_circle(linspace(-0.5*pi, -0.75*pi), radius=3.0, center=(0.0, 3.0))
+        (x_circ, y_circ, yaw_circ) = points_on_circle(linspace(-0.5*pi, 1.48*pi, num=300), radius=5.0, center=(0.0, 4.0))
+        # path = create_path(x_circ+x_circ+x_circ, y_circ+y_circ+y_circ, yaw_circ+yaw_circ+yaw_circ)
         path = create_path(x_circ, y_circ, yaw_circ)
 
-        speed = -0.6
+        speed = 0.6
         endspeed = 0
 
         # Start goal and cancel in between
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
         reconfigure.update_configuration({"target_x_vel": speed})
+        reconfigure.update_configuration({"l": 4.0})
+        reconfigure.update_configuration({"Kp_lat": 0.25})
+        reconfigure.update_configuration({"Ki_lat": 0.0})
         reconfigure.update_configuration({"target_end_x_vel": endspeed})
         reconfigure.update_configuration({"target_x_acc": 0.5})
         reconfigure.update_configuration({"target_x_decc": 0.5})
         reconfigure.update_configuration({"use_mpc": False})
+        reconfigure.update_configuration({"feedforward_lat": True})
+        reconfigure.update_configuration({"feedforward_ang": True})
         # We require debug enabled here to retrieve the markers!
         reconfigure.update_configuration({"controller_debug_enabled": True})
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
+        rospy.sleep(1)
 
-        rospy.sleep(2.0)
-        rospy.logwarn("Preempting path!")
-        client.cancel_goal()
-        rospy.logwarn("Wait for result")
-        preempt_in_time = client.wait_for_result(timeout=rospy.Duration(10))
-        rospy.logwarn("Got result")
+        preempt_in_time = client.wait_for_result(timeout=rospy.Duration(1000))
+        rospy.logwarn(f"Got result: {client.get_state()}")
         self.assertTrue(preempt_in_time, msg="Action call didn't preempt in time")
-
-        self.assertTrue(self.carrot_dir_flipped is False, msg="Guiding direction flipped while stopping!")
-
 
 if __name__ == "__main__":
     rospy.init_node("rostest_path_tracking_pid_bw_turn_cancel", anonymous=False)

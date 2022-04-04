@@ -18,53 +18,8 @@
     <node  if="$(eval rviz)" name="rviz" pkg="rviz" type="rviz" args="-d $(find path_tracking_pid)/test/test.rviz" />
     <node  if="$(eval reconfigure)" name="reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" />
 
-    <test test-name="rostest_path" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="nav_test" args="0.0 0 0 0 0 0 base_link nav_link" />
 
-    <!-- Test different approach directions of the robot to the path -->
-    <test test-name="rostest_path_approach_sideways" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[0, 2, 0]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test>
-    <test test-name="rostest_path_approach_reversed" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[0, 2, 3]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test>
-    <test test-name="rostest_path_approach_perpendicular" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[0, 0, 1.57]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test>
-    <test test-name="rostest_path_approach_corner" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[20, 0, 0]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test>
-    <!-- <test test-name="rostest_path_approach_otherside" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[3, 9, 0]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test> -->
-    <test test-name="rostest_path_approach_far" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="initialpose">[3, -25, 0]</rosparam>
-        <rosparam param="backward">False</rosparam>
-    </test>
-
-    <test test-name="rostest_path_lethal_obstacle" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="obstacles">[[10.0, 10.0]]</rosparam>
-        <rosparam param="outcome">4</rosparam>  <!-- cancelled -->
-        <rosparam param="max_tracking_error_linear_y">1.0</rosparam> <!-- not interested in tracking error for this test -->
-    </test>
-    <test test-name="rostest_path_close_obstacle" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="obstacles">[[15.0, -8.0]]</rosparam>
-    </test>
-    <test test-name="rostest_mpc_vel_reduction" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="radius">1.0</rosparam>  <!-- test mpc with sharp corners -->
-        <rosparam param="/move_base_flex/PathTrackingPID/use_mpc">true</rosparam>
-    </test>
-    <test test-name="rostest_external_vel_reduction" pkg="path_tracking_pid" type="test_path_tracking_pid.py" time-limit="300.0" >
-        <rosparam param="max_vel">1.0</rosparam>
-    </test>
-    <test test-name="rostest_curve_skip" pkg="path_tracking_pid" type="test_path_tracking_pid_turn_skip.py" time-limit="300.0" />
-    <test test-name="rostest_preempt_brake" pkg="path_tracking_pid" type="test_path_tracking_pid_accel.py" time-limit="300.0" />
-    <test test-name="rostest_preempt_resume" pkg="path_tracking_pid" type="test_path_tracking_pid_preempt.py" time-limit="300.0" />
     <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" />
-    <test test-name="rostest_fw_bw" pkg="path_tracking_pid" type="test_path_tracking_pid_fw_bw.py" time-limit="20.0" />
 
 </launch>

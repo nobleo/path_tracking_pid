@@ -1,7 +1,7 @@
 holonomic_robot: false
 track_base_link: true
 estimate_pose_angle: false
-base_link_frame: 'base_link'
+base_link_frame: 'nav_link'
 Kd_ang: 0.3
 Kd_lat: 0.3
 Ki_ang: 0.0
