@@ -374,11 +374,8 @@ Controller::UpdateResult Controller::update(
 
   if (config_.track_base_link) {
     if (config_.feedback_lat_tracking_error) {
-      const auto proportional_cp_lat_shift =
-        config_.Kp_lat_track_err * controller_state_.tracking_error_lat;
-      // compute rotation to obtain a desired translation shift independent of l.
       const auto  gp_rotation = std::clamp(
-        asin(std::clamp(proportional_cp_lat_shift / config_.l, -1.0, 1.0)),
+         config_.Kp_lat_track_err * controller_state_.tracking_error_lat,
         -config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0,
          config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0);
       path_quat.setEuler(0.0, 0.0, gp_rotation);
