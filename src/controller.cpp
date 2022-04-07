@@ -40,7 +40,7 @@ bool is_pose_angle_obtuse(
 /**
  * Checks the given plan. The first and last poses are always accepted (if they exist). Intermediate
  * poses are only accepted if the angle (with respect to the previous and next poses) is obtuse.
- * 
+ *
  * @param[in] plan Plan to check.
  * @return True if all poses in the plan are accepted. False otherwise.
  */
@@ -345,7 +345,46 @@ Controller::UpdateResult Controller::update(
 
   current_pos_on_plan_ = current_goal_ = find_result.pose;
 
+  // tracking error
+  // Transform current pose into local-path-frame to get tracked-frame-error
+  tf2::Quaternion path_quat;
+  path_quat.setEuler(
+    0.0, 0.0,
+    atan2(
+      global_plan_tf_[path_pose_idx + 1].getOrigin().y() -
+        global_plan_tf_[path_pose_idx].getOrigin().y(),
+      global_plan_tf_[path_pose_idx + 1].getOrigin().x() -
+        global_plan_tf_[path_pose_idx].getOrigin().x()));
+  tf2::Transform path_segmen_tf = tf2::Transform(
+    path_quat, tf2::Vector3(
+                 global_plan_tf_[path_pose_idx].getOrigin().x(),
+                 global_plan_tf_[path_pose_idx].getOrigin().y(),
+                 global_plan_tf_[path_pose_idx].getOrigin().z()));
+
+  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * current_tf.getOrigin());
+
+  // trackin_error here represents the error between tracked link and position on plan
+  controller_state_.tracking_error_lat = current_tracking_err.y();
+  // Here we cannot still compute the angular error in this way.
+  // Shall we just move it after the erro tp cp is recomputed? or fill it with the path pose error?
+  // set to zero for now
+  controller_state_.tracking_error_ang = 0.0;
+  // controller_state_.tracking_error_ang = angles::normalize_angle(tf2::getYaw(error.getRotation())),
+  // dt.toSec();
+
   if (config_.track_base_link) {
+    if (config_.feedback_lat_tracking_error) {
+      const auto proportional_cp_lat_shift =
+        config_.Kp_lat_track_err * controller_state_.tracking_error_lat;
+      // compute rotation to obtain a desired translation shift independent of l.
+      const auto  gp_rotation = std::clamp(
+        asin(std::clamp(proportional_cp_lat_shift / config_.l, -1.0, 1.0)),
+        -config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0,
+         config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0);
+      path_quat.setEuler(0.0, 0.0, gp_rotation);
+      auto gp_rotation_tf = tf2::Transform(path_quat, tf2::Vector3(0.0, 0.0, 0.0));
+      current_goal_ = current_goal_ * gp_rotation_tf;
+    }
     current_goal_ = getControlPointPose(current_goal_, config_.l);
   }
 
@@ -371,29 +410,6 @@ Controller::UpdateResult Controller::update(
   auto error_lat_filtered = controller_state_.error_lat.filter(error.getOrigin().y(), dt.toSec());
   auto error_ang_filtered = controller_state_.error_ang.filter(
     angles::normalize_angle(tf2::getYaw(error.getRotation())), dt.toSec());
-
-  // tracking error for diagnostic purposes
-  // Transform current pose into local-path-frame to get tracked-frame-error
-  tf2::Quaternion path_quat;
-  path_quat.setEuler(
-    0.0, 0.0,
-    atan2(
-      global_plan_tf_[path_pose_idx + 1].getOrigin().y() -
-        global_plan_tf_[path_pose_idx].getOrigin().y(),
-      global_plan_tf_[path_pose_idx + 1].getOrigin().x() -
-        global_plan_tf_[path_pose_idx].getOrigin().x()));
-  tf2::Transform path_segmen_tf = tf2::Transform(
-    path_quat, tf2::Vector3(
-                 global_plan_tf_[path_pose_idx].getOrigin().x(),
-                 global_plan_tf_[path_pose_idx].getOrigin().y(),
-                 global_plan_tf_[path_pose_idx].getOrigin().z()));
-
-  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * current_tf.getOrigin());
-
-  // trackin_error here represents the error between tracked link and position on plan
-  controller_state_.tracking_error_lat = current_tracking_err.y();
-  controller_state_.tracking_error_ang = angles::normalize_angle(tf2::getYaw(error.getRotation())),
-  dt.toSec();
 
   // integrate the error
   auto error_integral_lat =
