@@ -72,12 +72,14 @@ class TestPathTrackingPID(unittest.TestCase):
         # Subscribe to visualization-markers to track control direction
         self.vis_sub = rospy.Subscriber("move_base_flex/PathTrackingPID/visualization_marker", Marker, self.vis_cb)
 
-        (x_circ, y_circ, yaw_circ) = points_on_circle(linspace(-0.5*pi, 1.48*pi, num=300), radius=5.0, center=(0.0, 4.0))
+        (x_circ, y_circ, yaw_circ) = points_on_circle(linspace(-0.5*pi, 0.5*pi, num=300), radius=5.0, center=(0.0, 4.0))
         # path = create_path(x_circ+x_circ+x_circ, y_circ+y_circ+y_circ, yaw_circ+yaw_circ+yaw_circ)
         path = create_path(x_circ, y_circ, yaw_circ)
+        path_straight = create_path([0.0, -10.0], [9.0, 9.0], [pi, pi])
+
 
         speed = 0.6
-        endspeed = 0
+        endspeed = 0.6
 
         # Start goal and cancel in between
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
@@ -87,7 +89,7 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure.update_configuration({"Ki_lat": 0.00})
         reconfigure.update_configuration({"Kd_lat": 0.0})
         reconfigure.update_configuration({"feedback_lat_tracking_error": True})
-        reconfigure.update_configuration({"Kp_lat_track_err": 5.0})
+        reconfigure.update_configuration({"Kp_lat_track_err": 10.0})
         reconfigure.update_configuration({"max_gp_abs_rot_fb_lat_terr": 30.0})
         reconfigure.update_configuration({"feedback_ang": False})
         reconfigure.update_configuration({"Kp_ang": 0.5})
@@ -103,6 +105,17 @@ class TestPathTrackingPID(unittest.TestCase):
         reconfigure.update_configuration({"controller_debug_enabled": True})
         rospy.logwarn("Starting path!")
         client.send_goal(ExePathGoal(path=path))
+        rospy.sleep(1)
+
+        preempt_in_time = client.wait_for_result(timeout=rospy.Duration(1000))
+        rospy.logwarn(f"Got result: {client.get_state()}")
+        self.assertTrue(preempt_in_time, msg="Action call didn't preempt in time")
+
+        speed = 2.0
+        endspeed = 0.0
+        reconfigure.update_configuration({"target_x_vel": speed})
+        reconfigure.update_configuration({"target_end_x_vel": endspeed})
+        client.send_goal(ExePathGoal(path=path_straight))
         rospy.sleep(1)
 
         preempt_in_time = client.wait_for_result(timeout=rospy.Duration(1000))
