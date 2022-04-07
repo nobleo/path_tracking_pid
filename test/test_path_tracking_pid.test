@@ -20,6 +20,11 @@
 
     <node pkg="tf2_ros" type="static_transform_publisher" name="nav_test" args="0.0 0 0 0 0 0 base_link nav_link" />
 
-    <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" />
+    <!-- <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" /> -->
+
+    <node name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py"/>
+
+    <node pkg="rosbag" type="record" name="rosbag_record_diag" args="-a -O /home/cesar/Documents/harvey/ptpid_test.bag"/>
+
 
 </launch>
