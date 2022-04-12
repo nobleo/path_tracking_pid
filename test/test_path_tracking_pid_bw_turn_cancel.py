@@ -84,8 +84,9 @@ class TestPathTrackingPID(unittest.TestCase):
         # Start goal and cancel in between
         reconfigure = ReconfigureClient("/move_base_flex/PathTrackingPID", timeout=5)
         reconfigure.update_configuration({"target_x_vel": speed})
-        reconfigure.update_configuration({"l": 2.0})
-        reconfigure.update_configuration({"Kp_lat": 0.5})
+        reconfigure.update_configuration({"l": 4.0})
+        reconfigure.update_configuration({"la": 2.0})
+        reconfigure.update_configuration({"Kp_lat": 0.25})
         reconfigure.update_configuration({"Ki_lat": 0.00})
         reconfigure.update_configuration({"Kd_lat": 0.0})
         reconfigure.update_configuration({"feedback_lat_tracking_error": True})

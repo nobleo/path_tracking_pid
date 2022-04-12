@@ -18,7 +18,7 @@
     <node  if="$(eval rviz)" name="rviz" pkg="rviz" type="rviz" args="-d $(find path_tracking_pid)/test/test.rviz" />
     <node  if="$(eval reconfigure)" name="reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" />
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="nav_test" args="1.0 0 0 0 0 0 base_link nav_link" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="nav_test" args="-1.0 0 0 0 0 0 base_link nav_link" />
 
     <!-- <test test-name="rostest_bw_curve_cancel" pkg="path_tracking_pid" type="test_path_tracking_pid_bw_turn_cancel.py" time-limit="300.0" /> -->
 
