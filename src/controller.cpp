@@ -374,12 +374,17 @@ Controller::UpdateResult Controller::update(
 
   if (config_.track_base_link) {
     if (config_.feedback_lat_tracking_error) {
+      const auto auxiliary_global_point = getControlPointPose(current_tf, config_.la);
+      const auto auxiliary_control_point =  getControlPointPose(current_goal_, config_.la);
+      const auto error_auxiliary_points = auxiliary_global_point.inverseTimes(auxiliary_control_point);
+
+      // Rotate CP around GP based on error between AGP-ACP
       const auto  gp_rotation = std::clamp(
-         config_.Kp_lat_track_err * controller_state_.tracking_error_lat,
+         config_.Kp_lat_track_err * error_auxiliary_points.getOrigin().y(),
         -config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0,
          config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0);
       path_quat.setEuler(0.0, 0.0, gp_rotation);
-      auto gp_rotation_tf = tf2::Transform(path_quat, tf2::Vector3(0.0, 0.0, 0.0));
+      const auto gp_rotation_tf = tf2::Transform(path_quat, tf2::Vector3(0.0, 0.0, 0.0));
       current_goal_ = current_goal_ * gp_rotation_tf;
     }
     current_goal_ = getControlPointPose(current_goal_, config_.l);
