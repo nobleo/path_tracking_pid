@@ -1,0 +1,12 @@
+Checks: 'boost-*,
+         bugprone-*,
+         cert-*,-cert-err58-cpp,
+         clang-*,-clang-analyzer-core.uninitialized.Assign,
+         concurrency-*,
+         cppcoreguidelines-*,-cppcoreguidelines-pro-type-vararg,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-cppcoreguidelines-avoid-magic-numbers,-cppcoreguidelines-init-variables,
+         misc-*,
+         modernize-*,-modernize-use-trailing-return-type,-modernize-use-nodiscard,
+         performance-*,
+         portability-*,
+         readability-*,-readability-magic-numbers'
+FormatStyle: file

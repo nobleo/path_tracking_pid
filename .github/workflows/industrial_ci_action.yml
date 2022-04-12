@@ -1,0 +1,20 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  industrial_ci:
+    strategy:
+      matrix:
+        env:
+          - {ROS_DISTRO: melodic}
+          - {ROS_DISTRO: noetic, CMAKE_ARGS: '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: 'ros-industrial/industrial_ci@master'
+        env:
+          ROS_DISTRO: ${{ matrix.env.ROS_DISTRO }}
+          CMAKE_ARGS: ${{ matrix.env.CMAKE_ARGS }}
+          VERBOSE_TESTS: true
