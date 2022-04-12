@@ -14,8 +14,10 @@ public:
   explicit Visualization(ros::NodeHandle nh);
 
   void publishControlPoint(const std_msgs::Header & header, const tf2::Transform & pose);
+  void publishAuxiliaryControlPoint(const std_msgs::Header & header, const tf2::Transform & pose);
   void publishAxlePoint(const std_msgs::Header & header, const tf2::Transform & pose);
   void publishGoalPoint(const std_msgs::Header & header, const tf2::Transform & pose);
+  void publishAuxiliaryGoalPoint(const std_msgs::Header & header, const tf2::Transform & pose);
   void publishPlanPoint(const std_msgs::Header & header, const tf2::Transform & pose);
   void publishCollisionObject(
     const std_msgs::Header & header, uint8_t cost, const tf2::Vector3 & point);

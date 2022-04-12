@@ -374,9 +374,9 @@ Controller::UpdateResult Controller::update(
 
   if (config_.track_base_link) {
     if (config_.feedback_lat_tracking_error) {
-      const auto auxiliary_global_point = getControlPointPose(current_tf, config_.la);
-      const auto auxiliary_control_point =  getControlPointPose(current_goal_, config_.la);
-      const auto error_auxiliary_points = auxiliary_global_point.inverseTimes(auxiliary_control_point);
+      auxiliary_global_point_ = getControlPointPose(current_goal_, config_.la);
+      auxiliary_control_point_ =  getControlPointPose(current_tf, config_.la);
+      const auto error_auxiliary_points = auxiliary_control_point_.inverseTimes(auxiliary_global_point_);
 
       // Rotate CP around GP based on error between AGP-ACP
       const auto  gp_rotation = std::clamp(

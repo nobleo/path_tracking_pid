@@ -268,8 +268,8 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
   feedback_msg.progress = update_result.progress;
   feedback_pub_.publish(feedback_msg);
 
+  path_tracking_pid::PidConfig config = pid_controller_.getConfig();
   if (cancel_requested_) {
-    path_tracking_pid::PidConfig config = pid_controller_.getConfig();
     // Copysign here, such that when cancelling while driving backwards, we decelerate to -0.0 and hence
     // the sign propagates correctly
     config.target_x_vel = std::copysign(0.0, config.target_x_vel);
@@ -293,7 +293,12 @@ std::optional<geometry_msgs::Twist> TrackingPidLocalPlanner::computeVelocityComm
     visualization_->publishAxlePoint(header, tfCurPose);
     visualization_->publishControlPoint(header, pid_controller_.getCurrentWithCarrot());
     visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
+    visualization_->publishGoalPoint(header, pid_controller_.getCurrentGoal());
     visualization_->publishPlanPoint(header, pid_controller_.getCurrentPosOnPlan());
+    if (config.track_base_link && config.feedback_lat_tracking_error) {
+      visualization_->publishAuxiliaryGoalPoint(header, pid_controller_.getAuxiliaryGlobalPoint());
+      visualization_->publishAuxiliaryControlPoint(header, pid_controller_.getAuxiliaryControlPoint());
+    }
   }
 
   prev_time_ = now;

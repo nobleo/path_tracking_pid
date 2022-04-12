@@ -161,6 +161,8 @@ public:
   tf2::Transform getCurrentGoal() const { return current_goal_; }
   tf2::Transform getCurrentWithCarrot() const { return current_with_carrot_; }
   tf2::Transform getCurrentPosOnPlan() const { return current_pos_on_plan_; }
+  tf2::Transform getAuxiliaryControlPoint() const { return auxiliary_control_point_; }
+  tf2::Transform getAuxiliaryGlobalPoint() const { return auxiliary_global_point_; }
 
   /** Get current forward velocity. */
   double getCurrentForwardVelocity() const { return controller_state_.current_x_vel; }
@@ -224,7 +226,9 @@ private:
   std::vector<double> distance_to_goal_vector_;    // Vector with distances to goal
   std::vector<double> turning_radius_inv_vector_;  // Vector with computed turning radius inverse
   tf2::Transform current_goal_;
+  tf2::Transform auxiliary_control_point_;
   tf2::Transform current_pos_on_plan_;
+  tf2::Transform auxiliary_global_point_;
   tf2::Transform current_with_carrot_;
 
   // Auxiliary variables

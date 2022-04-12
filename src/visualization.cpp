@@ -27,6 +27,8 @@ const auto green = create_color(0, 1, 0);
 const auto blue = create_color(1, 0, 1);
 const auto yellow = create_color(1, 1, 0);
 const auto orange = create_color(1, 0.5, 0);
+const auto pink = create_color(1, 0.7, 0.7);
+const auto bright_green = create_color(0.5, 1, 0);
 
 std::vector<geometry_msgs::Point> to_msg(std::vector<tf2::Vector3> points)
 {
@@ -50,6 +52,12 @@ void Visualization::publishControlPoint(
   publishSphere(header, "control point", pose, green);
 }
 
+void Visualization::publishAuxiliaryControlPoint(
+  const std_msgs::Header & header, const tf2::Transform & pose)
+{
+  publishSphere(header, "auxiliary control point", pose, bright_green);
+}
+
 void Visualization::publishAxlePoint(const std_msgs::Header & header, const tf2::Transform & pose)
 {
   std_msgs::ColorRGBA color;
@@ -60,6 +68,12 @@ void Visualization::publishGoalPoint(const std_msgs::Header & header, const tf2:
 {
   std_msgs::ColorRGBA color;
   publishSphere(header, "goal point", pose, red);
+}
+
+void Visualization::publishAuxiliaryGoalPoint(const std_msgs::Header & header, const tf2::Transform & pose)
+{
+  std_msgs::ColorRGBA color;
+  publishSphere(header, "auxiliary goal point", pose, pink);
 }
 
 void Visualization::publishPlanPoint(const std_msgs::Header & header, const tf2::Transform & pose)
