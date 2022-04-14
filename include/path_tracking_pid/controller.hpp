@@ -208,6 +208,7 @@ private:
     details::Integral error_integral_ang;
     details::Derivative error_deriv_lat;
     details::Derivative error_deriv_ang;
+    details::Integral error_auxiliary_integral_lat;
   };
 
   geometry_msgs::Twist computeTricycleModelForwardKinematics(double x_vel, double steering_angle);

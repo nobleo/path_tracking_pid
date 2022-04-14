@@ -361,7 +361,9 @@ Controller::UpdateResult Controller::update(
                  global_plan_tf_[path_pose_idx].getOrigin().y(),
                  global_plan_tf_[path_pose_idx].getOrigin().z()));
 
-  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * current_tf.getOrigin());
+
+  auto shifted_nav_link = getControlPointPose(current_tf, -0.7);
+  tf2::Vector3 current_tracking_err = -(path_segmen_tf.inverse() * shifted_nav_link.getOrigin());
 
   // trackin_error here represents the error between tracked link and position on plan
   controller_state_.tracking_error_lat = current_tracking_err.y();
@@ -378,9 +380,14 @@ Controller::UpdateResult Controller::update(
       auxiliary_control_point_ =  getControlPointPose(current_tf, config_.la);
       const auto error_auxiliary_points = auxiliary_control_point_.inverseTimes(auxiliary_global_point_);
 
+
+      auto error_auxiliaty_lat = error_auxiliary_points.getOrigin().y();
+      auto error_auxiliary_integral_lat =
+        controller_state_.error_auxiliary_integral_lat.filter(error_auxiliaty_lat, dt.toSec());
       // Rotate CP around GP based on error between AGP-ACP
       const auto  gp_rotation = std::clamp(
-         config_.Kp_lat_track_err * error_auxiliary_points.getOrigin().y(),
+         config_.Kp_lat_track_err * error_auxiliaty_lat +
+           config_.Ki_lat_track_err * error_auxiliary_integral_lat,
         -config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0,
          config_.max_gp_abs_rot_fb_lat_terr * M_PI / 180.0);
       path_quat.setEuler(0.0, 0.0, gp_rotation);
