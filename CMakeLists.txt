@@ -49,14 +49,16 @@ add_library(${library_name} SHARED
         src/path_tracking_pid_nav2_controller.cpp
         src/controller.cpp)
 
-# # prevent pluginlib from using boost
-# target_compile_definitions(${library_name} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+# prevent pluginlib from using boost
+target_compile_definitions(${library_name} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 ament_target_dependencies(${library_name}
   ${dependencies}
 )
 
-rosidl_target_interfaces(${library_name}  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# rosidl_target_interfaces(${library_name}  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+target_link_libraries(${library_name} "${cpp_typesupport_target}")
 
 install(TARGETS ${library_name}
   ARCHIVE DESTINATION lib

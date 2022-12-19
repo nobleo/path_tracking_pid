@@ -20,7 +20,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/utils.h>
 #include <tf2/convert.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 // Typesafe sign implementation with signum:
 // https://stackoverflow.com/a/4609795
