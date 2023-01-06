@@ -9,7 +9,7 @@
   <author email="cesar.lopez@nobleo.nl">Cesar Lopez</author>
   <author email="michiel.francke@nobleo.nl">Michiel Francke</author>
 
-  <license>TBD</license>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>message_generation</build_depend>
